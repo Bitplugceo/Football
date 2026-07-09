@@ -1,4 +1,3 @@
-A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3500,7 +3499,8 @@ function getDynamicEdgeThreshold(league, marketKey, context = null) {
 
   let key = String(marketKey || "default").toLowerCase();
   if (key === "team_a" || key === "team_b") key = "team";
-  else if (key && key.startsWith("q") && key.length === 2) key = "q";
+  // Remove quarter handling
+  if (key === "q1" || key === "q2" || key === "q3" || key === "q4") key = "ft"; // fallback
   
   let basePct = rules[key] !== undefined ? rules[key] : (rules.default || EDGE_RULES_V1.default);
   let thresholdPct = basePct;
@@ -3917,25 +3917,18 @@ const PICK_RULES = {
   default: { over: 0.050, under: 0.055, underExtra: 0.010, underBlockRatio: 0.82 },
   ft:      { over: 0.050, under: 0.055, underExtra: 0.005, underBlockRatio: 0.82 },
   team:    { over: 0.055, under: 0.060, underExtra: 0.010, underBlockRatio: 0.82 },
-  h1:      { underExtra: 0.005 },
-  h2:      { underExtra: 0.005 }
+  h1:      { underExtra: 0.005 }
 };
 
 function getLeagueUnderBlockRatio(league) {
-  const map = {
-    nba: 0.82, ncaa: 0.75, ncaaw: 0.75, wnba: 0.80, wnba_pre: 0.80,
-    nba_gl: 0.82, euroleague: 0.90, eurocup: 0.88, champions_league: 0.88,
-    acb: 0.87, lba: 0.87, bbl: 0.85, turkey_bsl: 0.86,
-    ausnbl: 0.83, bleague: 0.84, united_league: 0.86, proa: 0.85
-  };
-  return map[String(league || "").toLowerCase()] || 0.82;
+  // Football uses a fixed ratio
+  return 0.82;
 }
 
 
 
 
 const LEAGUE_EDGE_THRESHOLDS = {
-  // Football edge thresholds (goals as % of line)
   premier_league:   { ft: 0.040, h1: 0.045 },
   la_liga:          { ft: 0.040, h1: 0.045 },
   bundesliga:       { ft: 0.045, h1: 0.050 },
@@ -3956,8 +3949,7 @@ const LEAGUE_EDGE_THRESHOLDS = {
 
 // Raw point thresholds (edge = projection - line)
 const LEAGUE_EDGE_POINT_THRESHOLDS = {
-  // Football (soccer): edge thresholds in goals
-  // Typically much smaller than basketball points
+  // Football edge thresholds in goals
   premier_league:      { ft: 0.30, h1: 0.35, team: 0.40 },
   la_liga:             { ft: 0.30, h1: 0.35, team: 0.40 },
   bundesliga:          { ft: 0.35, h1: 0.40, team: 0.45 },
@@ -3989,7 +3981,7 @@ function getLeagueEdgePointThreshold(league, marketKey) {
     const EUROPE_EDGE_LEAGUES = [];
 const ASIA_EDGE_LEAGUES = [];
 
-    const TRAP_RULES = {
+const TRAP_RULES = {
       minEdgePct: 0.015,
       extremeEdgePct: 0.12,
       lowLineUnder: { nba: 205, ncaa: 125 },
@@ -4000,10 +3992,10 @@ const ASIA_EDGE_LEAGUES = [];
       }
     };
 
-            const ANCHOR_RULES = {
-      ft:   { nbaDiff: 18, otherDiff: 25, nbaWeight: MODEL_CONFIG.LINE_ANCHOR_NBA, otherWeight: MODEL_CONFIG.LINE_ANCHOR_OTHER },
-      h1:   { nbaDiff: 9,  otherDiff: 12, nbaWeight: MODEL_CONFIG.LINE_ANCHOR_NBA, otherWeight: MODEL_CONFIG.LINE_ANCHOR_OTHER },
-      team: { nbaDiff: 10, otherDiff: 12, nbaWeight: 0.55, otherWeight: 0.50 }
+const ANCHOR_RULES = {
+      ft:   { nbaDiff: 18, otherDiff: 25, nbaWeight: 0.5, otherWeight: 0.5 },
+      h1:   { nbaDiff: 9,  otherDiff: 12, nbaWeight: 0.5, otherWeight: 0.5 },
+      team: { nbaDiff: 10, otherDiff: 12, nbaWeight: 0.5, otherWeight: 0.5 }
     };
 
 
@@ -4032,83 +4024,10 @@ let LEAGUE_BASES = {
   fiba_wc: 156, fiba_eb: 156, fiba_ac: 154, unknown: 160
 };
 
-const NBA_2026_TEAM_BASELINES = {
-  ATL: { ortg: 116.1, drtg: 113.7, pace: 101.7, total: 234.5 },
-  BOS: { ortg: 120.8, drtg: 112.7, pace: 94.8,  total: 222.1 },
-  BRK: { ortg: 108.7, drtg: 119.0, pace: 97.1,  total: 221.8 },
-  CHO: { ortg: 119.4, drtg: 114.4, pace: 96.8,  total: 227.2 },
-  CHI: { ortg: 113.0, drtg: 118.1, pace: 102.5, total: 237.8 },
-  CLE: { ortg: 119.2, drtg: 115.1, pace: 99.9,  total: 234.9 },
-  DAL: { ortg: 111.2, drtg: 116.5, pace: 101.7, total: 233.7 },
-  DEN: { ortg: 122.6, drtg: 117.4, pace: 98.4,  total: 239.0 },
-  DET: { ortg: 112.3, drtg: 120.1, pace: 101.8, total: 234.9 },
-  GSW: { ortg: 115.0, drtg: 115.6, pace: 99.0,  total: 229.8 },
-  HOU: { ortg: 118.6, drtg: 113.2, pace: 96.1,  total: 225.2 },
-  IND: { ortg: 110.9, drtg: 118.8, pace: 101.0, total: 232.8 },
-  LAC: { ortg: 117.3, drtg: 116.1, pace: 96.5,  total: 226.4 },
-  LAL: { ortg: 118.2, drtg: 116.4, pace: 98.3,  total: 230.9 },
-  MEM: { ortg: 112.9, drtg: 118.8, pace: 101.3, total: 235.4 },
-  MIA: { ortg: 116.7, drtg: 114.5, pace: 103.4, total: 239.4 },
-  MIL: { ortg: 112.9, drtg: 119.3, pace: 97.6,  total: 227.4 },
-  MIN: { ortg: 116.8, drtg: 113.5, pace: 100.5, total: 232.6 },
-  NOP: { ortg: 114.4, drtg: 118.9, pace: 100.3, total: 235.5 },
-  NYK: { ortg: 119.8, drtg: 113.3, pace: 96.8,  total: 226.6 },
-  OKC: { ortg: 119.2, drtg: 111.8, pace: 99.6,  total: 231.0 },
-  ORL: { ortg: 114.9, drtg: 114.3, pace: 100.0, total: 230.8 },
-  PHI: { ortg: 115.4, drtg: 115.5, pace: 99.4,  total: 232.0 },
-  PHO: { ortg: 115.4, drtg: 113.9, pace: 97.2,  total: 223.7 },
-  POR: { ortg: 114.4, drtg: 114.7, pace: 100.5, total: 231.3 },
-  SAC: { ortg: 111.4, drtg: 121.5, pace: 99.2,  total: 232.0 },
-  SAS: { ortg: 114.5, drtg: 117.6, pace: 98.3,  total: 228.8 },
-  TOR: { ortg: 115.9, drtg: 113.0, pace: 98.4,  total: 226.4 },
-  UTA: { ortg: 114.1, drtg: 122.3, pace: 102.3, total: 243.6 },
-  WAS: { ortg: 111.0, drtg: 122.7, pace: 101.4, total: 237.8 }
-};
-
-const _NBA_NAME_TO_ABV = {
-  "atlanta hawks": "ATL", "boston celtics": "BOS", "brooklyn nets": "BRK",
-  "charlotte hornets": "CHO", "chicago bulls": "CHI", "cleveland cavaliers": "CLE",
-  "dallas mavericks": "DAL", "denver nuggets": "DEN", "detroit pistons": "DET",
-  "golden state warriors": "GSW", "houston rockets": "HOU", "indiana pacers": "IND",
-  "los angeles clippers": "LAC", "los angeles lakers": "LAL", "memphis grizzlies": "MEM",
-  "miami heat": "MIA", "milwaukee bucks": "MIL", "minnesota timberwolves": "MIN",
-  "new orleans pelicans": "NOP", "new york knicks": "NYK",
-  "oklahoma city thunder": "OKC", "orlando magic": "ORL",
-  "philadelphia 76ers": "PHI", "phoenix suns": "PHO", "portland trail blazers": "POR",
-  "sacramento kings": "SAC", "san antonio spurs": "SAS",
-  "toronto raptors": "TOR", "utah jazz": "UTA", "washington wizards": "WAS",
-  "hawks": "ATL", "celtics": "BOS", "nets": "BRK", "hornets": "CHO", "bulls": "CHI",
-  "cavaliers": "CLE", "cavs": "CLE", "mavericks": "DAL", "mavs": "DAL",
-  "nuggets": "DEN", "pistons": "DET", "warriors": "GSW", "rockets": "HOU",
-  "pacers": "IND", "clippers": "LAC", "lakers": "LAL", "grizzlies": "MEM",
-  "heat": "MIA", "bucks": "MIL", "timberwolves": "MIN", "wolves": "MIN",
-  "pelicans": "NOP", "knicks": "NYK", "thunder": "OKC", "magic": "ORL",
-  "76ers": "PHI", "sixers": "PHI", "suns": "PHO", "trail blazers": "POR",
-  "blazers": "POR", "kings": "SAC", "spurs": "SAS", "raptors": "TOR",
-  "jazz": "UTA", "wizards": "WAS",
-  "atlanta": "ATL", "boston": "BOS", "brooklyn": "BRK", "charlotte": "CHO",
-  "chicago": "CHI", "cleveland": "CLE", "dallas": "DAL", "denver": "DEN",
-  "detroit": "DET", "golden state": "GSW", "houston": "HOU", "indiana": "IND",
-  "la clippers": "LAC", "la lakers": "LAL", "memphis": "MEM", "miami": "MIA",
-  "milwaukee": "MIL", "minnesota": "MIN", "new orleans": "NOP", "new york": "NYK",
-  "oklahoma city": "OKC", "orlando": "ORL", "philadelphia": "PHI",
-  "phoenix": "PHO", "portland": "POR", "sacramento": "SAC", "san antonio": "SAS",
-  "toronto": "TOR", "utah": "UTA", "washington": "WAS",
-  "atl": "ATL", "bos": "BOS", "brk": "BRK", "cho": "CHO", "chi": "CHI",
-  "cle": "CLE", "dal": "DAL", "den": "DEN", "det": "DET", "gsw": "GSW",
-  "hou": "HOU", "ind": "IND", "lac": "LAC", "lal": "LAL", "mem": "MEM",
-  "mia": "MIA", "mil": "MIL", "min": "MIN", "nop": "NOP", "nyk": "NYK",
-  "okc": "OKC", "orl": "ORL", "phi": "PHI", "pho": "PHO", "por": "POR",
-  "sac": "SAC", "sas": "SAS", "tor": "TOR", "uta": "UTA", "was": "WAS"
-};
-
-function getNBASeasonBaseline(teamName, league) {
-  if (league !== "nba" || !teamName) return null;
-  const key = String(teamName).toLowerCase().trim();
-  const abv = _NBA_NAME_TO_ABV[key] || null;
-  if (!abv) return null;
-  return NBA_2026_TEAM_BASELINES[abv] || null;
-}
+// NBA team baselines removed – football only
+const NBA_2026_TEAM_BASELINES = {};
+const _NBA_NAME_TO_ABV = {};
+function getNBASeasonBaseline(teamName, league) { return null; }
 
 const LEAGUE_PACE_BASES = {
   // Football has no "pace" stat – this is a placeholder for compatibility
@@ -4121,16 +4040,13 @@ const LEAGUE_RATING_BASES = {
   default: 1.0
 };
 
-function getLeagueRecencyDefaults(league) {
-  // FIX #21: LEAGUE_CONFIG_MAP recency weights are all [1,1,1,1,1] placeholders
-  // that are never intended to be used directly. getLeagueRecencyDefaults is the
-  // correct source of truth for recency weights. Always return calibrated defaults
-  // when no learned weights exist, ignoring LEAGUE_CONFIG_MAP entirely.
-  const learned = getLearnedRecencyWeights(league);
-  const isFlat = learned.every(w => w === 1);
-  if (isFlat) return [1.35, 1.20, 1.00, 0.85, 0.70, 0.56, 0.44, 0.33, 0.24, 0.16];
-  return learned;
-}
+    function getLeagueRecencyDefaults(league) {
+      // Football recency defaults remain the same
+      const learned = getLearnedRecencyWeights(league);
+      const isFlat = learned.every(w => w === 1);
+      if (isFlat) return [1.35, 1.20, 1.00, 0.85, 0.70, 0.56, 0.44, 0.33, 0.24, 0.16];
+      return learned;
+    }
 
 const LEAGUE_HOME_EDGE = {
   nba: 0, ncaa: 0, wnba: 0, wnba_pre: 0, nba_gl: 0,
@@ -4140,34 +4056,17 @@ const LEAGUE_HOME_EDGE = {
 };
 
 const LEAGUE_VOL_LIMITS = {
-  // Football goals are low-variance; use a universal volatility limit
   default: 1.2
 };
 
 
 
-const LEAGUE_CONFIG_MAP = {
-  NBA: { recencyWeights:[1,1,1,1,1], volLimit:12, homeEdge:0, sanityMin:160, sanityMax:250, paceClampMin:0.85, paceClampMax:1.15 },
-  NCAA: { recencyWeights:[1,1,1,1,1], volLimit:15, homeEdge:0, sanityMin:120, sanityMax:200, paceClampMin:0.85, paceClampMax:1.15 },
-  NCAAW: { recencyWeights:[1,1,1,1,1], volLimit:15, homeEdge:0, sanityMin:100, sanityMax:175, paceClampMin:0.85, paceClampMax:1.15 },
-  WNBA: { recencyWeights:[1,1,1,1,1], volLimit:13, homeEdge:0, sanityMin:130, sanityMax:200, paceClampMin:0.85, paceClampMax:1.15 },
-  WNBA_PRE: { recencyWeights:[1,1,1,1,1], volLimit:14, homeEdge:0, sanityMin:125, sanityMax:200, paceClampMin:0.85, paceClampMax:1.15 },
-  NBA_GL: { recencyWeights:[1,1,1,1,1], volLimit:13, homeEdge:0, sanityMin:155, sanityMax:245, paceClampMin:0.85, paceClampMax:1.15 },
-  EUROLEAGUE: { recencyWeights:[1,1,1,1,1], volLimit:10, homeEdge:0, sanityMin:130, sanityMax:200, paceClampMin:0.85, paceClampMax:1.15 },
-  EUROCUP: { recencyWeights:[1,1,1,1,1], volLimit:11, homeEdge:0, sanityMin:125, sanityMax:195, paceClampMin:0.85, paceClampMax:1.15 },
-  CHAMPIONS_LEAGUE: { recencyWeights:[1,1,1,1,1], volLimit:11, homeEdge:0, sanityMin:120, sanityMax:195, paceClampMin:0.85, paceClampMax:1.15 },
-  ACB: { recencyWeights:[1,1,1,1,1], volLimit:11, homeEdge:0, sanityMin:130, sanityMax:200, paceClampMin:0.85, paceClampMax:1.15 },
-  LBA: { recencyWeights:[1,1,1,1,1], volLimit:11, homeEdge:0, sanityMin:125, sanityMax:195, paceClampMin:0.85, paceClampMax:1.15 },
-  BBL: { recencyWeights:[1,1,1,1,1], volLimit:12, homeEdge:0, sanityMin:130, sanityMax:205, paceClampMin:0.85, paceClampMax:1.15 },
-  TURKEY_BSL: { recencyWeights:[1,1,1,1,1], volLimit:12, homeEdge:0, sanityMin:130, sanityMax:205, paceClampMin:0.85, paceClampMax:1.15 },
-  AUSNBL: { recencyWeights:[1,1,1,1,1], volLimit:12, homeEdge:0, sanityMin:130, sanityMax:210, paceClampMin:0.85, paceClampMax:1.15 }
-};
+// LEAGUE_CONFIG_MAP removed – football uses simpler configuration
+const LEAGUE_CONFIG_MAP = {};
 
 function getLeagueConfig(league) {
-  const key = String(league || "").toUpperCase();
-  const cfg = LEAGUE_CONFIG_MAP[key];
-  if (cfg) return { scoringBaseline: LEAGUE_BASES[String(league).toLowerCase()] || 160, volatilityLimit: cfg.volLimit, paceBase: LEAGUE_PACE_BASES[String(league).toLowerCase()] || 74, homeEdge: 0 };
-  return { scoringBaseline: 160, volatilityLimit: 12, paceBase: 74, homeEdge: 0 };
+  // Football simplified
+  return { scoringBaseline: 2.6, volatilityLimit: 1.2, paceBase: 1.0, homeEdge: 0 };
 }
 
 
@@ -4246,103 +4145,13 @@ function getLeagueTrustSortRank(level) {
 }
 
 
-const LEAGUE_FETCH_RULES = {
-    nba: {
-    recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  wnba: {
-    recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  wnba_pre: {
-    recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  ncaa: {
-    recentSeasons: 3,
-    scheduleTypes: ["2", "3"],
-    h2hScheduleTypes: ["2", "3"],
-    regulationPeriods: 2
-  },
-  // [CLOSED: ESPN+ EXPANSION — LEAGUE_FETCH_RULES ENTRIES]
-  // ncaaw and nba_gl were missing entirely — fetchScheduleCore and fetchH2HCore returned
-  // null for both leagues, silently blocking all stats and H2H fetch.
-  // ncaaw uses halftime-style (2 regulation periods) like NCAA Men's.
-  // nba_gl uses 4 quarters like NBA. Season types mirror their parent leagues.
-  // DO NOT remove — without these, schedule/H2H fetch returns null for both leagues.
-  ncaaw: {
-    recentSeasons: 3,
-    scheduleTypes: ["2", "3"],
-    h2hScheduleTypes: ["2", "3"],
-    regulationPeriods: 2
-  },
-  nba_gl: {
-    recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  euroleague:      { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  eurocup:         { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  champions_league:{ recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  turkey_bsl:      { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  acb:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  bbl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  ausnbl:          { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  lba:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  bleague:         { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  united_league:   { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  proa:            { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  bcl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  aba:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  isl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  cebl:            { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 }
-};
+// LEAGUE_FETCH_RULES removed – no ESPN auto-fetch for football
+const LEAGUE_FETCH_RULES = {};
 
-    const NBA_TEAM_MAP = {
-      "hawks":1,"atlanta":1,"celtics":2,"boston":2,"nets":17,"brooklyn":17,
-      "hornets":30,"charlotte":30,"bulls":4,"chicago":4,"cavaliers":5,"cavs":5,"cleveland":5,
-      "mavericks":6,"mavs":6,"dallas":6,"nuggets":7,"denver":7,"pistons":8,"detroit":8,
-      "warriors":9,"golden state":9,"gsw":9,"rockets":10,"houston":10,"pacers":11,"indiana":11,
-      "clippers":12,"la clippers":12,"lakers":13,"los angeles lakers":13,"la lakers":13,
-      "grizzlies":29,"memphis":29,"heat":14,"miami":14,"bucks":15,"milwaukee":15,
-      "timberwolves":16,"wolves":16,"minnesota":16,"pelicans":3,"new orleans":3,
-      "knicks":18,"new york":18,"thunder":25,"okc":25,"oklahoma city":25,"magic":19,"orlando":19,
-      "76ers":20,"sixers":20,"philadelphia":20,"suns":21,"phoenix":21,
-      "trail blazers":22,"trailblazers":22,"blazers":22,"portland":22,
-      "kings":23,"sacramento":23,"spurs":24,"san antonio":24,"raptors":28,"toronto":28,
-      "jazz":26,"utah":26,"wizards":27,"washington":27
-    };
-
-    const NCAA_TEAM_MAP = {
-      "duke":150,"kentucky":96,"kansas":2305,"unc":153,"north carolina":153,"uconn":41,"connecticut":41,
-      "arizona":12,"gonzaga":2250,"purdue":2509,"ucla":26,"houston":248,"baylor":239,"tennessee":2633,
-      "alabama":333,"auburn":2,"michigan state":127,"wisconsin":275,"illinois":356,"texas":251,
-      "arkansas":8,"memphis":235,"florida":57,"virginia":258,"villanova":222,"marquette":269,
-      "creighton":156,"xavier":2752,"saint marys":2608,"st marys":2608,"san diego state":21,
-      "new mexico":167,"dayton":2168,"byu":252,"iowa state":66,"texas tech":2641,"texas a&m":245,
-      "texas a and m":245,"missouri":142,"indiana":84,"ohio state":194,"michigan":130,"usc":30,"oregon":2483,
-      "nevada":4,"boise state":68,"colorado state":36,"utah state":328,"providence":2507,"seton hall":2550,
-      "st johns":2599,"saint johns":2599,"wake forest":154,"clemson":228,"florida atlantic":2226,
-      "fau":2226,"miami":2390,"texas christian":2628,"tcu":2628,"nc state":152,"north carolina state":152,
-      "louisville":97,"syracuse":183,"notre dame":87,"georgetown":46,"georgia":61,"ole miss":145,
-      "mississippi state":344,"lsu":99,"vanderbilt":238,"butler":2086,"belmont":2057,"drake":2181,
-      "oregon state":204,"washington":264,"washington state":265
-    };
-
-    const WNBA_TEAM_MAP = {
-      "aces":18,"las vegas":18,"liberty":10,"new york":10,"sun":15,"connecticut":15,
-      "lynx":16,"minnesota":16,"storm":14,"seattle":14,"mercury":11,"phoenix":11,
-      "fever":13,"indiana":13,"dream":19,"atlanta":19,"sky":17,"chicago":17,
-      "wings":6,"dallas":6,"mystics":20,"washington":20,"sparks":12,"los angeles":12
-    };
+// Basketball team maps removed – football only
+const NBA_TEAM_MAP = {};
+const NCAA_TEAM_MAP = {};
+const WNBA_TEAM_MAP = {};
 
     const _schedCache = new Map();
     const _summaryCache = new Map();
@@ -8014,12 +7823,10 @@ function renderTrackedPicks() {
       if (aGame < bGame) return -1;
       if (aGame > bGame) return 1;
 
-      const mktOrderMap = {
+    const mktOrderMap = {
         "ft": 1, "h1": 2,
-        "q1": 3, "q2": 4, "q3": 5, "q4": 6,
-        "q1_team_a": 7, "q1_team_b": 8,
-        "h1_team_a": 9, "h1_team_b": 10,
-        "team_a": 11, "team_b": 12
+        "h1_team_a": 3, "h1_team_b": 4,
+        "team_a": 5, "team_b": 6
       };
       return (mktOrderMap[a.marketKey] || 99) - (mktOrderMap[b.marketKey] || 99);
     })
@@ -8034,8 +7841,8 @@ function renderTrackedPicks() {
 
   summaryEl.textContent = `${displayPicks.length} live/recent • ${pendingCount} pending • ${stats.wins} wins • ${stats.losses} losses`;
 
-  const marketLabels = { ft: "FT", h1: "1H", q1: "Q1", q2: "Q2", q3: "Q3", q4: "Q4", team_a: "Team A", team_b: "Team B" };
-  const chips = ["ft", "h1", "q1", "q2", "q3", "q4", "team_a", "team_b"].map(key => {
+    const marketLabels = { ft: "FT", h1: "1H", team_a: "Team A", team_b: "Team B" };
+    const chips = ["ft", "h1", "team_a", "team_b"].map(key => {
     const pending = active.filter(p => p.marketKey === key && String(p.resultStatus || "pending").toLowerCase() === "pending").length;
     return pending ? `<div class="tracker-market-chip">${marketLabels[key]} ${pending}</div>` : "";
   }).filter(Boolean);
@@ -9563,13 +9370,8 @@ function applySoftTrackerInfluenceToPicks(picks, fixtureMeta, phase2Activation =
     };
   });
 }
-// [CLOSED: ESPN+ EXPANSION] Extended to all 5 ESPN auto-fetch leagues.
-// ncaaw → womens-college-basketball. nba_gl → nba-g-league.
-// Powers live polling, settlement, and tracker for the two new leagues.
-// DO NOT add leagues whose ESPN endpoints are unreliable or inconsistently structured.
 function getTrackedLeagueBase(league) {
-  // Football has no ESPN auto-fetch – manual SofaScore only
-  // Return empty string to disable auto-fetch
+  // Football – no ESPN auto-fetch; manual SofaScore only
   return "";
 }
 
@@ -10567,10 +10369,8 @@ function validateLines(league, ftLine, h1Line, aLine, bLine) {
 }
 
     function validateLinesFromExtracted(league, lines = {}) {
-  // FIX #34: h2Line param removed from validateLines — it was already always passed
-  // as null here and never read inside that function's body.
-  return validateLines(league, lines.ftLine, lines.h1Line, lines.aLine, lines.bLine);
-}
+      return validateLines(league, lines.ftLine, lines.h1Line, lines.aLine, lines.bLine);
+    }
 
 // Helper: get overall 10-game scored series for a team side
 function getOverallSeries(side, limit) {
@@ -10907,11 +10707,11 @@ function formatPctIntel(value) {
   return Math.round(value) + "%";
 }
 
-function getIntelTeamBase(league, marketKey = "ft") {
-  const totalBase = LEAGUE_BASES[league] || LEAGUE_BASES.unknown;
-  if (marketKey === "h1" || marketKey === "h2") return totalBase / 4;
-  return totalBase / 2;
-}
+    function getIntelTeamBase(league, marketKey = "ft") {
+      const totalBase = LEAGUE_BASES[league] || LEAGUE_BASES.unknown;
+      if (marketKey === "h1") return totalBase / 2;
+      return totalBase / 2;
+    }
 
 function buildLooseParsedState() {
   return {
@@ -10996,22 +10796,13 @@ function applyIntelligenceLayerToPicks(picks, intelligencePack, league) {
 }
 
 const FIELD_GROUPS = {
-  markets: ["ftMarket", "h1Market", "teamAMarket", "teamBMarket", "q1Market", "q2Market", "q3Market", "q4Market"],
-
+  markets: ["ftMarket", "h1Market", "teamAMarket", "teamBMarket"],
   teamAOverall: ["aFTScored", "a1HScored"],
-
   teamBOverall: ["bFTScored", "b1HScored"],
-
-  h2h: ["aFTH2H", "bFTH2H", "a1HH2H", "b1HH2H", "aQ1H2H", "bQ1H2H", "aQ2H2H", "bQ2H2H", "aQ3H2H", "bQ3H2H", "aQ4H2H", "bQ4H2H"],
-
+  h2h: ["aFTH2H", "bFTH2H", "a1HH2H", "b1HH2H"],
   autoTags: ["aAutoTag", "bAutoTag", "h2hAutoTag"],
-
   periodInputs: [
-    "a1HScored","a1HAllowed","b1HScored","b1HAllowed","a1HH2H","b1HH2H","h1Market",
-    "aQ1Scored","aQ1Allowed","bQ1Scored","bQ1Allowed","aQ1H2H","bQ1H2H","q1Market",
-    "aQ2Scored","aQ2Allowed","bQ2Scored","bQ2Allowed","aQ2H2H","bQ2H2H","q2Market",
-    "aQ3Scored","aQ3Allowed","bQ3Scored","bQ3Allowed","aQ3H2H","bQ3H2H","q3Market",
-    "aQ4Scored","aQ4Allowed","bQ4Scored","bQ4Allowed","aQ4H2H","bQ4H2H","q4Market"
+    "a1HScored","a1HAllowed","b1HScored","b1HAllowed","a1HH2H","b1HH2H","h1Market"
   ]
 };
 
@@ -11223,68 +11014,22 @@ if (!league) {
 
     // [ESPN+ EXPANSION] Inner resolver — mirrors getTrackedLeagueBase. Both must stay in sync.
     function getLeagueBase(league) {
-      const l = String(league || "").toLowerCase();
-      const _BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/";
-      const _SLUG_MAP = {
-        nba: "nba", wnba: "wnba", wnba_pre: "wnba",
-        ncaa: "mens-college-basketball", ncaaw: "womens-college-basketball",
-        nba_gl: "nba-g-league",
-        euroleague: "euroleague", eurocup: "eurocup",
-        champions_league: "basketball-champions-league",
-        turkey_bsl: "turkish-bsl", acb: "spanish-liga-acb",
-        bbl: "german-bbl", ausnbl: "australian-nbl",
-        lba: "italian-lba", bleague: "japan-b-league",
-        united_league: "vtb-united-league", proa: "french-pro-a",
-        bcl: "greek-basket-league", aba: "adriatic-basketball-association",
-        isl: "israel-super-league", cebl: "cebl"
-      };
-      return _SLUG_MAP[l] ? _BASE + _SLUG_MAP[l] : "";
+      // Football has no ESPN base – return empty
+      return "";
     }
 
-function getCurrentSeasonYear(league) {
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth(); // Jan=0, Oct=9
-
-  // Football: most leagues are Aug–May, so if before Aug, we're in previous season
-  if (month < 8) return year - 1;
-  return year;
-}
+    function getCurrentSeasonYear(league) {
+      // Football: most leagues run Aug–May; if before August, we're in previous season
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = now.getUTCMonth();
+      if (month < 8) return year - 1;
+      return year;
+    }
 
     async function fetchLeagueTeamCatalog(league) {
-      const base = getLeagueBase(league);
-      if (!base) return [];
-      if (_teamCatalogCache.has(league)) return _teamCatalogCache.get(league);
-
-      const promise = (async () => {
-        const data = await proxyFetch(base + "/teams?limit=500");
-        const leagues = data?.sports?.[0]?.leagues || [];
-        let teams = [];
-        for (const lg of leagues) teams = teams.concat(lg?.teams || []);
-        if (!teams.length) teams = data?.teams || [];
-
-        const seen = new Set();
-        const out = [];
-        for (const item of teams) {
-          const t = item.team || item;
-          const id = String(t?.id || "");
-          const name = t?.displayName || t?.shortDisplayName || t?.name || "";
-          if (!id || !name) continue;
-          const key = id + "::" + normalizeTeamName(name);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          out.push({ id, name });
-        }
-        out.sort((a, b) => a.name.localeCompare(b.name));
-        return out;
-      })().catch(err => {
-        _teamCatalogCache.delete(league);
-        logDebug("fetchLeagueTeamCatalog failed", err);
-        return [];
-      });
-
-      cacheSet(_teamCatalogCache, league, promise);
-      return promise;
+      // Football – no team catalog
+      return [];
     }
 
     function highlight(name, query) {
@@ -11344,38 +11089,7 @@ updateIntelligencePack();
 }
 
     function lookupTeamId(name, leagueHint) {
-      const n = normalizeTeamName(name);
-      if (leagueHint === "nba") {
-        if (NBA_TEAM_MAP[n] !== undefined) return NBA_TEAM_MAP[n];
-        let bestKey = null, bestLen = 0;
-        for (const key of Object.keys(NBA_TEAM_MAP)) {
-          if (n.includes(key) && key.length > bestLen) { bestKey = key; bestLen = key.length; }
-        }
-        if (bestKey) return NBA_TEAM_MAP[bestKey];
-        if (n.length >= 3) {
-          bestKey = null; bestLen = 0;
-          for (const key of Object.keys(NBA_TEAM_MAP)) {
-            if (key.includes(n) && key.length > bestLen) { bestKey = key; bestLen = key.length; }
-          }
-          if (bestKey) return NBA_TEAM_MAP[bestKey];
-        }
-      }
-      if (leagueHint === "wnba" || leagueHint === "wnba_pre") {
-        if (WNBA_TEAM_MAP[n] !== undefined) return WNBA_TEAM_MAP[n];
-        let bestKey = null, bestLen = 0;
-        for (const key of Object.keys(WNBA_TEAM_MAP)) {
-          if (n.includes(key) && key.length > bestLen) { bestKey = key; bestLen = key.length; }
-        }
-        if (bestKey) return WNBA_TEAM_MAP[bestKey];
-      }
-      if (leagueHint === "ncaa") {
-        if (NCAA_TEAM_MAP[n] !== undefined) return NCAA_TEAM_MAP[n];
-        let bestKey = null, bestLen = 0;
-        for (const key of Object.keys(NCAA_TEAM_MAP)) {
-          if (n.includes(key) && key.length > bestLen) { bestKey = key; bestLen = key.length; }
-        }
-        if (bestKey) return NCAA_TEAM_MAP[bestKey];
-      }
+      // Football has no hardcoded team IDs – always return null
       return null;
     }
 
@@ -11517,167 +11231,18 @@ btn.addEventListener("click", () => { section.classList.toggle("collapsed"); });
     }
 
     function validateTeamId(id, league) {
-      if (!id) return false;
-      const n = parseInt(id, 10);
-      if (isNaN(n)) return false;
-      if (league === "nba") return n >= 1 && n <= 30;
-      if (league === "ncaa") return n >= 2;
-      return n > 0;
+      // Football – no team ID validation needed
+      return false;
     }
 
     async function searchTeamFromAPI(base, name, league) {
-      const n = normalizeTeamName(name);
-      try {
-        const data = await proxyFetch(base + "/teams?limit=500");
-        const leagues = data?.sports?.[0]?.leagues || [];
-        let teams = [];
-        for (const l of leagues) teams = teams.concat(l?.teams || []);
-        if (!teams.length) teams = data?.teams || [];
-
-        const words = n.split(/\s+/).filter(w => w.length >= 3);
-        let best = null, bestScore = 0;
-
-        for (const t of teams) {
-          const team = t.team || t;
-          const displayName = normalizeTeamName(team.displayName || "");
-          const shortName = normalizeTeamName(team.shortDisplayName || "");
-          const nickname = normalizeTeamName(team.nickname || "");
-          const location = normalizeTeamName(team.location || "");
-          const abbrev = normalizeTeamName(team.abbreviation || "");
-
-          if (displayName === n || shortName === n) return String(team.id);
-
-          let score = 0;
-          if (displayName.includes(n) || n.includes(displayName)) score += 4;
-          if (shortName.includes(n) || n.includes(shortName)) score += 4;
-          if (nickname && (nickname === n || n.includes(nickname))) score += 2;
-          if (location && n.includes(location)) score += 2;
-          if (abbrev && abbrev === n) score += 2;
-          score += words.filter(w => displayName.includes(w) || shortName.includes(w)).length;
-          if (score > bestScore) { bestScore = score; best = String(team.id); }
-        }
-        if (best && bestScore >= 3 && validateTeamId(best, league)) return best;
-      } catch (e) {
-        logDebug("searchTeamFromAPI teams failed", e);
-      }
-
-      try {
-        const catalog = await fetchLeagueTeamCatalog(league);
-        const catalogMap = new Map(catalog.map(t => [String(t.id), normalizeTeamName(t.name)]));
-        const data = await proxyFetch(
-          "https://site.api.espn.com/apis/common/v3/search?query=" +
-          encodeURIComponent(name) + "&limit=10&type=team&sport=basketball"
-        );
-
-        let bestId = null, bestScore = 0;
-        for (const r of (data?.items || data?.results || [])) {
-          const uid = r?.uid || r?.team?.uid || "";
-          const mUid = uid.match(/t:(\d+)/);
-          const id = mUid ? mUid[1] : (r?.id || r?.team?.id ? String(r?.id || r?.team?.id) : null);
-          if (!id || !catalogMap.has(String(id))) continue;
-
-          const resultName = normalizeTeamName(r?.displayName || r?.team?.displayName || r?.name || "");
-          const catalogName = catalogMap.get(String(id)) || "";
-          let score = 0;
-          if (resultName === n || catalogName === n) score += 6;
-          else {
-            if (resultName && (resultName.includes(n) || n.includes(resultName))) score += 2;
-            if (catalogName && (catalogName.includes(n) || n.includes(catalogName))) score += 4;
-          }
-          if (score > bestScore) { bestScore = score; bestId = id; }
-        }
-        return bestId && bestScore >= 2 && validateTeamId(bestId, league) ? bestId : null;
-      } catch (e) {
-        logDebug("searchTeamFromAPI common failed", e);
-        return null;
-      }
+      // Football – no team search needed
+      return null;
     }
 
-    async function fetchInjuryMeta(base, teamId, teamAvgScored, league) {
-  const result = {
-    scoringMult: 1,
-    notes: [],
-    outCount: 0,
-    dtdCount: 0,
-    unknownImpactCount: 0,
-    hasUnknownImpact: false,
-    highUncertainty: false
-  };
-
-  try {
-    const data = await proxyFetch(`${base}/teams/${teamId}/injuries`).catch(() => null);
-    const items = data?.injuries || data?.items || [];
-    if (!items.length) return result;
-
-    const avgPPG = (isFinite(teamAvgScored) && teamAvgScored > 0) ? teamAvgScored : 80;
-    let totalReduction = 0;
-
-    for (const inj of items) {
-      const status = (inj?.status || inj?.type?.description || "").toLowerCase();
-      const isOut = status.includes("out") || status.includes("injured reserve") || status.includes("suspended");
-      const isDTD = status.includes("questionable") || status.includes("doubtful") || status.includes("day-to-day");
-      if (!isOut && !isDTD) continue;
-
-      const athlete = inj?.athlete || inj?.person || {};
-      const playerName = athlete?.displayName || athlete?.fullName || "Unknown";
-      const tag = isOut ? "OUT" : "DTD";
-
-      if (isOut) result.outCount++;
-      if (isDTD) result.dtdCount++;
-
-      let ppg = 0;
-
-      for (const cat of (athlete?.statistics?.splits?.categories || [])) {
-        for (const stat of (cat.stats || [])) {
-          if (stat.name === "avgPoints" || stat.abbreviation === "PPG") {
-            ppg = parseFloat(stat.value) || 0;
-          }
-        }
-      }
-
-      if (ppg <= 0) {
-        result.unknownImpactCount++;
-        const unknownPenalty = isOut ? 0.02 : 0.01; 
-        totalReduction += unknownPenalty;
-        result.notes.push({
-          type: isOut ? "out" : "dtd",
-          text: `${playerName} — ${tag} (impact unknown) → -${(unknownPenalty * 100).toFixed(1)}%`
-        });
-        continue;
-      }
-
-      const share = ppg / avgPPG;
-      const impact = Math.min(isOut ? share * 0.65 : share * 0.30, 0.22);
-      totalReduction += impact;
-
-      result.notes.push({
-        type: isOut ? "out" : "dtd",
-        text: `${playerName} (${ppg.toFixed(1)} ppg) — ${tag} → -${(impact * 100).toFixed(1)}% offense`
-      });
-    }
-
-    const maxInjCap = league === "nba" ? 0.25 : 0.20;
-    result.scoringMult = 1 - Math.min(totalReduction, maxInjCap);
-    result.hasUnknownImpact = result.unknownImpactCount > 0;
-
-    result.highUncertainty =
-      result.dtdCount >= 2 ||
-      result.unknownImpactCount >= 2 ||
-      (result.dtdCount >= 1 && result.hasUnknownImpact) ||
-      result.outCount >= 3;
-
-    if (result.hasUnknownImpact) {
-      result.notes.push({ type: "meta", text: "Injury caution: some player scoring data unavailable" });
-    }
-
-    if (result.highUncertainty) {
-      result.notes.push({ type: "meta", text: "High injury uncertainty" });
-    }
-  } catch (e) {
-    logDebug("fetchInjuryMeta failed", e);
-  }
-
-  return result;
+// fetchInjuryMeta permanently removed – football injuries not supported
+async function fetchInjuryMeta(base, teamId, teamAvgScored, league) {
+  return { scoringMult: 1, notes: [], outCount: 0, dtdCount: 0, unknownImpactCount: 0, hasUnknownImpact: false, highUncertainty: false };
 }
 
 
@@ -11698,462 +11263,14 @@ btn.addEventListener("click", () => { section.classList.toggle("collapsed"); });
 
     // V3 + V6 + V7: shared fetch core using LEAGUE_FETCH_RULES
 
+// fetchScheduleCore permanently removed – football uses manual SofaScore only
 async function fetchScheduleCore(base, teamId, leagueKey, requiredVenue, allowFallback = true) {
-  const rules = LEAGUE_FETCH_RULES[leagueKey];
-  if (!rules) return null;
-
-  const tId = String(teamId);
-  const gameRefs = [];
-  const currentSeason = getCurrentSeasonYear(leagueKey);
-
-  const _schedJobList = [];
-  const _schedMeta = [];
-  for (let i = 0; i < rules.recentSeasons; i++) {
-    const season = String(currentSeason - i);
-    for (const stype of rules.scheduleTypes) {
-      const key = `${base}:sched:${teamId}:${season}:${stype}`;
-      const req = _schedCache.has(key)
-        ? _schedCache.get(key)
-        : (() => {
-            const p = proxyFetch(`${base}/teams/${teamId}/schedule?season=${season}&seasontype=${stype}`).catch(err => {
-              _schedCache.delete(key);
-              throw err;
-            });
-            cacheSet(_schedCache, key, p);
-            return p;
-          })();
-      _schedJobList.push(req);
-      _schedMeta.push({ season, stype });
-    }
-  }
-  const _schedPayloads = await Promise.allSettled(_schedJobList);
-  _schedPayloads.forEach((result, _schedIdx) => {
-    if (result.status !== 'fulfilled') {
-      const _schedFailMeta = _schedMeta[_schedIdx] || {};
-      engineDebug("fetchScheduleCore schedule fetch failed for teamId=" + teamId, { season: _schedFailMeta.season, seasontype: _schedFailMeta.stype, reason: result.reason?.message || String(result.reason) });
-      return;
-    }
-    const r = result.value;
-    const events = r?.events || r?.team?.schedule?.events || [];
-    for (const ev of events) {
-      if (!ev?.id) continue;
-
-      const comp = ev?.competitions?.[0];
-      if (!comp) continue;
-
-      const done =
-        comp?.status?.type?.completed ||
-        comp?.status?.type?.name === "STATUS_FINAL" ||
-        comp?.status?.type?.state === "post";
-
-      if (!done || (comp?.competitors || []).length < 2) continue;
-
-      const competitors = comp.competitors;
-      const mine = competitors.find(x => matchesTeam(x, tId)) || competitors[0];
-      const opp = competitors.find(x => !matchesTeam(x, tId)) || competitors[1];
-      const ps = s => typeof s === "object" ? parseFloat(s.value ?? s.displayValue ?? 0) : parseFloat(s);
-
-      // [CLOSED: FIX 23 — SOS] oppId captured for opponent win% cross-reference at return time.
-      // DO NOT remove oppId — it is the key used to look up opponent records in standings cache.
-      gameRefs.push({
-        id: String(ev.id),
-        date: ev.date || "",
-        rawS: ps(mine?.score),
-        rawA: ps(opp?.score),
-        venue: mine?.homeAway || "",
-        oppId: String(opp?.team?.id || "")
-      });
-    }
-  });
-
-  if (!gameRefs.length) return null;
-
-  const seen = new Set();
-  const unique = gameRefs
-    .filter(g => {
-      if (seen.has(g.id)) return false;
-      seen.add(g.id);
-      return true;
-    })
-    .sort((a, b) => {
-      const da = a.date ? new Date(a.date).getTime() : 0;
-      const db = b.date ? new Date(b.date).getTime() : 0;
-      return db - da;
-    });
-
-  const strictFiltered = requiredVenue ? unique.filter(g => g.venue === requiredVenue) : unique;
-  const venueReliable = strictFiltered.length >= 2;
-  const usedVenueFallback = !!requiredVenue && !venueReliable && unique.length >= 2 && allowFallback;
-  const chosen = venueReliable ? strictFiltered : (allowFallback ? unique : strictFiltered);
-
-  if (chosen.length < 2) return null;
-
-  const scored10 = [];
-  const allowed10 = [];
-  const h1Scored10 = [];
-  const h1Allowed10 = [];
-  // FIX #34 / 2H REMOVAL: h2Scored10/h2Allowed10 and all second-half ("2H") aggregation
-  // permanently removed. The 2H market was never wired to a projection or pick (see FIX #33
-  // HTML notes), so none of this data was ever consumed downstream.
-  const qS = { q1:[], q2:[], q3:[], q4:[] };
-  const qA = { q1:[], q2:[], q3:[], q4:[] };
-
-    // Issue 17 fix: raised from 5 to 10. The sample-tier ladder, venue blend, and
-    // ORTG/DRTG/pace all assume up to 10 games of real per-game detail — capping the
-    // summary fetch at 5 silently starved all of them. This roughly doubles summary
-    // API calls per run (up to 10 per team instead of 5) — watch for slower runs or
-    // more frequent proxy/rate-limit failures on the free CORS proxies.
-    const _chosenForSummary = chosen.slice(0, Math.min(chosen.length, 10));
-    const summaries = await Promise.all(_chosenForSummary.map(async ref => {
-      let ms = ref.rawS;
-      let os = ref.rawA;
-      let h1m = 0, h1o = 0;
-      let gotLS = false;
-      let advanced = null;
-
-      try {
-    const key = `${base}:sum:${ref.id}`;
-    const data = await (_summaryCache.has(key)
-      ? _summaryCache.get(key)
-      : (() => {
-          const p = proxyFetch(`${base}/summary?event=${ref.id}`).catch(err => {
-            _summaryCache.delete(key);
-            throw err;
-          });
-          cacheSet(_summaryCache, key, p);
-          return p;
-        })());
-
-    const hc = data?.header?.competitions?.[0];
-    const boxscore = data?.boxscore;
-
-    if (hc) {
-      const competitors = hc?.competitors || [];
-      const mine = competitors.find(c => matchesTeam(c, tId));
-      const opp = competitors.find(c => !matchesTeam(c, tId));
-
-      if (mine && opp) {
-        gotLS = true;
-        ms = parseFloat(mine.score) || ms;
-        os = parseFloat(opp.score) || os;
-
-        const lm = mine?.linescores || [];
-        const lo = opp?.linescores || [];
-
-        if (lm.length >= 1 && lo.length >= 1) {
-          if (rules.regulationPeriods >= 4) {
-            h1m = (readVal(lm[0]) || 0) + (readVal(lm[1]) || 0);
-            h1o = (readVal(lo[0]) || 0) + (readVal(lo[1]) || 0);
-            if (lm.length >= 4 && lo.length >= 4) {
-              const _qm = [readVal(lm[0]), readVal(lm[1]), readVal(lm[2]), readVal(lm[3])];
-              const _qo = [readVal(lo[0]), readVal(lo[1]), readVal(lo[2]), readVal(lo[3])];
-              if (_qm.every(v => v > 0) && _qo.every(v => v > 0)) {
-                ref.qs = { m: _qm, o: _qo };
-              }
-            }
-          } else {
-            [h1m, h1o] = extractFirstHalf(lm, lo);
-          }
-          [ms, os] = stripOTFromScores(ms, os, lm, lo, rules.regulationPeriods);
-        }
-
-        if (boxscore && typeof boxscore === 'object') {
-          let sMap = {};
-          const safeTeams = Array.isArray(boxscore.teams) ? boxscore.teams : [];
-          const myBox = safeTeams.find(t => matchesTeam(t, tId));
-          
-          if (myBox && Array.isArray(myBox.statistics) && myBox.statistics.length > 0) {
-            myBox.statistics.forEach(s => { sMap[s.name] = s.displayValue; });
-          } else if (Array.isArray(boxscore.players)) {
-            const safePlayers = boxscore.players || [];
-            const myPlayers = safePlayers.find(p => matchesTeam(p, tId));
-            if (myPlayers && Array.isArray(myPlayers.statistics) && myPlayers.statistics[0] && Array.isArray(myPlayers.statistics[0].athletes)) {
-              let fga = 0, fta = 0, orb = 0, tov = 0;
-              const keys = myPlayers.statistics[0].names || [];
-              const iFga = keys.indexOf("FGA");
-              const iFta = keys.indexOf("FTA");
-              const iOrb = keys.indexOf("OREB");
-              const iTov = keys.indexOf("TO");
-              
-              myPlayers.statistics[0].athletes.forEach(ath => {
-                const st = ath.stats || [];
-                if (iFga >= 0) fga += parseFloat(st[iFga]) || 0;
-                if (iFta >= 0) fta += parseFloat(st[iFta]) || 0;
-                if (iOrb >= 0) orb += parseFloat(st[iOrb]) || 0;
-                if (iTov >= 0) tov += parseFloat(st[iTov]) || 0;
-              });
-              sMap = { fieldGoals: fga, freeThrows: fta, offensiveRebounds: orb, turnovers: tov };
-            }
-          }
-          
-          if (Object.keys(sMap).length > 0) {
-            const gameMinutes = leagueKey === "nba" ? 48 : 40;
-            const advResult = calculateAdvancedMetrics(sMap, ms, os, gameMinutes);
-            if (advResult) {
-              advanced = advResult;
-              trackerDebug(`Level 2 Stats Extracted: ${ref.id}`, advanced);
-            }
-          }
-        }
-      }
-    }
-  } catch (e) {
-    logDebug("fetchScheduleCore summary failed", e);
-  }
-
-  if (isNaN(ms) || isNaN(os) || ms <= 0 || os <= 0) return null;
-
-  return {
-    ms: Math.round(ms),
-    os: Math.round(os),
-    h1m: gotLS && h1m > 0 ? Math.round(h1m) : null,
-    h1o: gotLS && h1o > 0 ? Math.round(h1o) : null,
-    qs: ref.qs,
-    advanced: advanced
-  };
-}));
-
-
-  summaries.filter(Boolean).forEach(game => {
-    scored10.push(game.ms);
-    allowed10.push(game.os);
-
-    if (game.h1m !== null && game.h1o !== null) {
-      h1Scored10.push(game.h1m);
-      h1Allowed10.push(game.h1o);
-    }
-
-    // 2H REMOVAL: second-half aggregation permanently removed — see comment above.
-    if (game.qs) {
-      qS.q1.push(game.qs.m[0]); qS.q2.push(game.qs.m[1]); qS.q3.push(game.qs.m[2]); qS.q4.push(game.qs.m[3]);
-      qA.q1.push(game.qs.o[0]); qA.q2.push(game.qs.o[1]); qA.q3.push(game.qs.o[2]); qA.q4.push(game.qs.o[3]);
-    }
-  });
-
-    return scored10.length >= 2 
-? { 
-scored: scored10.slice(0, 10), 
-allowed: allowed10.slice(0, 10), 
-        h1Scored: h1Scored10.slice(0, 10), 
-h1Allowed: h1Allowed10.slice(0, 10), 
-q1Scored: qS.q1.slice(0, 10), q2Scored: qS.q2.slice(0, 10), q3Scored: qS.q3.slice(0, 10), q4Scored: qS.q4.slice(0, 10), 
-q1Allowed: qA.q1.slice(0, 10), q2Allowed: qA.q2.slice(0, 10), q3Allowed: qA.q3.slice(0, 10), q4Allowed: qA.q4.slice(0, 10), 
-        ortg10: summaries.filter(s => s && s.advanced).map(s => s.advanced.ortg),
-        drtg10: summaries.filter(s => s && s.advanced).map(s => s.advanced.drtg),
-        pace10: summaries.filter(s => s && s.advanced).map(s => s.advanced.pace),
-        scored10,
-        allowed10,
-        h1Scored10,
-        h1Allowed10,
-        lastGameDate: unique[0]?.date || null,
-        venueReliable,
-        usedVenueFallback,
-        // 2H REMOVAL: h2VenueReliable permanently removed. It referenced h2Scored10/
-        // h2Allowed10 arrays that no longer exist (see FIX #34 above), which threw
-        // "Can't find variable: h2Scored10" on every fetch. The 2H market was never
-        // wired to a projection or pick, so this field is not needed by anything.
-        // [CLOSED: FIX 23 — SOS] Schedule strength: average opponent win% from standings cache.
-        // Null when standings cache is empty (manual leagues, first load before prefetch completes).
-        // High SOS (> 0.55) → team performed vs tough opponents → results are trustworthy.
-        // Low SOS (< 0.45) → easy schedule → scoring numbers may be inflated.
-        // DO NOT remove — feeds sosLayer in the convergence engine.
-        sos: (() => {
-          const cache = window._espnStandingsCache?.[leagueKey]?.data;
-          if (!cache) return null;
-          const oppPcts = unique.slice(0, 10).map(g => cache[g.oppId]?.pct).filter(v => isFinite(v) && v > 0);
-          if (oppPcts.length < 3) return null;
-          return parseFloat((oppPcts.reduce((a, b) => a + b, 0) / oppPcts.length).toFixed(3));
-        })()
-      }
-    : null;
-
-
+  return null;
 }
 
+// fetchH2HCore permanently removed – football uses manual SofaScore only
 async function fetchH2HCore(base, teamAId, teamBId, leagueKey) {
-  const rules = LEAGUE_FETCH_RULES[leagueKey];
-  if (!rules) return [];
-
-  const tA = String(teamAId);
-  const tB = String(teamBId);
-  const currentSeason = getCurrentSeasonYear(leagueKey);
-
-  // [CLOSED: FIX 6/15 — H2H WINDOW EXTENDED] Lookback expanded from 2 → 4 seasons (~2022+).
-  // Year-based decay weights applied at consumption time: current=1.0, -1=0.75, -2=0.50, -3=0.30.
-  // Old games inform but never dominate — decay handles staleness, not exclusion.
-  // Game cap stays at 10 (enforced by slice in g_massacreFetchContext).
-  // DO NOT reduce lookbackYears — low-weight old games expand sample for rare matchups.
-  const lookbackYears = 4; 
-  const minSeason = currentSeason - lookbackYears;
-  const minDateTs = new Date(minSeason, 0, 1).getTime();
-
-  const scheduleJobs = [];
-
-  for (let season = currentSeason; season >= minSeason; season--) {
-    for (const stype of rules.h2hScheduleTypes) {
-      const key = `${base}:h2h-sched:${tA}:${season}:${stype}`;
-      const req = _schedCache.has(key)
-        ? _schedCache.get(key)
-        : (() => {
-            const p = proxyFetch(`${base}/teams/${teamAId}/schedule?season=${season}&seasontype=${stype}`).catch(err => {
-              _schedCache.delete(key);
-              throw err;
-            });
-            cacheSet(_schedCache, key, p);
-            return p;
-          })();
-
-      scheduleJobs.push(
-        req.catch(err => {
-          logDebug("fetchH2HCore schedule scan failed", err);
-          return null;
-        })
-      );
-    }
-  }
-
-
-  const schedulePayloads = await Promise.all(scheduleJobs);
-  const candidateMap = new Map();
-
-  schedulePayloads
-    .filter(Boolean)
-    .forEach(r => {
-      const events = [
-        ...(r?.events || []),
-        ...(r?.team?.schedule?.events || [])
-      ];
-
-      events.forEach(ev => {
-        const comp = ev?.competitions?.[0];
-        if (!ev?.id || !comp) return;
-
-        const done =
-          comp?.status?.type?.completed ||
-          comp?.status?.type?.name === "STATUS_FINAL" ||
-          comp?.status?.type?.state === "post";
-
-        if (!done) return;
-
-        const competitors = comp?.competitors || [];
-        if (competitors.length < 2) return;
-
-        const hasA = competitors.some(c => matchesTeam(c, tA));
-        const hasB = competitors.some(c => matchesTeam(c, tB));
-        if (!hasA || !hasB) return;
-
-        const rawDate = ev?.date || comp?.date || "";
-        const gameTs = rawDate ? Date.parse(rawDate) : NaN;
-        if (isFinite(gameTs) && gameTs < minDateTs) return;
-
-        candidateMap.set(String(ev.id), {
-          id: String(ev.id),
-          date: rawDate
-        });
-      });
-    });
-
-  if (!candidateMap.size) return [];
-
-  const refs = [...candidateMap.values()]
-    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-    .slice(0, 10);
-
-  const summaries = await Promise.all(
-    refs.map(async ref => {
-      try {
-        const key = `${base}:sum:${ref.id}`;
-        const data = await (_summaryCache.has(key)
-          ? _summaryCache.get(key)
-          : (() => {
-              const p = proxyFetch(`${base}/summary?event=${ref.id}`).catch(err => {
-                _summaryCache.delete(key);
-                throw err;
-              });
-              cacheSet(_summaryCache, key, p);
-              return p;
-            })());
-
-        const hc = data?.header?.competitions?.[0];
-        if (!hc) return null;
-
-        const done =
-          hc?.status?.type?.completed ||
-          hc?.status?.type?.name === "STATUS_FINAL" ||
-          hc?.status?.type?.state === "post";
-
-        if (!done) return null;
-
-        const gameDate = hc?.date || ref.date || "";
-        const gameTs = gameDate ? Date.parse(gameDate) : NaN;
-        if (isFinite(gameTs) && gameTs < minDateTs) return null;
-
-        const competitors = hc?.competitors || [];
-        const cA = competitors.find(c => matchesTeam(c, tA));
-        const cB = competitors.find(c => matchesTeam(c, tB));
-        if (!cA || !cB) return null;
-
-        const lA = cA?.linescores || [];
-        const lB = cB?.linescores || [];
-
-        let sA = readVal(cA?.score);
-        let sB = readVal(cB?.score);
-
-        if ((!isFinite(sA) || sA <= 0) && lA.length) {
-          sA = lA.reduce((t, p) => t + readVal(p), 0);
-        }
-        if ((!isFinite(sB) || sB <= 0) && lB.length) {
-          sB = lB.reduce((t, p) => t + readVal(p), 0);
-        }
-
-        if (!isFinite(sA) || !isFinite(sB) || sA <= 0 || sB <= 0) return null;
-
-        let h1A = 0;
-        let h1B = 0;
-        let h2A = 0;
-        let h2B = 0;
-
-        if (lA.length && lB.length) {
-          if (rules.regulationPeriods >= 4) {
-            h1A = lA.length >= 2 ? readVal(lA[0]) + readVal(lA[1]) : 0;
-            h1B = lB.length >= 2 ? readVal(lB[0]) + readVal(lB[1]) : 0;
-            h2A = lA.length >= 4 ? readVal(lA[2]) + readVal(lA[3]) : 0;
-            h2B = lB.length >= 4 ? readVal(lB[2]) + readVal(lB[3]) : 0;
-          } else {
-            [h1A, h1B] = extractFirstHalf(lA, lB);
-            [h2A, h2B] = extractSecondHalf(lA, lB);
-          }
-
-                    [sA, sB] = stripOTFromScores(sA, sB, lA, lB, rules.regulationPeriods);
-        }
-
-        return {
-          eventId: ref.id,
-          teamAId: tA,
-          teamBId: tB,
-          scoreA: Math.round(sA),
-          scoreB: Math.round(sB),
-          h1A: Math.round(h1A),
-          h1B: Math.round(h1B),
-          h2A: Math.round(h2A),
-          h2B: Math.round(h2B),
-          q1A: readVal(lA[0]), q1B: readVal(lB[0]),
-          q2A: readVal(lA[1]), q2B: readVal(lB[1]),
-          q3A: readVal(lA[2]), q3B: readVal(lB[2]),
-          q4A: readVal(lA[3]), q4B: readVal(lB[3]),
-          date: gameDate
-        };
-      } catch (e) {
-        logDebug("fetchH2HCore summary failed", e);
-        return null;
-      }
-    })
-  );
-
-  return summaries
-    .filter(Boolean)
-    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-    .slice(0, 10);
+  return [];
 }
 
 
@@ -12181,189 +11298,21 @@ const cls =
       box.style.display = "block";
     }
 
-// [REMOVED: SOFASCORE_LEAGUE_MAP and getSofaScoreDateStr — SofaScore removed. ESPN-only engine.]
-
-    async function diagnoseAPIBasketballLeagues() {
-      engineDebug("Leagues Diagnostics: Checking account status & subscriptions...");
-      try {
-        const statusUrl = "https://v1.basketball.api-sports.io/status";
-        const statusData = await apiBasketballFetch(statusUrl, 12000);
-        engineDebug("Leagues Diagnostics: Account Status Payload:", statusData?.response || statusData || "No status payload");
-
-        const url = "https://v1.basketball.api-sports.io/leagues";
-        const data = await apiBasketballFetch(url, 15000);
-        const response = data?.response || [];
-        if (!response.length) {
-          engineDebug("Leagues Diagnostics: Empty response from server. This indicates that your API key is accepted, but either has no active subscription to API-Basketball, or is an API-Football key being used on the Basketball endpoint.");
-          return;
-        }
-
-        const results = {};
-        const targets = ["cebl", "lba", "acb", "bbl", "euroleague", "eurocup", "aba", "turkey_bsl"];
-        
-        response.forEach(lg => {
-          const nameLower = String(lg.name || "").toLowerCase();
-          const countryLower = String(lg.country?.name || "").toLowerCase();
-          let key = null;
-
-          if (nameLower.includes("cebl")) key = "cebl";
-          else if (nameLower.includes("lega a") || (countryLower === "italy" && nameLower.includes("serie a"))) key = "lba";
-          else if (nameLower.includes("liga acb") || (countryLower === "spain" && nameLower.includes("endesa"))) key = "acb";
-          else if (nameLower.includes("bbl") || (countryLower === "germany" && nameLower.includes("bundesliga"))) key = "bbl";
-          else if (nameLower === "euroleague") key = "euroleague";
-          else if (nameLower === "eurocup") key = "eurocup";
-          else if (nameLower === "aba league") key = "aba";
-          else if (nameLower.includes("super lig") && countryLower === "turkey") key = "turkey_bsl";
-
-          if (key) {
-            const currentSeason = lg.seasons?.find(s => s.current === true) || lg.seasons?.[lg.seasons.length - 1];
-            results[key] = {
-              id: lg.id,
-              name: lg.name,
-              country: lg.country?.name,
-              activeSeason: currentSeason ? currentSeason.season : "none",
-              seasons: lg.seasons?.map(s => s.season) || []
-            };
-          }
-        });
-
-        engineDebug("Leagues Diagnostics: SUCCESS! Mapped results:", results);
-      } catch (e) {
-        engineDebug("Leagues Diagnostics: FAILED!", { error: e.message });
-      }
-    }
+// diagnoseAPIBasketballLeagues permanently removed
+async function diagnoseAPIBasketballLeagues() {}
 
     async function loadFixtures(offset = 0) {
-      const myToken = ++_fixtureLoadToken;
-      const league = document.getElementById("leagueSelect")?.value || "";
-      const toolbar = document.getElementById("fixtureToolbar");
+      // Football uses manual SofaScore only – no fixture loading
       const sel = document.getElementById("fixtureSelect");
-      if (!toolbar || !sel) return;
-
-      // Show fixture UI for every league (all now support auto‑fetch)
-      toolbar.style.display = "flex";
-      sel.style.display = "block";
-      setFixtureDay(offset);
-      sel.innerHTML = '<option value="">Loading matches...</option>';
-      sel.value = "";
-      selectedTeamIds = { A: null, B: null };
-      validateFetchSection();
-
-        const espnLeagues = new Set(["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl"]);
-  if (espnLeagues.has(league)) {
-    await loadFixturesESPN(league, offset, myToken);
-  } else {
-    if (myToken !== _fixtureLoadToken) return;
-    toolbar.style.display = "none";
-    sel.style.display = "none";
-  }
-    }
-
-    async function loadFixturesESPN(league, offset, myToken) {
-      const sel = document.getElementById("fixtureSelect");
-      const _FIXTURE_SLUG_MAP = {
-        ncaa: "mens-college-basketball", ncaaw: "womens-college-basketball",
-        nba_gl: "nba-g-league", wnba: "wnba", wnba_pre: "wnba",
-        euroleague: "euroleague", eurocup: "eurocup",
-        champions_league: "basketball-champions-league",
-        turkey_bsl: "turkish-bsl", acb: "spanish-liga-acb",
-        bbl: "german-bbl", ausnbl: "australian-nbl",
-        lba: "italian-lba", bleague: "japan-b-league",
-        united_league: "vtb-united-league", proa: "french-pro-a",
-        bcl: "greek-basket-league", aba: "adriatic-basketball-association",
-        isl: "israel-super-league", cebl: "cebl"
-      };
-      const leagueSlug = _FIXTURE_SLUG_MAP[league] || "nba";
-      const base = "https://site.api.espn.com/apis/site/v2/sports/basketball/" + leagueSlug;
-      const targetLocalKey = getLocalDateKey(offset);
-      const queryDates = offset === 0
-        ? [getLocalDateKey(-1), getLocalDateKey(0)]
-        : [getLocalDateKey(0), getLocalDateKey(1)];
-
-      try {
-        if (myToken !== _fixtureLoadToken) return;
-
-        const payloadResults = await Promise.allSettled(queryDates.map(dateStr => {
-          const cacheKey = "fixtures:" + league + ":" + dateStr;
-          if (_fixtureCache.has(cacheKey)) return _fixtureCache.get(cacheKey);
-          const p = proxyFetch(base + "/scoreboard?dates=" + dateStr + "&limit=200").catch(err => {
-            _fixtureCache.delete(cacheKey);
-            if (String(err?.message || "").includes("HTTP 400")) return { events: [] };
-            throw err;
-          });
-          cacheSet(_fixtureCache, cacheKey, p);
-          return p;
-        }));
-
-        const payloads = payloadResults.filter(r => r.status === "fulfilled").map(r => r.value);
-        if (!payloads.length) throw new Error("All fixture feeds failed");
-        if (myToken !== _fixtureLoadToken) return;
-
-        const seen = new Set();
-        const merged = [];
-        payloads.forEach(data => {
-          (data?.events || []).forEach(ev => {
-            if (!ev?.id || seen.has(ev.id)) return;
-            seen.add(ev.id);
-            merged.push(ev);
-          });
-        });
-
-        const _isMainLeague = ["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl"].includes(league);
-        if (!merged.length && !_isMainLeague) {
-          try {
-            const _fbData = await proxyFetch(`${base}/scoreboard?limit=200`).catch(() => null);
-            if (_fbData?.events) {
-              _fbData.events.forEach(ev => {
-                if (!ev?.id || seen.has(ev.id)) return;
-                seen.add(ev.id);
-                merged.push(ev);
-              });
-            }
-          } catch (_fbErr) {}
-        }
-
-        const events = merged.filter(ev => {
-          const comp = ev?.competitions?.[0];
-          if (!comp || (comp.competitors || []).length < 2) return false;
-          const eventTime = new Date(ev.date);
-          if (isNaN(eventTime.getTime())) return false;
-          if (getLocalDateKeyFromISO(ev.date) !== targetLocalKey) return false;
-          const state = String(comp?.status?.type?.state || "").toLowerCase();
-          const statusName = String(comp?.status?.type?.name || "").toUpperCase();
-          const isPreGame = state === "pre" || statusName === "STATUS_SCHEDULED" || statusName === "STATUS_PRE";
-          return isPreGame;
-        }).sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        if (myToken !== _fixtureLoadToken) return;
-        if (!events.length) { sel.innerHTML = '<option value="">No upcoming matches</option>'; return; }
-
-        sel.innerHTML = '<option value="">— Select match —</option>';
-        events.forEach(ev => {
-          const comp = ev.competitions[0];
-          const competitors = comp.competitors || [];
-          const home = competitors.find(c => c.homeAway === "home") || competitors[0];
-          const away = competitors.find(c => c.homeAway === "away") || competitors[1];
-          const homeName = home?.team?.displayName || "Home";
-          const awayName = away?.team?.displayName || "Away";
-          const homeId = home?.team?.id || "";
-          const awayId = away?.team?.id || "";
-          const tipoff = formatFixtureTime(ev.date);
-          const opt = document.createElement("option");
-          opt.value = String(ev.id || "");
-          opt.textContent = tipoff + " — " + homeName + " vs " + awayName;
-          opt.dataset.home = homeName;
-          opt.dataset.away = awayName;
-          opt.dataset.homeId = homeId;
-          opt.dataset.awayId = awayId;
-          opt.dataset.eventDate = ev.date || "";
-          sel.appendChild(opt);
-        });
-      } catch (e) {
-        if (myToken !== _fixtureLoadToken) return;
-        logDebug("loadFixturesESPN failed", e);
-        sel.innerHTML = '<option value="">Unable to load matches</option>';
+      if (sel) {
+        sel.innerHTML = '<option value="">Manual entry only</option>';
+        sel.style.display = "none";
       }
+      const toolbar = document.getElementById("fixtureToolbar");
+      if (toolbar) toolbar.style.display = "none";
+    }
+    async function loadFixturesESPN(league, offset, myToken) {
+      // No-op
     }
 
 // [REMOVED: pickSofaScoreFixture — SofaScore removed.]
@@ -12552,7 +11501,7 @@ async function fetchESPN() {
   g_massacreFetchContext.league = league;
 
   // Clear market lines
-  const marketFields = ["ftMarket", "h1Market", "teamAMarket", "teamBMarket", "q1Market", "q2Market", "q3Market", "q4Market", "h1TeamAMarket", "h1TeamBMarket", "q1TeamAMarket", "q1TeamBMarket", "highQTotalMarket", "lowQTotalMarket"];
+    const marketFields = ["ftMarket", "h1Market", "teamAMarket", "teamBMarket", "h1TeamAMarket", "h1TeamBMarket"];
   marketFields.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
@@ -13129,7 +12078,7 @@ function getConfidenceClass(conf) {
 
 function getMarketKeyFromName(name, marketKeyOverride) {
   // Fix: Priority Override. If the engine already assigned a key, keep it.
-  const validKeys = ["ft", "h1", "h2", "team_a", "team_b", "q1", "q2", "q3", "q4", "h1_team_a", "h1_team_b", "player"];
+    const validKeys = ["ft", "h1", "team_a", "team_b", "h1_team_a", "h1_team_b"];
   if (validKeys.includes(marketKeyOverride)) return marketKeyOverride;
   if (marketKeyOverride === "player") return "player";
   const n = String(name || "");
@@ -13299,7 +12248,6 @@ function compute1HProjection({ league, parsed, lines, injMultA = 1, injMultB = 1
 
 
 function getMarketVolLimit(league, marketKey) {
-  // Football goals are low-variance; use a universal default
   return 1.2;
 }
 
@@ -13438,7 +12386,7 @@ function getMassacreH2HSeries(marketKey, fixtureMeta, parsed) {
 
 
 function getMassacreMarketWindowSet() {
-  return ["ft", "h1", "q1", "q2", "q3", "q4"];
+  return ["ft", "h1"];
 }
 
 function _getMassacreBlendWeight(severity) {
@@ -13857,10 +12805,10 @@ function buildTrackedPickPayload({ pickRow, isLock, fixtureMeta: originalFixture
   if (!pickRow || pickRow.pick === "NO PLAY" || !pickRow.confidence || pickRow.confidence === "NaN") return null;
 
   const fixtureMeta = { ...originalFixtureMeta };
-  const exoticNoLineMarkets = ["player", "w_ou", "race", "high_q", "low_q", "htft", "margin_team", "margin_any", "high_q_ou", "low_q_ou", "other"];
+    const exoticNoLineMarkets = ["other"];
   const isExoticNoLine = pickRow && exoticNoLineMarkets.includes(pickRow.marketKey);
 
-  const isManualLeague = league !== "nba" && league !== "wnba" && league !== "wnba_pre" && league !== "ncaa" && league !== "ncaaw" && league !== "nba_gl";
+    const isManualLeague = true; // All football leagues are manual
   if (!fixtureMeta.eventId) {
     const safeHome = (fixtureMeta.homeTeam || "home").replace(/[\s'"`<>&]/g, "");
     const safeAway = (fixtureMeta.awayTeam || "away").replace(/[\s'"`<>&]/g, "");
@@ -13954,14 +12902,13 @@ function buildTrackedPickPayload({ pickRow, isLock, fixtureMeta: originalFixture
       const grade = String(pickRow.confidence || "—").toUpperCase();
   const isABQualified = grade === "A" || grade === "B";
 
-  function getSampleTierForMarket(market, dx = {}) {
+    function getSampleTierForMarket(market, dx = {}) {
     if (market === "ft" || market === "team_a" || market === "team_b") return dx.ftSampleTier || "unknown";
-    if (market === "h1" || market === "h1_team_a" || market === "h1_team_b" || market.startsWith("q")) return dx.h1SampleTier || "unknown";
-    if (market === "h2") return dx.h2SampleTier || "unknown";
+    if (market === "h1" || market === "h1_team_a" || market === "h1_team_b") return dx.h1SampleTier || "unknown";
     return "unknown";
   }
 
-  function getProjectionOnlyForMarket(market, dx = {}) {
+    function getProjectionOnlyForMarket(market, dx = {}) {
     if (market === "ft" || market === "team_a" || market === "team_b") return !!dx.ftProjectionOnly;
     if (market === "h1" || market === "h1_team_a" || market === "h1_team_b") return !!dx.h1ProjectionOnly;
     return false;
@@ -13970,14 +12917,10 @@ function buildTrackedPickPayload({ pickRow, isLock, fixtureMeta: originalFixture
     function getHasH2HForMarket(market, dx = {}) {
     if (market === "ft" || market === "team_a" || market === "team_b") return !!dx.ftHasH2H;
     if (market === "h1" || market === "h1_team_a" || market === "h1_team_b") return !!dx.h1HasH2H;
-    if (market === "q1") return !!dx.q1HasH2H;
-    if (market === "q2") return !!dx.q2HasH2H;
-    if (market === "q3") return !!dx.q3HasH2H;
-    if (market === "q4") return !!dx.q4HasH2H;
     return false;
   }
 
-  function getVolatilityValueForMarket(market, dx = {}) {
+    function getVolatilityValueForMarket(market, dx = {}) {
     if (market === "ft") return Math.max(Number(dx.aVol || 0), Number(dx.bVol || 0));
     if (market === "team_a") return Number(dx.aVol || 0);
     if (market === "team_b") return Number(dx.bVol || 0);
@@ -13985,26 +12928,14 @@ function buildTrackedPickPayload({ pickRow, isLock, fixtureMeta: originalFixture
     return 0;
   }
 
-  function getVolatilityBucket(value = 0) {
-  // Volatility bucket removed per spec – always return "normal"
-  return "normal";
-}
+    function getVolatilityBucket(value = 0) {
+      return "normal";
+    }
 
     function getInjuryBucketForPayload(market, dx = {}) {
-    const injA = Number(dx.injMultA ?? 1);
-    const injB = Number(dx.injMultB ?? 1);
-
-    const target =
-      market === "team_a" ? injA :
-      market === "team_b" ? injB :
-      Math.min(injA, injB);
-
-    if (target <= 0.75) return "severe";
-    if (target <= 0.85) return "high";
-    if (target <= 0.92) return "moderate";
-    if (target < 0.99) return "light";
-    return "clean";
-  }
+      // Injuries not supported in football – always "clean"
+      return "clean";
+    }
 
   function getEdgeBucket(edge, line) {
     if (!isFinite(edge) || !isFinite(line) || !line) return "unknown";
@@ -14017,44 +12948,38 @@ function buildTrackedPickPayload({ pickRow, isLock, fixtureMeta: originalFixture
     return "extreme";
   }
 
-  function getLineBucket(market, line) {
+    function getLineBucket(market, line) {
     if (!isFinite(line)) return "unknown";
 
     if (market === "ft") {
-      if (line < 150) return "ft_low";
-      if (line < 180) return "ft_mid";
-      if (line < 210) return "ft_high";
+      if (line < 1.5) return "ft_low";
+      if (line < 2.5) return "ft_mid";
+      if (line < 3.5) return "ft_high";
       return "ft_very_high";
     }
 
     if (market === "h1") {
-      if (line < 70) return "h1_low";
-      if (line < 95) return "h1_mid";
+      if (line < 0.5) return "h1_low";
+      if (line < 1.0) return "h1_mid";
       return "h1_high";
     }
 
-    if (market === "h2") {
-      if (line < 70) return "h2_low";
-      if (line < 95) return "h2_mid";
-      return "h2_high";
-    }
-
     if (market === "team_a" || market === "team_b") {
-      if (line < 70) return "team_low";
-      if (line < 90) return "team_mid";
-      if (line < 110) return "team_high";
+      if (line < 0.5) return "team_low";
+      if (line < 1.0) return "team_mid";
+      if (line < 1.5) return "team_high";
       return "team_very_high";
     }
 
     return "unknown";
   }
 
-  function getPaceRiskForMarket(market, dx = {}) {
+    function getPaceRiskForMarket(market, dx = {}) {
     if (market === "h1" || market === "h1_team_a" || market === "h1_team_b") return !!dx.h1PaceGapRisk;
     return !!dx.paceGapRisk;
   }
 
-  function getDefFloorForMarket(market, dx = {}) {
+    function getDefFloorForMarket(market, dx = {}) {
     if (market === "h1" || market === "h1_team_a" || market === "h1_team_b") return !!dx.h1DefensiveFloorFlag;
     return !!dx.defensiveFloorFlag;
   }
@@ -14793,105 +13718,10 @@ const h1Calc = compute1HProjection({
           h1Calc.projB1H = NaN;
         }
 
-  // computeQ removed – football has no quarters. Quarter markets are not supported.
-  // This function is intentionally deleted to prevent quarter projections.
+    // Quarter variables removed – football has no quarters.
+    const q1 = null, q2 = null, q3 = null, q4 = null;
 
-    const q1 = computeQ("q1", parseMarketLine(document.getElementById("q1Market")?.value));
-    const q2 = computeQ("q2", parseMarketLine(document.getElementById("q2Market")?.value));
-    const q3 = computeQ("q3", parseMarketLine(document.getElementById("q3Market")?.value));
-    const q4 = computeQ("q4", parseMarketLine(document.getElementById("q4Market")?.value));
-
-    // Issue 19: Q4 garbage time adjustment — blowout projected margin distorts Q4 scoring.
-    if (q4 && isFinite(q4.projA) && isFinite(q4.projB) && q4.line &&
-        isFinite(ftCalc.blowoutGap) && ftCalc.blowoutGap > 15) {
-      const isFavorA = ftCalc.projAFT > ftCalc.projBFT;
-      q4.projA = isFavorA ? q4.projA * 0.85 : q4.projA * 1.10;
-      q4.projB = isFavorA ? q4.projB * 1.10 : q4.projB * 0.85;
-      q4.proj = q4.projA + q4.projB;
-      q4.edge = q4.proj - q4.line;
-      q4.pick = getPick(q4.edge, q4.line, league, "q4", {});
-    }
-
-    // FIX #3: Two-pass reconciliation that preserves the H1 model AND quarter coherence.
-    // Pass 1: Scale Q1+Q2 to match authoritative h1Proj (H1 model is single source of truth).
-    // Pass 2: Scale Q3+Q4 to match (ftProj - h1Proj) so all 4 quarters sum to ftProj.
-    // H1 pick and projection are NOT overwritten — they stay as computed by compute1HProjection.
-    const rawQ12Sum = (q1?.proj || 0) + (q2?.proj || 0);
-    const rawQ34Sum = (q3?.proj || 0) + (q4?.proj || 0);
-    const h1Target = isFinite(h1Calc.h1Proj) && h1Calc.h1Proj > 0 ? h1Calc.h1Proj : rawQ12Sum;
-    const h2Target = isFinite(ftCalc.ftProj) && h1Target > 0 ? ftCalc.ftProj - h1Target : rawQ34Sum;
-
-            if (rawQ12Sum > 0 && isFinite(h1Target)) {
-          const q1Weight = 1.0;
-          const q2Weight = 1.03; // Accounting for Q2 rotation pacing shifts
-          const totalWeightedRaw = (q1?.proj || 0) * q1Weight + (q2?.proj || 0) * q2Weight;
-          const q1Scale = (h1Target * (q1?.proj || 0) * q1Weight) / (totalWeightedRaw || 1) / (q1?.proj || 1);
-          const q2Scale = (h1Target * (q2?.proj || 0) * q2Weight) / (totalWeightedRaw || 1) / (q2?.proj || 1);
-
-          if (q1 && isFinite(q1.proj) && isFinite(q1.line)) {
-            q1.proj *= q1Scale;
-            q1.edge = q1.proj - q1.line;
-            // FIX #28: marketKey was hardcoded "h1" here, which made getPick() apply the H1
-            // edge-point threshold (e.g. 8.0 pts for NBA) instead of the much smaller, correctly
-            // calibrated Q threshold (5.0 pts for NBA — see LEAGUE_EDGE_POINT_THRESHOLDS), via
-            // getLeagueEdgePointThreshold()'s marketKey routing. This silently suppressed valid
-            // Q1 picks that had real edge but not enough to clear the wrong (larger) H1 bar.
-            q1.pick = getPick(q1.edge, q1.line, league, "q1", {});
-            q1.confidence = getConfidenceGrade({
-              pick: q1.pick, line: q1.line, edge: q1.edge, sampleTier: q1.tier,
-              volLimit: 12, marketKey: "q1", hasH2H: q1.hasH2H, modelState: globalModelState
-            });
-          }
-          if (q2 && isFinite(q2.proj) && isFinite(q2.line)) {
-            q2.proj *= q2Scale;
-            q2.edge = q2.proj - q2.line;
-            // FIX #28: marketKey was hardcoded "h1" here, which made getPick() apply the H1
-            // edge-point threshold instead of the correctly calibrated Q threshold via
-            // getLeagueEdgePointThreshold()'s marketKey routing. This silently suppressed
-            // valid Q2 picks that had real edge but not enough to clear the wrong (larger) bar.
-            q2.pick = getPick(q2.edge, q2.line, league, "q2", {});
-            q2.confidence = getConfidenceGrade({
-              pick: q2.pick, line: q2.line, edge: q2.edge, sampleTier: q2.tier,
-              volLimit: 12, marketKey: "q2", hasH2H: q2.hasH2H, modelState: globalModelState
-            });
-          }
-        }
-
-        if (rawQ34Sum > 0 && isFinite(h2Target) && h2Target > 0) {
-          const q3Weight = 1.0;
-          const q4Weight = 1.08; // 8% fouling inflation premium modeled for Q4
-          const totalWeightedRaw = (q3?.proj || 0) * q3Weight + (q4?.proj || 0) * q4Weight;
-          const q3Scale = (h2Target * (q3?.proj || 0) * q3Weight) / (totalWeightedRaw || 1) / (q3?.proj || 1);
-          const q4Scale = (h2Target * (q4?.proj || 0) * q4Weight) / (totalWeightedRaw || 1) / (q4?.proj || 1);
-
-          if (q3 && isFinite(q3.proj) && isFinite(q3.line)) {
-            q3.proj *= q3Scale;
-            q3.edge = q3.proj - q3.line;
-            // FIX #28: marketKey was hardcoded "h1" here, which made getPick() apply the H1
-            // edge-point threshold instead of the correctly calibrated Q threshold via
-            // getLeagueEdgePointThreshold()'s marketKey routing. This silently suppressed
-            // valid Q3 picks that had real edge but not enough to clear the wrong (larger) bar.
-            q3.pick = getPick(q3.edge, q3.line, league, "q3", {});
-            q3.confidence = getConfidenceGrade({
-              pick: q3.pick, line: q3.line, edge: q3.edge, sampleTier: q3.tier,
-              volLimit: 12, marketKey: "q3", hasH2H: q3.hasH2H, modelState: globalModelState
-            });
-          }
-          if (q4 && isFinite(q4.proj) && isFinite(q4.line)) {
-            q4.proj *= q4Scale;
-            q4.edge = q4.proj - q4.line;
-            // FIX #28: marketKey was hardcoded "h1" here, which made getPick() apply the H1
-            // edge-point threshold instead of the correctly calibrated Q threshold via
-            // getLeagueEdgePointThreshold()'s marketKey routing. This silently suppressed
-            // valid Q4 picks that had real edge but not enough to clear the wrong (larger) bar.
-            q4.pick = getPick(q4.edge, q4.line, league, "q4", {});
-            q4.confidence = getConfidenceGrade({
-              pick: q4.pick, line: q4.line, edge: q4.edge, sampleTier: q4.tier,
-              volLimit: 12, marketKey: "q4", hasH2H: q4.hasH2H, modelState: globalModelState
-            });
-          }
-        }
-    // H1 pick and projection remain authoritative — do NOT overwrite here.
+    // All quarter-related code removed – football has no quarters.
 
     if (ftCalc.ftSampleTier === "insufficient") {
       ftPick = "NO PLAY";
@@ -15228,8 +14058,7 @@ const ftNote = ftCalc.ftNote || ftCalc.ftProjectionNote || null;
     const mktOrderMap = {
       "ft": 1, "h1": 2,
       "team_a": 3, "team_b": 4,
-      "q1": 5, "q2": 6, "q3": 7, "q4": 8,
-      "h1_team_a": 9, "h1_team_b": 10
+      "h1_team_a": 5, "h1_team_b": 6
     };
     finalPicks.sort((a, b) => (mktOrderMap[a.marketKey] || 99) - (mktOrderMap[b.marketKey] || 99));
 
@@ -16040,407 +14869,18 @@ if (trackedToSave.length) {
   }
 }
 
-            // API Basketball helpers
-  const RAPID_API_KEY = "16c26653db4f4cc4c85eed30359eabd6";
-  const RAPID_API_HOST = "api-basketball.p.rapidapi.com";
-  const RAPID_API_BASE = "https://api-basketball.p.rapidapi.com";
-
-  // Dedicated fetch for API Basketball – bypasses worker/proxy chain and adds required headers
-  async function apiBasketballFetch(url, timeoutMs = 12000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const isDirect = String(RAPID_API_KEY || "").trim().length === 32;
-    let finalUrl = url;
-    const headers = {};
-
-    if (isDirect) {
-      finalUrl = String(url).replace("api-basketball.p.rapidapi.com", "v1.basketball.api-sports.io");
-      headers["x-apisports-key"] = RAPID_API_KEY;
-    } else {
-      headers["X-RapidAPI-Key"] = RAPID_API_KEY;
-      headers["X-RapidAPI-Host"] = RAPID_API_HOST;
-    }
-
-    engineDebug("API Basketball Outbound Request", { url: finalUrl });
-
-    try {
-      const response = await fetch(finalUrl, {
-        headers: headers,
-        signal: controller.signal,
-        cache: "no-store"
-      });
-      clearTimeout(timer);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const text = await response.text();
-      let parsed;
-      try {
-        parsed = JSON.parse(text);
-      } catch (e) {
-        throw new Error("Invalid JSON response");
-      }
-      const apiErrors = parsed?.errors;
-      const hasApiErrors = apiErrors && (Array.isArray(apiErrors) ? apiErrors.length > 0 : Object.keys(apiErrors).length > 0);
-      if (hasApiErrors) {
-        const errMsg = typeof apiErrors === "object" ? Object.values(apiErrors).join("; ") : String(apiErrors);
-        engineDebug("API Basketball returned errors field", { url: finalUrl, apiErrors });
-        throw new Error(`API-Sports error: ${errMsg}`);
-      }
-      const resultsCount = Array.isArray(parsed?.response) ? parsed.response.length : (parsed?.results || 0);
-      engineDebug("API Basketball Response Success", { url: finalUrl, status: response.status, resultsCount });
-      return parsed;
-    } catch (err) {
-      clearTimeout(timer);
-      engineDebug("API Basketball fetch failed", { url: finalUrl, error: err.message });
-      throw err;
-    }
-  }
-
-  // Keep original proxyFetch for ESPN etc.
-  const originalProxyFetch = proxyFetch;
-  window.proxyFetch = async function(url, timeoutMs = 12000) {
-    const isApiBasketball = url.includes(RAPID_API_HOST);
-    if (isApiBasketball) {
-      return apiBasketballFetch(url, timeoutMs);
-    }
-    return originalProxyFetch(url, timeoutMs);
-  };
-
-  // TheSportsDB league IDs for manual leagues (free API, no key needed, current season)
-  // Find your league ID: https://www.thesportsdb.com/api/v1/json/3/search_all_leagues.php?s=Basketball
-  const THESPORTSDB_LEAGUE_MAP = {
-    "aba":           "4426",
-    "isl":           "4428",
-    "lkl":           "4435",
-    "plk":           "4433",
-    "nznbl":         "4382",
-    "cebl":          "4416",
-    "cba":           "4439",
-    "pba":           "4452",
-    "korea_kbl":     "4459",
-    "brazil_nbb":    "4451",
-    "argentina_lnb": "4450",
-    "bnxt":          "4438",
-    "china_nbl":     "4440",
-    "aus_nbl1_east": "4382",
-    "aus_nbl1_north":"4382",
-    "aus_nbl1_south":"4382",
-    "aus_nbl1_west": "4382"
-  };
-
-  // Map dropdown league keys to API Basketball league IDs
-  // Expanded with more manual leagues for auto‑fetch support
-  const LEAGUE_ID_MAP = {
-    "aba": 8945, "acb": 758, "argentina_lnb": 9, "ausnbl": 111, "austria_superliga": 14,
-    "austria_zweite": 14, "bal": 18, "bbl": 121, "belgium_top": 19, "bih_1st": 25,
-    "bnxt": 15, "brazil_nbb": 20, "brazil_lbf_w": 20, "bulgaria_nbl": 21,
-    "cba": 7, "cebl": 10077, "chile_lnb": 23, "chile_lnb2": 23, "china_nbl": 24,
-    "croatia_premier": 25, "cyprus_div_a": 26, "nbl_cz": 27, "denmark_bliga": 27,
-    "el_salvador_lmb": 23, "england_slb": 19, "england_slb_w": 19,
-    "estonia_kml": 28, "eurocup": 822, "euroleague": 821, "champions_league": 823,
-    "fiba_ac": 18, "fiba_eb": 1, "fiba_wc": 1, "finland_koris": 28,
-    "proa": 6, "prob": 6, "france_lfb_w": 6, "georgia_super": 30,
-    "germany_proa": 31, "gb_super_league_w": 19, "bcl": 5, "hungary_nb1": 32,
-    "iceland_urvalsdeild": 33, "iceland_urvalsdeild_w": 33, "iceland_1st": 33,
-    "indonesia_ibl": 34, "isl": 695, "lba": 698, "italy_a2": 36, "italy_serb": 37,
-    "italy_a1_w": 36, "italy_a2_w": 36, "bleague": 38, "korea_kbl": 38,
-    "latvia_lbl": 39, "lebanon_1st": 35, "lkl": 39, "mexico_cibacopa": 40,
-    "mexico_lnbp": 41, "nba": 12, "nba_gl": 13, "ncaa": 3, "ncaaw": 3,
-    "nznbl": 11, "pba": 42, "phil_mpbl": 42, "plk": 43, "poland_1liga": 44,
-    "portugal_lpb": 45, "portugal_proliga": 45, "portugal_taca": 45,
-    "portugal_lfb_w": 45, "proa": 6, "puerto_rico_bsn": 46, "romania_ln": 47,
-    "rwanda": 48, "serbia_kls": 49, "slovenia_1a": 50, "spain_primera": 51,
-    "spain_segunda": 52, "sweden_sbl": 53, "swiss_sbl": 767, "turkey_bsl": 769,
-    "turkey_tbl": 770, "turkey_tb2l": 771, "united_league": 15, "uruguay_lub": 55,
-    "uruguay_lfb_w": 55, "venezuela_sl": 56, "wnba": 9, "wnba_pre": 9,
-    "unknown": 12,
-    // [NEEDS VERIFICATION] placeholder IDs — confirm against the API-Basketball /leagues
-    // endpoint (run the diagnostic fetch script) before trusting these.
-    "taipei_tpbl": 229,
-    "aus_nbl1_east": 111,
-    "aus_nbl1_north": 111,
-    "aus_nbl1_south": 111,
-    "aus_nbl1_west": 111,
-    "aus_nbl1_east_w": 111,
-    "aus_nbl1_north_w": 111,
-    "aus_nbl1_south_w": 111,
-    "aus_nbl1_west_w": 111,
-    "aus_big_v": 111,
-    "aus_big_v_w": 111
-  };
-
-  async function searchAPIbasketballTeam(league, teamName) {
-    const leagueId = LEAGUE_ID_MAP[league];
-    if (!leagueId) return null;
-    const url = `${RAPID_API_BASE}/teams?search=${encodeURIComponent(teamName)}&league=${leagueId}&season=${getCurrentSeasonYear(league)}`;
-    const data = await apiBasketballFetch(url, 12000);
-    const teams = data?.response || [];
-    if (!teams.length) return null;
-    // pick the first match (best match by name)
-    const best = teams.find(t => t.name.toLowerCase().includes(teamName.toLowerCase())) || teams[0];
-    return String(best.id);
-  }
-
-  async function fetchAPIbasketballSchedule(teamId, league, limit = 10) {
-    const leagueId = LEAGUE_ID_MAP[league];
-    if (!leagueId) return null;
-    const season = getAPIBasketballSeasonParam(league);
-    const url = `${RAPID_API_BASE}/games?team=${teamId}&league=${leagueId}&season=${season}&timezone=UTC`;
-    const data = await apiBasketballFetch(url, 12000);
-    // Handle possible nested response
-    const games = data?.response || (Array.isArray(data) ? data : []);
-    const completed = games.filter(g => g?.status?.long === "Finished");
-    completed.sort((a, b) => new Date(b?.date?.start || 0) - new Date(a?.date?.start || 0));
-    const recent = completed.slice(0, limit);
-    // FIX #34: h2Scored/h2Allowed (second-half totals) removed — the 2H market never
-    // had a projection or pick built from it, so this data was computed and stored but
-    // never consumed downstream.
-    const scored = [], allowed = [], h1Scored = [], h1Allowed = [];
-    const q1Scored = [], q2Scored = [], q3Scored = [], q4Scored = [];
-    const q1Allowed = [], q2Allowed = [], q3Allowed = [], q4Allowed = [];
-
-    for (const g of recent) {
-      const isHome = String(g.teams.home.id) === String(teamId);
-      const myScores = isHome ? g.scores.home : g.scores.away;
-      const oppScores = isHome ? g.scores.away : g.scores.home;
-      const ft = myScores.total;
-      const oppFt = oppScores.total;
-      if (!ft || !oppFt) continue;
-      scored.push(ft);
-      allowed.push(oppFt);
-
-      const h1 = myScores.halftime;
-      const oppH1 = oppScores.halftime;
-      if (h1 && oppH1) {
-        h1Scored.push(h1);
-        h1Allowed.push(oppH1);
-      }
-      const q1 = myScores.quarter_1, q2 = myScores.quarter_2, q3 = myScores.quarter_3, q4 = myScores.quarter_4;
-      const oq1 = oppScores.quarter_1, oq2 = oppScores.quarter_2, oq3 = oppScores.quarter_3, oq4 = oppScores.quarter_4;
-      if (q1 && oq1) { q1Scored.push(q1); q1Allowed.push(oq1); }
-      if (q2 && oq2) { q2Scored.push(q2); q2Allowed.push(oq2); }
-      if (q3 && oq3) { q3Scored.push(q3); q3Allowed.push(oq3); }
-      if (q4 && oq4) { q4Scored.push(q4); q4Allowed.push(oq4); }
-    }
-    return { scored, allowed, h1Scored, h1Allowed,
-             q1Scored, q2Scored, q3Scored, q4Scored,
-             q1Allowed, q2Allowed, q3Allowed, q4Allowed };
-  }
-
-  async function fetchAPIbasketballH2H(teamAId, teamBId, league) {
-    const leagueId = LEAGUE_ID_MAP[league];
-    if (!leagueId) return [];
-    const season = getAPIBasketballSeasonParam(league);
-    const url = `${RAPID_API_BASE}/games?league=${leagueId}&season=${season}&team=${teamAId}&opponent=${teamBId}`;
-    const data = await apiBasketballFetch(url, 12000);
-    const games = data?.response || [];
-    const completed = games.filter(g => g.status.long === "Finished");
-    completed.sort((a, b) => new Date(b.date.start) - new Date(a.date.start));
-    const h2h = [];
-    for (const g of completed.slice(0, 10)) {
-      const isAHome = String(g.teams.home.id) === String(teamAId);
-      const scoreA = isAHome ? g.scores.home.total : g.scores.away.total;
-      const scoreB = isAHome ? g.scores.away.total : g.scores.home.total;
-      const h1A = isAHome ? g.scores.home.halftime : g.scores.away.halftime;
-      const h1B = isAHome ? g.scores.away.halftime : g.scores.home.halftime;
-      const q1A = isAHome ? g.scores.home.quarter_1 : g.scores.away.quarter_1;
-      const q1B = isAHome ? g.scores.away.quarter_1 : g.scores.home.quarter_1;
-      const q2A = isAHome ? g.scores.home.quarter_2 : g.scores.away.quarter_2;
-      const q2B = isAHome ? g.scores.away.quarter_2 : g.scores.home.quarter_2;
-      const q3A = isAHome ? g.scores.home.quarter_3 : g.scores.away.quarter_3;
-      const q3B = isAHome ? g.scores.away.quarter_3 : g.scores.home.quarter_3;
-      const q4A = isAHome ? g.scores.home.quarter_4 : g.scores.away.quarter_4;
-      const q4B = isAHome ? g.scores.away.quarter_4 : g.scores.home.quarter_4;
-      h2h.push({
-        eventId: g.id,
-        scoreA, scoreB, h1A, h1B, q1A, q1B, q2A, q2B, q3A, q3B, q4A, q4B,
-        date: g.date.start
-      });
-    }
-    return h2h;
-  }
-
-  async function fetchAPIbasketball(league, teamAName, teamBName) {
-    const btn = document.getElementById("fetchBtn");
-    try {
-      let teamAId = selectedTeamIds.A;
-      if (!teamAId || !validateTeamId(teamAId, league)) {
-        teamAId = await searchAPIbasketballTeam(league, teamAName);
-      }
-      let teamBId = selectedTeamIds.B;
-      if (!teamBId || !validateTeamId(teamBId, league)) {
-        teamBId = await searchAPIbasketballTeam(league, teamBName);
-      }
-      if (!teamAId) throw new Error(`Cannot find team ID for "${teamAName}" in league ${league}. Check league selection.`);
-      if (!teamBId) throw new Error(`Cannot find team ID for "${teamBName}" in league ${league}. Check league selection.`);
-      if (String(teamAId) === String(teamBId)) throw new Error("Team A and Team B cannot be the same team.");
-
-      selectedTeamIds.A = String(teamAId);
-      selectedTeamIds.B = String(teamBId);
-      setStatusHTML('<span class="spinner"></span>Loading schedule from API Basketball...', "loading");
-
-      const aStats = await fetchAPIbasketballSchedule(teamAId, league);
-      const bStats = await fetchAPIbasketballSchedule(teamBId, league);
-      // Debug log for API fetch
-      engineDebug("API Basketball fetch result", {
-        league, teamAName, teamBName,
-        aGames: aStats.scored.length,
-        bGames: bStats.scored.length
-      });
-
-      if (!aStats.scored.length && !bStats.scored.length) throw new Error("No completed games found for these teams.");
-
-      g_injA = defaultInjuryMeta();
-      g_injB = defaultInjuryMeta();
-      g_fetchMeta = defaultFetchMeta();
-      hideInjuryBox("A");
-      hideInjuryBox("B");
-      clearSideFields("A");
-      clearSideFields("B");
-      clearH2HFields();
-
-      const messages = [];
-
-      if (aStats.scored.length) {
-        document.getElementById("aFTScored").value = aStats.scored.slice(0,10).join(",");
-        document.getElementById("aFTAllowed").value = aStats.allowed.slice(0,10).join(",");
-        if (aStats.h1Scored.length) {
-          document.getElementById("a1HScored").value = aStats.h1Scored.slice(0,10).join(",");
-          document.getElementById("a1HAllowed").value = aStats.h1Allowed.slice(0,10).join(",");
-        }
-        // FIX #34: a2HScored/a2HAllowed population removed — those input fields no
-        // longer exist in the form.
-        if (aStats.q1Scored.length) {
-          document.getElementById("aQ1Scored").value = aStats.q1Scored.slice(0,10).join(",");
-          document.getElementById("aQ1Allowed").value = aStats.q1Allowed.slice(0,10).join(",");
-          document.getElementById("aQ2Scored").value = aStats.q2Scored.slice(0,10).join(",");
-          document.getElementById("aQ2Allowed").value = aStats.q2Allowed.slice(0,10).join(",");
-          document.getElementById("aQ3Scored").value = aStats.q3Scored.slice(0,10).join(",");
-          document.getElementById("aQ3Allowed").value = aStats.q3Allowed.slice(0,10).join(",");
-          document.getElementById("aQ4Scored").value = aStats.q4Scored.slice(0,10).join(",");
-          document.getElementById("aQ4Allowed").value = aStats.q4Allowed.slice(0,10).join(",");
-        }
-        document.getElementById("aAutoTag").style.display = "inline";
-        messages.push(`${safeText(teamAName)}: ${aStats.scored.length} games ✅`);
-      } else {
-        messages.push(`${safeText(teamAName)}: no data ❌`);
-      }
-
-      if (bStats.scored.length) {
-        document.getElementById("bFTScored").value = bStats.scored.slice(0,10).join(",");
-        document.getElementById("bFTAllowed").value = bStats.allowed.slice(0,10).join(",");
-        if (bStats.h1Scored.length) {
-          document.getElementById("b1HScored").value = bStats.h1Scored.slice(0,10).join(",");
-          document.getElementById("b1HAllowed").value = bStats.h1Allowed.slice(0,10).join(",");
-        }
-        // FIX #34: b2HScored/b2HAllowed population removed — those input fields no
-        // longer exist in the form.
-        if (bStats.q1Scored.length) {
-          document.getElementById("bQ1Scored").value = bStats.q1Scored.slice(0,10).join(",");
-          document.getElementById("bQ1Allowed").value = bStats.q1Allowed.slice(0,10).join(",");
-          document.getElementById("bQ2Scored").value = bStats.q2Scored.slice(0,10).join(",");
-          document.getElementById("bQ2Allowed").value = bStats.q2Allowed.slice(0,10).join(",");
-          document.getElementById("bQ3Scored").value = bStats.q3Scored.slice(0,10).join(",");
-          document.getElementById("bQ3Allowed").value = bStats.q3Allowed.slice(0,10).join(",");
-          document.getElementById("bQ4Scored").value = bStats.q4Scored.slice(0,10).join(",");
-          document.getElementById("bQ4Allowed").value = bStats.q4Allowed.slice(0,10).join(",");
-        }
-        document.getElementById("bAutoTag").style.display = "inline";
-        messages.push(`${safeText(teamBName)}: ${bStats.scored.length} games ✅`);
-      } else {
-        messages.push(`${safeText(teamBName)}: no data ❌`);
-      }
-
-      g_fetchMeta.A.ft = { source: "manual", venueReliable: true };
-      g_fetchMeta.B.ft = { source: "manual", venueReliable: true };
-      if (aStats.h1Scored.length) g_fetchMeta.A.h1 = { source: "manual", venueReliable: true };
-      if (bStats.h1Scored.length) g_fetchMeta.B.h1 = { source: "manual", venueReliable: true };
-
-      setStatusHTML('<span class="spinner"></span>Scanning H2H...', "loading");
-      let h2hGames = [];
-      try {
-        h2hGames = await fetchAPIbasketballH2H(teamAId, teamBId, league);
-      } catch(e) { logDebug("H2H fetch failed", e); }
-
-      if (h2hGames.length >= 2) {
-        clearH2HFields();
-        const h2hA = h2hGames.map(g => g.scoreA);
-        const h2hB = h2hGames.map(g => g.scoreB);
-        document.getElementById("aFTH2H").value = h2hA.join(",");
-        document.getElementById("bFTH2H").value = h2hB.join(",");
-        syncH2HCheckbox("ft", false); queueH2HCheckboxSync(false);
-        document.getElementById("h2hAutoTag").style.display = "inline";
-
-        const h2hA1H = h2hGames.map(g => g.h1A).filter(v => v);
-        const h2hB1H = h2hGames.map(g => g.h1B).filter(v => v);
-        if (h2hA1H.length >= 2 && h2hB1H.length >= 2) {
-          document.getElementById("a1HH2H").value = h2hA1H.join(",");
-          document.getElementById("b1HH2H").value = h2hB1H.join(",");
-          syncH2HCheckbox("h1", false); queueH2HCheckboxSync(false);
-        }
-        messages.push(`H2H: ${h2hGames.length} games ✅`);
-      } else if (h2hGames.length === 1) {
-        clearH2HFields();
-        document.getElementById("aFTH2H").value = h2hGames[0].scoreA;
-        document.getElementById("bFTH2H").value = h2hGames[0].scoreB;
-        syncAllH2HCheckboxes(false); queueH2HCheckboxSync(false);
-        messages.push("H2H: 1 game found");
-      } else {
-        messages.push("H2H: no games found");
-      }
-
-      g_massacreFetchContext = {
-        league,
-        eventDate: new Date().toISOString(),
-        A: { overall: { ftScored10: aStats.scored, ftAllowed10: aStats.allowed }, q1Scored: aStats.q1Scored, q2Scored: aStats.q2Scored, q3Scored: aStats.q3Scored, q4Scored: aStats.q4Scored, q1Allowed: aStats.q1Allowed, q2Allowed: aStats.q2Allowed, q3Allowed: aStats.q3Allowed, q4Allowed: aStats.q4Allowed, roster: [] },
-        B: { overall: { ftScored10: bStats.scored, ftAllowed10: bStats.allowed }, q1Scored: bStats.q1Scored, q2Scored: bStats.q2Scored, q3Scored: bStats.q3Scored, q4Scored: bStats.q4Scored, q1Allowed: bStats.q1Allowed, q2Allowed: bStats.q2Allowed, q3Allowed: bStats.q3Allowed, q4Allowed: bStats.q4Allowed, roster: [] },
-        h2hGames: h2hGames.slice(0,10)
-      };
-
-      updateIntelligencePack(league, {
-        ftLine: parseMarketLine(document.getElementById("ftMarket")?.value || ""),
-        h1Line: parseMarketLine(document.getElementById("h1Market")?.value || ""),
-        aLine: parseMarketLine(document.getElementById("teamAMarket")?.value || ""),
-        bLine: parseMarketLine(document.getElementById("teamBMarket")?.value || "")
-      });
-
-      const fetchAuditIssues = buildFetchAuditIssues({ league, teamAName, teamBName, aStats, bStats, h2hGames });
-      setFetchAuditIssues(fetchAuditIssues);
-      const aGameCount = Math.min(aStats.scored.length, aStats.allowed.length);
-      const bGameCount = Math.min(bStats.scored.length, bStats.allowed.length);
-      const allGood = aGameCount >= 5 && bGameCount >= 5;
-
-      if (allGood) {
-        g_lastFetchedTeams.A = normalizeTeamName(teamAName);
-        g_lastFetchedTeams.B = normalizeTeamName(teamBName);
-        updateSectionLocks();
-      } else {
-        const missingMsg = `⚠️ FETCH INCOMPLETE: ${teamAName} has only ${aGameCount} games, ${teamBName} has ${bGameCount} games. Full model requires 5 each.`;
-        if (!fetchAuditIssues.includes(missingMsg)) fetchAuditIssues.push(missingMsg);
-        setFetchAuditIssues(fetchAuditIssues);
-        if (!messages.includes(missingMsg)) messages.push(missingMsg);
-      }
-
-      const compactFetchStatus = buildCompactFetchStatus(messages, fetchAuditIssues);
-      const statusClass = (allGood && !fetchAuditIssues.length) ? "ok" : "err";
-      setStatusHTML(compactFetchStatus ? `<div style="font-weight:bold;">${compactFetchStatus}</div>` : "", statusClass);
-
-    } catch (e) {
-      if (e.name !== 'AbortError') {
-        const _isPlanErr = String(e.message || "").toLowerCase().includes("free plan") ||
-                           String(e.message || "").toLowerCase().includes("access to this season");
-        if (_isPlanErr) {
-          setStatusText("⚠️ Stats auto-fetch unavailable — API-Sports free plan doesn't cover the current season. Enter team stats manually in the fields below.", "err");
-          engineDebug("API Basketball plan restriction — manual entry required", { error: e.message });
-        } else {
-          setFetchAuditIssues([e.message]);
-          setStatusText("❌ " + e.message, "err");
-        }
-      }
-    } finally {
-      btn.disabled = false;
-    }
-  }
+// All API Basketball helpers permanently removed – not used in football
+const RAPID_API_KEY = "";
+const RAPID_API_HOST = "";
+const RAPID_API_BASE = "";
+const THESPORTSDB_LEAGUE_MAP = {};
+const LEAGUE_ID_MAP = {};
+async function apiBasketballFetch(url, timeoutMs) { return null; }
+async function searchAPIbasketballTeam(league, teamName) { return null; }
+async function fetchAPIbasketballSchedule(teamId, league, limit) { return null; }
+async function fetchAPIbasketballH2H(teamAId, teamBId, league) { return []; }
+async function fetchAPIbasketball(league, teamAName, teamBName) { /* no-op */ }
+function getAPIBasketballSeasonParam(league) { return ""; }
 
   function clearAll() {
       acknowledgeGlobalEngineAlert();
@@ -16941,7 +15381,7 @@ window.addEventListener("beforeunload", () => {
         });
       });
 
-            const bucketMap = {
+    const bucketMap = {
         "aFTScored":["A","ft"],
         "a1HScored":["A","h1"],
         "bFTScored":["B","ft"],
