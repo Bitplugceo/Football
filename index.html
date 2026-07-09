@@ -1,3 +1,4 @@
+A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15598,24 +15599,37 @@ function evaluateMassacreForPick(pickRow, profileA, profileB) {
   const pick = pickRow?.pick || "";
   const side = getPickSideFromText(pick);
   if (!side) return { isMassacre: false };
-  
+
   let isMassacre = false;
   let severity = "none";
   let direction = "";
-  
-  // Streak activation logic (Issue 7 Massacre Activation)
-  // FOOTBALL CONVERSION — VERIFIED: thresholds rescaled from basketball point margins
-  // (>15 avg margin / 6-game streak) to football goal margins (>3 avg margin / 6-game
-  // streak), consistent with the light/heavy/nuclear rescale in getMassacreProfile
-  // above. A >3 goal average margin over a streak is a genuinely lopsided run in
-  // football, mirroring how >15 points was chosen to be genuinely lopsided in basketball.
-  // [LOCK: DIRECTION-GATED TRIGGER — VERIFIED FIX. The prior version gated only on
-  // Math.abs(avgMargin), so a team getting BLOWN OUT by 15-20+ points a game (a very
-  // negative avgMargin, streakDirection "cold") still fired the OVER boost for that
-  // team's picks, exactly as if it were a team blowing opponents out. A previous fix
-  // only corrected what the resulting direction LABEL said (see the still-present
-  // comment below) but never gated the trigger itself on that direction. Now the OVER
-  // branch
+
+  if (profileA.streakLength >= 6 && profileA.severity !== "none") {
+    if (side === "over" && profileA.streakDirection === "hot") {
+      isMassacre = true;
+      severity = profileA.severity;
+      direction = "hot";
+    } else if (side === "under" && profileA.streakDirection === "cold") {
+      isMassacre = true;
+      severity = profileA.severity;
+      direction = "cold";
+    }
+  }
+
+  if (!isMassacre && profileB.streakLength >= 6 && profileB.severity !== "none") {
+    if (side === "over" && profileB.streakDirection === "hot") {
+      isMassacre = true;
+      severity = profileB.severity;
+      direction = "hot";
+    } else if (side === "under" && profileB.streakDirection === "cold") {
+      isMassacre = true;
+      severity = profileB.severity;
+      direction = "cold";
+    }
+  }
+
+  return { isMassacre, severity, direction };
+}
 
 function getMassacreProfile(series, teamName) {
   const games = normalizeIntelSeries(series);
@@ -17269,10 +17283,10 @@ const h1Calc = compute1HProjection({
 
     // PATCHABLE ISSUE #2 FIX: pass config (with h2hFactor from the verified FT config)
     // down to each quarter so the h2hFactor tuning pipeline actually reaches quarters.
-    const q1 = computeQ("q1", parseMarketLine(document.getElementById("q1Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
-    const q2 = computeQ("q2", parseMarketLine(document.getElementById("q2Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
-    const q3 = computeQ("q3", parseMarketLine(document.getElementById("q3Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
-    const q4 = computeQ("q4", parseMarketLine(document.getElementById("q4Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
+    const q1 = isNbaOrNcaa ? computeQ("q1", parseMarketLine(document.getElementById("q1Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor }) : null;
+    const q2 = isNbaOrNcaa ? computeQ("q2", parseMarketLine(document.getElementById("q2Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor }) : null;
+    const q3 = isNbaOrNcaa ? computeQ("q3", parseMarketLine(document.getElementById("q3Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor }) : null;
+    const q4 = isNbaOrNcaa ? computeQ("q4", parseMarketLine(document.getElementById("q4Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor }) : null;
 
     // Issue 19: Q4 garbage time adjustment — blowout projected margin distorts Q4 scoring.
     if (q4 && isFinite(q4.projA) && isFinite(q4.projB) && q4.line &&
@@ -18785,7 +18799,7 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
         if (el) el.style.display = "none";
       });
       const h2hQ = document.getElementById("h2hQSection");
-      if (h2hQ) h2hQ.style.display = (isQs && isNbaOrNcaa) || !isNbaOrNcaa ? "block" : "none";
+      if (h2hQ) h2hQ.style.display = "none";
       
       const h1MarketEl = document.getElementById("h1MarketSection");
       if (h1MarketEl) h1MarketEl.style.display = leagueVal ? "block" : "none";
@@ -19971,10 +19985,10 @@ document.addEventListener('DOMContentLoaded', function() {
       typeof searchTeamFromAPI === 'function';
     if (!_allReady && _afdbAttempts++ < 20) return setTimeout(_tryPatchAfdb, 100);
   setTimeout(function() {
-          if (typeof proxyFetch === 'function' && !proxyFetch._afdbPatched) {
+    if (typeof proxyFetch === 'function' && !proxyFetch._afdbPatched) {
       const _orig = proxyFetch;
       window.proxyFetch = async function(url, timeout) {
-        const short = String(url||'').replace(/https:\/\/site\.api\.espn\.com\/apis\/site\/v2\/sports\/basketball\//,'BB/').replace(/https:\/\/site\.api\.espn\.com\/apis\/site\/v2\/sports\//,'ESPN/');
+        const short = String(url||'').replace(/https:\/\/site\.api\.espn\.com\/apis\/site\/v2\/sports\/soccer\//,'BB/').replace(/https:\/\/site\.api\.espn\.com\/apis\/site\/v2\/sports\//,'ESPN/');
         try { return await _orig.apply(this, arguments); }
         catch(err) {
           const _em = err.message || '';
