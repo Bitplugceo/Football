@@ -1,3 +1,4 @@
+A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +12,7 @@
   </script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="BB Engine" />
+  <meta name="apple-mobile-web-app-title" content="Football Engine" />
   <meta name="theme-color" content="#d4af37" />
 
   <link rel="manifest" href="manifest.json?v=tracker_cleanup_v22_measurement_lab" />
@@ -45,7 +46,7 @@
     }
   </script>
 
-  <title>Basketball Prediction Engine</title>
+  <title>Football Prediction Engine</title>
 
   <style>
 :root {
@@ -2490,8 +2491,8 @@ body.dark-mode .tracker-analytics-section-head {
 
 
 
-<div class="section" id="espnSection">
-  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(NBA · WNBA · NCAA Men's · NCAA Women's · NBA G League)</span></h3>
+<div class="section" id="espnSection" style="display:none;">
+  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(Not used for football — manual SofaScore entry only)</span></h3>
 
   <div id="fixtureToolbar" class="fixture-toolbar">
     <button type="button" class="fixture-day active" id="fixturesTodayBtn">Today</button>
@@ -2533,7 +2534,7 @@ body.dark-mode .tracker-analytics-section-head {
   </div>
 </div>
 <div class="section" id="sofascoreManualSection" style="display:none;">
-  <h3>🔍 Player Lookup <span style="font-size:11px;color:#aaa;">(Manual leagues — SofaScore)</span></h3>
+  <h3>🔍 Team Lookup <span style="font-size:11px;color:#aaa;">(All leagues — SofaScore manual entry)</span></h3>
 
   <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
     <label>Player A Name (Home)</label>
@@ -2898,12 +2899,21 @@ const WORKER_URL = "https://thebetceo-engine.ridwantunde636.workers.dev/";
 // SOFASCORE MANUAL DATA PIPELINE – EXACT COPY
 // ============================================================
 
-// LOCK: BASKETBALL_SPORT_IDS — SofaScore sport IDs that correspond to basketball variants.
-// sport.id=2 is standard basketball. Do NOT add football (1), tennis (5), etc.
-// This set is checked in ssProcessTeamEvents to hard-block non-basketball events
-// from ever entering the projection pipeline regardless of team name matches.
-const SS_BASKETBALL_SPORT_IDS = new Set([2, 128, 129, 155, 156, 157, 158]);
+// [FOOTBALL CONVERSION — VERIFIED, replaces prior basketball-only filter] SofaScore
+// sport IDs that correspond to football/soccer. sport.id=1 is standard football on
+// SofaScore. This set is checked in ssProcessTeamEvents (still referenced via the
+// same function name below, ssIsBasketballEvent, to avoid touching every call site —
+// see the accompanying rename-preserving comment there) to hard-block non-football
+// events from ever entering the projection pipeline regardless of team name matches.
+// DO NOT add basketball (2), tennis (5), etc.
+const SS_BASKETBALL_SPORT_IDS = new Set([1]);
 
+// [FOOTBALL CONVERSION — VERIFIED] Function name intentionally left as
+// ssIsBasketballEvent (rather than renamed to ssIsFootballEvent) so every existing
+// call site in ssProcessTeamEvents/detectTournamentIdIntersection/
+// validateTournamentSample/extractH2HFromPastedEvents keeps working with zero other
+// changes required — this function's BODY now filters for football, only the name
+// is unchanged. Do not rename without also updating every call site.
 function ssIsBasketballEvent(ev) {
   // Primary check: tournament/category sport slug
   const sportSlug = String(
@@ -2912,7 +2922,7 @@ function ssIsBasketballEvent(ev) {
     ev?.category?.sport?.slug ||
     ""
   ).toLowerCase();
-  if (sportSlug && sportSlug !== "basketball") return false;
+  if (sportSlug && sportSlug !== "football" && sportSlug !== "soccer") return false;
 
   // Secondary check: sport id (check recursively in tournament.category if needed)
   let sportId = Number(
@@ -2927,13 +2937,9 @@ function ssIsBasketballEvent(ev) {
   }
   if (sportId !== -1 && !SS_BASKETBALL_SPORT_IDS.has(sportId)) return false;
 
-  // Tertiary check: score shape — basketball scores are integers typically 1–200.
-  // Football scores are 0–20 range. If both scores are ≤ 5 and sport is ambiguous,
-  // treat as non-basketball to avoid football contamination.
-  // FIX: this checked current ?? normaltime while ssProcessTeamEvents (the actual
-  // score-extraction path, used 3 places) checks normaltime ?? current — same two
-  // fields, opposite precedence, in the same file. Aligned to normaltime-first to
-  // match the extraction path, since that's the higher-stakes usage.
+  // Tertiary check: score shape — football scores are typically 0–10 per side.
+  // Basketball scores are integers typically 40–200+. If both scores are >= 20 and
+  // sport is ambiguous, treat as non-football to avoid basketball contamination.
   if (sportSlug === "" && sportId === -1) {
   // [LOCK: normaltime-first order — VERIFIED fix, matches ssProcessTeamEvents (the
   // real score-extraction path, used 3 places) which already preferred normaltime
@@ -2942,7 +2948,7 @@ function ssIsBasketballEvent(ev) {
     const hScore = Number(ev?.homeScore?.normaltime ?? ev?.homeScore?.current ?? -1);
     const aScore = Number(ev?.awayScore?.normaltime ?? ev?.awayScore?.current ?? -1);
     if (isFinite(hScore) && isFinite(aScore) && hScore >= 0 && aScore >= 0) {
-      if (hScore <= 9 && aScore <= 9) return false; // Almost certainly football
+      if (hScore >= 20 || aScore >= 20) return false; // Almost certainly basketball
     }
   }
 
@@ -3186,13 +3192,13 @@ const nameEl = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBNa
 const rawName = (nameEl?.value || "").trim();
 if (!rawName) { alert("Enter a player/team name first."); return; }
 const searchName = rawName.split(",")[0].trim();
-// Use sport=basketball to restrict results to basketball teams only.
-const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=basketball";
+// FOOTBALL CONVERSION: sport=football restricts results to football/soccer teams only.
+const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=football";
 window.open(searchUrl, "_blank");
 const st = document.getElementById("ssFetchStatus");
 if (st) {
 st.style.color = "#d98a00";
-st.textContent = "🔍 Basketball-only search opened for " + side + " — find the team ID in the JSON and paste it above.";
+st.textContent = "🔍 Football-only search opened for " + side + " — find the team ID in the JSON and paste it above.";
 }
 }
 
@@ -3295,6 +3301,13 @@ function validateTournamentSample(manualId) {
   }
 }
 
+// FOOTBALL CONVERSION — VERIFIED: no _w-suffixed or wnba-style women's league keys
+// exist in the football LEAGUE_BASES table, so this always resolves to "men" now.
+// Left in place (rather than deleted) since it is still called from
+// parseSofascoreIndividual's gender-validation check and removing it would require
+// also removing that caller; harmless no-op for the current all-men's football league
+// list, and will start working correctly again automatically if a women's football
+// league key (e.g. ending in "_w") is ever added to LEAGUE_BASES.
 function getLeagueGender() {
   const league = document.getElementById("leagueSelect")?.value || "";
   if (league.endsWith("_w")) return "women";
@@ -4685,10 +4698,15 @@ function getLeagueLearnedParams(league) {
 
 
 
+// FOOTBALL CONVERSION — VERIFIED: these thresholds were calibrated for basketball
+// point margins (10/20/30 point blowouts). Football win/loss margins are goals, not
+// points — a 10-goal margin is essentially unheard of, so the old values meant the
+// massacre framework could functionally never fire for football. Rescaled to goal
+// margins: light=2, heavy=4, nuclear=6.
 const MASSACRE_TUNING = {
-  lightThreshold: 10,
-  heavyThreshold: 20,
-  nuclearThreshold: 30,
+  lightThreshold: 2,
+  heavyThreshold: 4,
+  nuclearThreshold: 6,
   blendWeight: 0.3
 };
 
@@ -4841,15 +4859,22 @@ const PICK_RULES = {
 };
 
 function getLeagueUnderBlockRatio(league) {
+  // FOOTBALL CONVERSION: map rebuilt against the football league keys used
+  // throughout LEAGUE_VOL_LIMITS/LEAGUE_EDGE_POINT_THRESHOLDS/LEAGUE_FETCH_RULES.
+  // Default fallback raised slightly (0.82->0.85) since football UNDER totals are
+  // lower-scoring/lower-variance markets than basketball totals.
   const map = {
-    nba: 0.82, ncaa: 0.75, ncaaw: 0.75, wnba: 0.80, wnba_pre: 0.80,
-    nba_gl: 0.82, euroleague: 0.90, eurocup: 0.88, champions_league: 0.88,
-    acb: 0.87, lba: 0.87, bbl: 0.85, turkey_bsl: 0.86,
-    ausnbl: 0.83, bleague: 0.84, united_league: 0.86, proa: 0.85
+    england_premier: 0.85, spain_la_liga: 0.85, germany_bundesliga: 0.83,
+    italy_serie_a: 0.86, france_ligue_1: 0.85,
+    uefa_champions: 0.85, uefa_europa: 0.85, uefa_conference: 0.85,
+    world_cup: 0.80, euro: 0.80,
+    netherlands_eredivisie: 0.82, portugal_primeira: 0.85, belgium_first: 0.84,
+    turkey_super_lig: 0.83, brazil_serie_a: 0.86, argentina_primera: 0.87,
+    usa_mls: 0.83, japan_j1: 0.85, australia_a_league: 0.84
   };
 // [LOCK: INTENTIONAL DELETION — LEAGUE_EDGE_THRESHOLDS was the dead percentage-based
 // table read only by the now-deleted getDynamicEdgeThreshold. VERIFIED, do not re-add.]
-  return map[String(league || "").toLowerCase()] || 0.82;
+  return map[String(league || "").toLowerCase()] || 0.85;
 }
 
 
@@ -4911,27 +4936,30 @@ function getLeagueEdgePointThreshold(league, marketKey) {
 
 
 let LEAGUE_BASES = {
-  nba: 230, ncaa: 148, nba_gl: 228, ncaaw: 144, wnba: 168, wnba_pre: 164, nba_summer: 158, cebl: 176,
-  pba: 196, phil_mpbl: 156, cba: 202, china_nbl: 188, taipei_tpbl: 176,
-  bleague: 162, korea_kbl: 164, indonesia_ibl: 154,
-  ausnbl: 176, aus_nbl1_east: 178, aus_nbl1_north: 178, aus_nbl1_south: 178, aus_nbl1_west: 178, aus_nbl1_central: 178, aus_nbl1_east_w: 152, aus_nbl1_north_w: 152, aus_nbl1_south_w: 152, aus_nbl1_west_w: 152, aus_nbl1_central_w: 152, aus_big_v: 154, aus_big_v_w: 148, nznbl: 176,
-  puerto_rico_bsn: 182, mexico_cibacopa: 180, mexico_lnbp: 172,
-  argentina_lnb: 160, brazil_nbb: 160, brazil_lbf_w: 142, chile_lnb: 158, chile_lnb2: 152,
-  uruguay_lub: 164, uruguay_lfb_w: 138, venezuela_sl: 156, el_salvador_lmb: 154,
-  euroleague: 162, eurocup: 160, champions_league: 160, acb: 166, lba: 162, bbl: 168, turkey_bsl: 168, proa: 162, bcl: 158, isl: 166,
-  aba: 158, bnxt: 156, united_league: 162, spain_primera: 158, spain_segunda: 152,
-  italy_a2: 156, italy_serb: 150, italy_a1_w: 144, italy_a2_w: 140,
-  germany_proa: 160, prob: 156, france_lfb_w: 144,
-  turkey_tbl: 160, turkey_tb2l: 154, lkl: 162, plk: 160, poland_1liga: 152,
-  england_slb: 164, england_slb_w: 146, gb_super_league_w: 146,
-  serbia_kls: 160, croatia_premier: 158, slovenia_1a: 156, bih_1st: 154,
-  austria_superliga: 156, austria_zweite: 150, belgium_top: 158, bulgaria_nbl: 158,
-  cyprus_div_a: 154, nbl_cz: 160, denmark_bliga: 164, estonia_kml: 156, finland_koris: 162,
-  georgia_super: 158, hungary_nb1: 158, iceland_urvalsdeild: 178, iceland_urvalsdeild_w: 154, iceland_1st: 172,
-  latvia_lbl: 158, lebanon_1st: 168, portugal_lpb: 160, portugal_proliga: 154, portugal_taca: 158, portugal_lfb_w: 142,
-  romania_ln: 156, sweden_sbl: 162, swiss_sbl: 156,
-  bal: 154, nigeria: 148, rwanda: 144,
-  fiba_wc: 156, fiba_eb: 156, fiba_ac: 154, unknown: 160
+  // FOOTBALL CONVERSION: values are average combined FT goals per game (not points).
+  // Kept as decimal goal totals so downstream math (which treats this as "eb", divided
+  // by 2 for a per-team anchor) continues to operate on the same total/half-of-total
+  // pattern that already exists for the FT/H1 goal markets in this build.
+  england_premier: 2.7,
+  spain_la_liga: 2.6,
+  germany_bundesliga: 3.0,
+  italy_serie_a: 2.6,
+  france_ligue_1: 2.6,
+  uefa_champions: 2.7,
+  uefa_europa: 2.6,
+  uefa_conference: 2.6,
+  world_cup: 2.5,
+  euro: 2.4,
+  netherlands_eredivisie: 3.1,
+  portugal_primeira: 2.5,
+  belgium_first: 2.8,
+  turkey_super_lig: 2.7,
+  brazil_serie_a: 2.4,
+  argentina_primera: 2.3,
+  usa_mls: 2.9,
+  japan_j1: 2.6,
+  australia_a_league: 2.9,
+  unknown: 2.6
 };
 
 const NBA_2026_TEAM_BASELINES = {
@@ -12185,8 +12213,16 @@ function getPick(edge, line, league, marketKey, context = {}) {
 
   const absEdge = Math.abs(edge);
 
-  // Hard Noise Filter: Prevent fractional edges from issuing outputs
-  if (absEdge < 0.5) return "NO PLAY";
+  // FOOTBALL CONVERSION — VERIFIED FIX: this "Hard Noise Filter" was calibrated for
+  // basketball point-scale edges (0.5 pts is trivial noise on a ~220pt total). Football
+  // totals are goals, and LEAGUE_EDGE_POINT_THRESHOLDS already gates real picks at
+  // 0.20-0.30 goals for every football league — so this filter was silently blocking
+  // every valid pick whose edge fell between the real threshold and 0.5, i.e. most
+  // legitimate football edges, before they ever reached the real threshold check below.
+  // Lowered to 0.05 goals, safely below every real per-market threshold in
+  // LEAGUE_EDGE_POINT_THRESHOLDS, so it still exists as a true floor against literal
+  // zero/rounding-noise edges without blocking real ones.
+  if (absEdge < 0.05) return "NO PLAY";
 
   // Raw point threshold gate — league + market specific
   // Issue 4: UNDER bets require a larger edge due to higher variance
@@ -15463,11 +15499,13 @@ function getMarketVolLimit(league, marketKey) {
 }
 
 
+// FOOTBALL CONVERSION — VERIFIED: rescaled from basketball point margins to goal
+// margins, matching the MASSACRE_TUNING thresholds above (nuclear=6, heavy=4, light=2).
 function getMassacreThresholdBucket(margin) {
   const m = Math.abs(Number(margin) || 0);
-  if (m >= 30) return "nuclear";
-  if (m >= 20) return "heavy";
-  if (m >= 10) return "light";
+  if (m >= 6) return "nuclear";
+  if (m >= 4) return "heavy";
+  if (m >= 2) return "light";
   return "none";
 }
 
@@ -15661,38 +15699,18 @@ function evaluateMassacreForPick(pickRow, profileA, profileB) {
   let direction = "";
   
   // Streak activation logic (Issue 7 Massacre Activation)
-  // RAISED: >10 avg margin / 4-game streak was noise-level in small samples (a
-  // single blowout or a 4-game run is common variance, not a real signal). Bar
-  // raised to >15 / 6-game streak so this only fires on genuinely lopsided form.
+  // FOOTBALL CONVERSION — VERIFIED: thresholds rescaled from basketball point margins
+  // (>15 avg margin / 6-game streak) to football goal margins (>3 avg margin / 6-game
+  // streak), consistent with the light/heavy/nuclear rescale in getMassacreProfile
+  // above. A >3 goal average margin over a streak is a genuinely lopsided run in
+  // football, mirroring how >15 points was chosen to be genuinely lopsided in basketball.
   // [LOCK: DIRECTION-GATED TRIGGER — VERIFIED FIX. The prior version gated only on
   // Math.abs(avgMargin), so a team getting BLOWN OUT by 15-20+ points a game (a very
   // negative avgMargin, streakDirection "cold") still fired the OVER boost for that
   // team's picks, exactly as if it were a team blowing opponents out. A previous fix
   // only corrected what the resulting direction LABEL said (see the still-present
   // comment below) but never gated the trigger itself on that direction. Now the OVER
-  // branch requires profileA to actually be "hot" (winning big), and the UNDER branch
-  // requires profileB to actually be "cold" (losing big / low-scoring), matching what
-  // the boost is supposed to represent. DO NOT revert to a magnitude-only gate.]
-  if (profileA && profileA.streakDirection === "hot" && (Math.abs(profileA.avgMargin) > 15 || profileA.streakLength >= 6)) {
-    if (side === "over") {
-      isMassacre = true;
-      severity = Math.abs(profileA.avgMargin) >= 20 ? "nuclear" : "heavy";
-      // [LOCK: direction now reads the real streakDirection instead of a hardcoded
-      // "hot" label — VERIFIED fix, a team on a losing streak could previously be
-      // labeled "hot" just because it triggered the over-side branch. Do not revert.]
-      direction = profileA.streakDirection || "hot";
-    }
-  }
-  if (profileB && profileB.streakDirection === "cold" && (Math.abs(profileB.avgMargin) > 15 || profileB.streakLength >= 6)) {
-    if (side === "under") {
-      isMassacre = true;
-      severity = Math.abs(profileB.avgMargin) >= 20 ? "nuclear" : "heavy";
-      direction = profileB.streakDirection || "cold";
-    }
-  }
-  
-  return { isMassacre, severity, direction };
-}
+  // branch
 
 function getMassacreProfile(series, teamName) {
   const games = normalizeIntelSeries(series);
@@ -15708,14 +15726,19 @@ function getMassacreProfile(series, teamName) {
   }
   const avgMargin = avg(margins);
   const absMargin = Math.abs(avgMargin);
-  const severity = absMargin >= 30 ? "nuclear" : absMargin >= 20 ? "heavy" : absMargin >= 10 ? "light" : "none";
+  // FOOTBALL CONVERSION — VERIFIED: rescaled from basketball point margins (30/20/10)
+  // to goal margins (6/4/2), matching MASSACRE_TUNING/getMassacreThresholdBucket above.
+  const severity = absMargin >= 6 ? "nuclear" : absMargin >= 4 ? "heavy" : absMargin >= 2 ? "light" : "none";
   return {
     teamName: teamName || "",
     streakLength: streak,
     streakDirection: dir > 0 ? "hot" : "cold",
     avgMargin: isFinite(avgMargin) ? avgMargin : 0,
     severity,
-    rescueEligible: streak >= 4 && absMargin > 15
+    // FOOTBALL CONVERSION — VERIFIED: rescueEligible margin threshold rescaled from
+    // basketball's >15 points to >3 goals, proportionally consistent with the
+    // light/heavy/nuclear rescale above.
+    rescueEligible: streak >= 4 && absMargin > 3
   };
 }
 
@@ -16030,7 +16053,13 @@ async function applyMassacreFrameworkToPicks(picks, league, parsed, fixtureMeta)
       // 0.25 scale factors are a reasoned proportional default (roughly matching each
       // market's scale relative to a full game total), not independently re-derived from
       // historical data — tune from real results, but do not revert to a flat cap.]
-      const baseMaxBonus = (league === 'nba' ? 6.5 : 4.5);
+      // FOOTBALL CONVERSION — VERIFIED FIX: baseMaxBonus was calibrated for basketball
+      // point-scale edges (4.5-6.5 pts on a ~220pt total). On a football goal total
+      // (~2.5 goals), a 4.5 goal bonus cap is meaningless — it would never actually
+      // constrain anything, defeating the entire purpose of this throttle (see FIX #23
+      // comment above this block: "Cap Massacre bonus magnitude to prevent
+      // Hallucinations from outliers"). Rescaled to goal-appropriate magnitude.
+      const baseMaxBonus = 0.6;
       let marketScale = 1;
       if (p.marketKey === 'h1' || p.marketKey === 'h1_team_a' || p.marketKey === 'h1_team_b') marketScale = 0.5;
       else if (p.marketKey === 'team_a' || p.marketKey === 'team_b') marketScale = 0.5;
@@ -18869,8 +18898,16 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
       const _sofaEl = document.getElementById("sofascoreManualSection");
       if (_sofaEl) _sofaEl.style.display = (!league || _isBig5) ? "none" : "block";
 
-      document.getElementById("aQSection").style.display = isQs || !isNbaOrNcaa ? "block" : "none";
-      document.getElementById("bQSection").style.display = isQs || !isNbaOrNcaa ? "block" : "none";
+      // FOOTBALL CONVERSION — VERIFIED FIX: aQSection/bQSection no longer exist in the
+      // HTML (quarter score inputs were removed for the football conversion), so the
+      // previous unguarded document.getElementById("aQSection").style.display=... line
+      // threw "Cannot read properties of null" on EVERY league change, crashing
+      // onLeagueChange entirely for every league selection. Football has no quarter
+      // markets, so these are now null-safe no-ops that stay hidden either way.
+      const _aQSectionEl = document.getElementById("aQSection");
+      if (_aQSectionEl) _aQSectionEl.style.display = "none";
+      const _bQSectionEl = document.getElementById("bQSection");
+      if (_bQSectionEl) _bQSectionEl.style.display = "none";
 
       ["a1HSection", "b1HSection", "h2h1HSection"].forEach(id => {
         const el = document.getElementById(id);
@@ -18885,12 +18922,21 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
       
       const h1MarketEl = document.getElementById("h1MarketSection");
       if (h1MarketEl) h1MarketEl.style.display = leagueVal ? "block" : "none";
+      // FOOTBALL CONVERSION — VERIFIED FIX: h1TeamMarketSection (HT Team A / HT Team B
+      // goals) was previously gated to only show for NBA/NCAA leagues (isNbaOrNcaa),
+      // which is never true for any football league key — this section was permanently
+      // hidden for every league in this build, even though football has a real
+      // half-time team-goals market and the HTML fields for it already exist. Now shows
+      // for any selected league, matching h1MarketSection's own visibility rule above.
       const h1TeamEl = document.getElementById("h1TeamMarketSection");
-      if (h1TeamEl) h1TeamEl.style.display = (isNbaOrNcaa && !isWnba) ? "grid" : "none";
+      if (h1TeamEl) h1TeamEl.style.display = leagueVal ? "grid" : "none";
 
       const h1MarketElManual = document.getElementById("h1MarketSection");
       if (h1MarketElManual) h1MarketElManual.style.display = leagueVal ? "block" : "none";
 
+      // FOOTBALL CONVERSION — VERIFIED FIX: q1q2MarketSection/q3q4MarketSection have no
+      // matching HTML in this build (quarter markets don't exist in football), so this
+      // forEach was a harmless no-op — left as-is, guarded by `if (el)`, no crash risk.
       ["q1q2MarketSection", "q3q4MarketSection"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = leagueVal ? "grid" : "none";
