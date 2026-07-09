@@ -2445,7 +2445,7 @@ body.dark-mode .tracker-analytics-section-head {
 
   <span class="brand-right">
 
-    <button class="theme-toggle" type="button" id="themeToggleBtn" title="Toggle dark/light mode">🏀</button>
+    <button class="theme-toggle" type="button" id="themeToggleBtn" title="Toggle dark/light mode">⚽</button>
     <button class="theme-toggle" type="button" id="trackerToggleBtn" title="Open tracked picks">📊</button>
     <button class="theme-toggle" type="button" id="afdbBtn" title="Auto-Fetch Debugger" onclick="if(typeof AFDB!=='undefined'&&AFDB.open)AFDB.open()">🔬</button>
     PREDICTIONS
@@ -2540,7 +2540,7 @@ body.dark-mode .tracker-analytics-section-head {
     <div style="display:flex;gap:6px;margin-bottom:4px;">
       <input id="ssTeamAName" placeholder="Player / Team A" style="margin-bottom:0;flex:1;" oninput="validateSofascoreSection()" />
       <input id="ssPasteA" placeholder="Paste JSON A" oninput="parseSofascoreIndividual('A')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-      <button type="button" onclick="searchSofascorePlayer('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search basketball team">🔍</button>
+      <button type="button" onclick="searchSofascorePlayer('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team">🔍</button>
       <button type="button" onclick="clearPasteJSON('A')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -2554,7 +2554,7 @@ body.dark-mode .tracker-analytics-section-head {
     <div style="display:flex;gap:6px;margin-bottom:4px;">
       <input id="ssTeamBName" placeholder="Player / Team B" style="margin-bottom:0;flex:1;" oninput="validateSofascoreSection()" />
       <input id="ssPasteB" placeholder="Paste JSON B" oninput="parseSofascoreIndividual('B')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-      <button type="button" onclick="searchSofascorePlayer('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search basketball team">🔍</button>
+      <button type="button" onclick="searchSofascorePlayer('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team">🔍</button>
       <button type="button" onclick="clearPasteJSON('B')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -3774,23 +3774,18 @@ function extractH2HFromPastedEvents() {
       const oppScoreObj = isAHome ? m.awayScore : m.homeScore;
       const myFT = Number(myScoreObj?.normaltime ?? myScoreObj?.current ?? myScoreObj?.display ?? 0);
       const oppFT = Number(oppScoreObj?.normaltime ?? oppScoreObj?.current ?? oppScoreObj?.display ?? 0);
-      if (myFT > 0) {
-        const mQ1 = Number(myScoreObj?.period1 ?? 0);
-        const mQ2 = Number(myScoreObj?.period2 ?? 0);
-        const mQ3 = Number(myScoreObj?.period3 ?? 0);
-        const mQ4 = Number(myScoreObj?.period4 ?? 0);
-        const oQ1 = Number(oppScoreObj?.period1 ?? 0);
-        const oQ2 = Number(oppScoreObj?.period2 ?? 0);
-        const oQ3 = Number(oppScoreObj?.period3 ?? 0);
-        const oQ4 = Number(oppScoreObj?.period4 ?? 0);
+      if (isFinite(myFT) && isFinite(oppFT) && myFT >= 0 && oppFT >= 0) {
+        const mQ1 = myScoreObj?.period1 !== undefined ? Number(myScoreObj.period1) : null;
+        const oQ1 = oppScoreObj?.period1 !== undefined ? Number(oppScoreObj.period1) : null;
+        const hasHalf = mQ1 !== null && oQ1 !== null && isFinite(mQ1) && isFinite(oQ1);
         newEntries.push({
           id: m.id,
           ts: m.startTimestamp || 0,
           aFT: myFT, bFT: oppFT,
-          aH1: mQ1 + mQ2, bH1: oQ1 + oQ2,
-          aQ1: mQ1, bQ1: oQ1, aQ2: mQ2, bQ2: oQ2,
-          aQ3: mQ3, bQ3: oQ3, aQ4: mQ4, bQ4: oQ4,
-          hasQ: mQ1 > 0 || mQ2 > 0
+          aH1: hasHalf ? mQ1 : 0, bH1: hasHalf ? oQ1 : 0,
+          aQ1: 0, bQ1: 0, aQ2: 0, bQ2: 0,
+          aQ3: 0, bQ3: 0, aQ4: 0, bQ4: 0,
+          hasQ: hasHalf
         });
       }
     });
@@ -5121,8 +5116,8 @@ const LEAGUE_VOL_LIMITS = {
 const VOL_CACHE_KEY = "engineVolCache_v1";
 const VOL_CACHE_MIN_SAMPLES = 25;   // don't trust the cache until it has real breadth
 const VOL_CACHE_MAX_SAMPLES = 2000; // sanity ceiling on Welford's running count, not a real limit
-const VOL_CACHE_MIN_LIMIT = 6;      // clamp band — protects against a near-zero-variance fluke
-const VOL_CACHE_MAX_LIMIT = 30;     // clamp band — protects against an early outlier-heavy sample
+const VOL_CACHE_MIN_LIMIT = 0.4;      // clamp band — protects against a near-zero-variance fluke
+const VOL_CACHE_MAX_LIMIT = 3.0;     // clamp band — protects against an early outlier-heavy sample
 
 function loadVolCache() {
   try {
@@ -11936,7 +11931,7 @@ function addTrackedPicks(newPicks) {
         paceGapRisk:     p.diagnostics.paceGapRisk || false,
         hasH2H:          p.diagnostics.ftHasH2H || false,
         volatilityRatio: (isFinite(Number(p.diagnostics.aVol)) && (LEAGUE_VOL_LIMITS[p.league] || 0) > 0)
-                           ? Number(p.diagnostics.aVol) / (LEAGUE_VOL_LIMITS[p.league] || 12)
+                           ? Number(p.diagnostics.aVol) / (LEAGUE_VOL_LIMITS[p.league] || 1.2)
                            : null,
         possProjection:  p.diagnostics.possProjection ?? null,
         anchorPull:      p.diagnostics.anchorPull ?? null,
@@ -12041,7 +12036,7 @@ function addTrackedPicks(newPicks) {
 
 function getVolatilityRatioForSeries(series, leagueVolLimit) {
   const sd = stdDev(Array.isArray(series) ? series : []);
-  const limit = Number(leagueVolLimit) || 12;
+  const limit = Number(leagueVolLimit) || 1.2;
   return Math.min(1, sd / limit);
 }
 
@@ -15392,7 +15387,7 @@ function compute1HProjection({ league, parsed, lines, injMultA = 1, injMultB = 1
 function getMarketVolLimit(league, marketKey) {
   const cfg = LEAGUE_CONFIG_MAP[String(league || "").toUpperCase()];
   const base = (cfg && isFinite(cfg.volLimit)) ? cfg.volLimit :
-    (getLearnedVolLimit(league) != null ? getLearnedVolLimit(league) : (LEAGUE_VOL_LIMITS[String(league || "").toLowerCase()] || 12));
+    (getLearnedVolLimit(league) != null ? getLearnedVolLimit(league) : (LEAGUE_VOL_LIMITS[String(league || "").toLowerCase()] || 1.2));
   // ISSUE #2 FIX: marketKey was accepted but never used, so H1/quarter volatility
   // adjustments were computed against the FT-scale limit (e.g. 12 for NBA), which is
   // roughly double/quadruple the real half/quarter scoring range, artificially
@@ -15739,7 +15734,7 @@ function calibrateConfidenceModel() {
   });
   // Store grade cutoffs based on logistic model score percentiles
   const scores = allPicks.map(p => {
-    const g = getConfidenceGrade({ pick: p.predictionText, line: p.line, edge: p.edge, sampleTier: p.sampleTier, projectionOnly: p.projectionOnly, fullModel: p.fullModel, trap: false, hasH2H: p.hasH2H, volatility: 0, volLimit: 12, marketKey: p.marketKey });
+    const g = getConfidenceGrade({ pick: p.predictionText, line: p.line, edge: p.edge, sampleTier: p.sampleTier, projectionOnly: p.projectionOnly, fullModel: p.fullModel, trap: false, hasH2H: p.hasH2H, volatility: 0, volLimit: 1.2, marketKey: p.marketKey });
     return { score: { A:4, B:3, C:2, D:1 }[g] || 0, result: p.resultStatus };
   }).filter(s => s.score > 0);
   if (scores.length >= 30) {
@@ -15785,7 +15780,7 @@ function calibrateConfidenceModel() {
     edgePct:   clampNumber(Number(p.edgePct || p.godsEyeMemory?.edgePct || 0) - 0.060, -0.06, 0.15),
     volRatio:  clampNumber(
                  ((Number(p.godsEyeMemory?.aVol || 0) + Number(p.godsEyeMemory?.bVol || 0)) / 2)
-                 / (LEAGUE_VOL_LIMITS[String(p.league || "")] || 12) - 1.0, -1, 2),
+                 / (LEAGUE_VOL_LIMITS[String(p.league || "")] || 1.2) - 1.0, -1, 2),
     sampleFull: (String(p.godsEyeMemory?.sampleTier || "").toLowerCase() === "full") ? 1 : 0,
     h2h:       (p.godsEyeMemory?.hasH2H) ? 1 : 0,
     trap:      (p.godsEyeMemory?.trap) ? 1 : 0
@@ -17806,9 +17801,9 @@ const ftNote = ftCalc.ftNote || ftCalc.ftProjectionNote || null;
     const isManualLeagueRun = !isNbaOrNcaa;
 
     // Streamlined allowlists — 2H, exotics, margins, race, HT-FT permanently removed
-    const wnbaAllowedMarkets   = new Set(["ft", "h1", "team_a", "team_b", "q1", "q2", "q3", "q4"]);
-    const nbaAllowedMarkets    = new Set(["ft", "h1", "team_a", "team_b", "q1", "q2", "q3", "q4", "h1_team_a", "h1_team_b"]);
-    const manualAllowedMarkets = new Set(["ft", "h1", "team_a", "team_b", "q1", "q2", "q3", "q4"]);
+    const wnbaAllowedMarkets   = new Set(["ft", "h1", "team_a", "team_b"]);
+    const nbaAllowedMarkets    = new Set(["ft", "h1", "team_a", "team_b", "h1_team_a", "h1_team_b"]);
+    const manualAllowedMarkets = new Set(["ft", "h1", "team_a", "team_b", "h1_team_a", "h1_team_b"]);
 
     const finalPicks = picks.filter(p => {
       if (isWnbaRun)       return wnbaAllowedMarkets.has(p.marketKey);
@@ -19874,7 +19869,7 @@ panel.innerHTML = '<div style="background:#080808;border-bottom:1px solid #222;p
     let paceAnomalies = 0, edgeAnomalies = 0;
     active.forEach(p => {
       const pace = (p.diagnostics && p.diagnostics.pace) || (p.godsEyeMemory && p.godsEyeMemory.pace);
-      if (pace && (pace > 135 || pace < 65)) paceAnomalies++;
+      if (pace && (pace > 1.5 || pace < 0.5)) paceAnomalies++;
       if (p.edgePct && Math.abs(p.edgePct) > 25) edgeAnomalies++;
     });
     if (paceAnomalies > 0) { log('ERROR','MATH ENGINE', paceAnomalies + ' picks show unrealistic pace projections (<65 or >135). Logic contradiction detected.'); totalSuspects++; }
@@ -20612,18 +20607,18 @@ window.INTEGRATION_TEST_SUITE = (() => {
       // ---- STEP 1: "FETCH" (seed manual-entry inputs the same way a real
       // fetch or manual paste would populate them, per the comment above) ----
       const ls = document.getElementById("leagueSelect");
-      if (ls) ls.value = "nba";
+      if (ls) ls.value = "england_premier";
       selectedTeamIds = { A: null, B: null };
       setVal("teamAName", TEAM_A);
       setVal("teamBName", TEAM_B);
-      setVal("aFTScored", "115,118,120,117,119");
-      setVal("aFTAllowed", "100,98,102,101,99");
-      setVal("bFTScored", "112,110,115,111,113");
-      setVal("bFTAllowed", "105,103,107,104,106");
-      // Line deliberately set far below the expected ~230 combined total so the
+      setVal("aFTScored", "2,1,3,0,2");
+      setVal("aFTAllowed", "1,2,1,0,1");
+      setVal("bFTScored", "1,2,1,2,0");
+      setVal("bFTAllowed", "2,1,2,1,2");
+      // Line deliberately set far below the expected combined total so the
       // engine's edge threshold is cleared unambiguously (avoids a flaky NO PLAY
       // depending on minor projection variance).
-      setVal("ftMarket", "150.5-152.5");
+      setVal("ftMarket", "1.5-2.5");
       setVal("h1Market", "");
       setVal("teamAMarket", "");
       setVal("teamBMarket", "");
@@ -20646,7 +20641,7 @@ window.INTEGRATION_TEST_SUITE = (() => {
       }
 
       // ---- STEP 4: "SETTLE" (manual settlement, same path a real user click uses) ----
-      savedPick.actualScore = "235-210"; // comfortably above our 151.5 OVER line
+      savedPick.actualScore = "3-1"; // comfortably above our 1.5/2.5 OVER line
       const settleOk = await applyManualSettlementToTrackedPick(savedPick.signature, "win");
       check("applyManualSettlementToTrackedPick returned true", settleOk === true);
 
@@ -20712,31 +20707,34 @@ window.REGRESSION_TEST_SUITE = (() => {
   const SCENARIOS = [
     {
       name: "nba_standard_over",
-      league: "nba",
+      league: "england_premier",
       fields: {
         teamAName: "ZZGOLDEN_TeamA", teamBName: "ZZGOLDEN_TeamB",
-        aFTScored: "115,118,120,117,119,116,121,114,118,120",
-        aFTAllowed: "100,98,102,101,99,103,97,100,102,101",
-        bFTScored: "112,110,115,111,113,109,114,112,110,113",
-        bFTAllowed: "105,103,107,104,106,108,102,105,107,104",
-        a1HScored: "", a1HAllowed: "", b1HScored: "", b1HAllowed: "",
+        aFTScored: "2,1,3,0,2,1,2,3,1,2",
+        aFTAllowed: "1,2,1,2,0,1,2,1,2,1",
+        bFTScored: "1,2,1,2,0,1,2,1,2,1",
+        bFTAllowed: "2,1,2,1,2,0,1,2,1,2",
+        a1HScored: "1,0,1,0,1,1,0,2,0,1", a1HAllowed: "0,1,0,1,0,0,1,0,1,0",
+        b1HScored: "0,1,0,1,0,0,1,0,1,0", b1HAllowed: "1,0,1,0,1,1,0,2,0,1",
         aFTH2H: "", bFTH2H: "",
-        ftMarket: "220.5-222.5", h1Market: "", teamAMarket: "", teamBMarket: "",
+        ftMarket: "2.5-3.5", h1Market: "0.5-1.5", teamAMarket: "", teamBMarket: "",
         q1Market: "", q2Market: "", q3Market: "", q4Market: ""
       }
     },
     {
       name: "nba_h2h_blend",
-      league: "nba",
+      league: "england_premier",
       fields: {
         teamAName: "ZZGOLDEN_TeamC", teamBName: "ZZGOLDEN_TeamD",
-        aFTScored: "108,105,110,107,109,106,111,104,108,110",
-        aFTAllowed: "112,110,115,111,113,109,114,112,110,113",
-        bFTScored: "118,120,116,119,117,121,115,118,120,116",
-        bFTAllowed: "108,106,110,107,109,105,111,108,106,109",
-        a1HScored: "", a1HAllowed: "", b1HScored: "", b1HAllowed: "",
-        aFTH2H: "215,220,218,222,216", bFTH2H: "210,208,212,209,211",
-        ftMarket: "225.5-227.5", h1Market: "", teamAMarket: "", teamBMarket: "",
+        aFTScored: "2,1,2,1,2,1,2,3,1,2",
+        aFTAllowed: "1,2,1,2,1,0,1,2,1,2",
+        bFTScored: "3,2,3,2,3,1,2,3,1,2",
+        bFTAllowed: "1,2,1,2,1,1,2,1,2,1",
+        a1HScored: "1,0,1,0,1,0,1,1,0,1", a1HAllowed: "0,1,0,1,0,0,1,1,0,1",
+        b1HScored: "1,1,1,1,1,0,1,1,0,1", b1HAllowed: "0,1,0,1,0,1,1,0,1,0",
+        aFTH2H: "2,1,3,0,2", bFTH2H: "1,2,1,2,0",
+        a1HH2H: "1,0,1,0,1", b1HH2H: "0,1,0,1,0",
+        ftMarket: "2.5-3.5", h1Market: "0.5-1.5", teamAMarket: "", teamBMarket: "",
         q1Market: "", q2Market: "", q3Market: "", q4Market: ""
       }
     }
