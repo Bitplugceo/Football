@@ -1,4 +1,3 @@
-M
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3985,44 +3984,42 @@ const ASIA_EDGE_LEAGUES = [];
 const TRAP_RULES = {
       minEdgePct: 0.015,
       extremeEdgePct: 0.12,
-      lowLineUnder: { nba: 205, ncaa: 125 },
+      lowLineUnder: { default: 2.1 },
       volThresholds: {
-        ft:   { nba: 18, other: 15 },
-        h1:   { nba: 10.5, other: 9.0 },
-        team: { nba: 11.5, other: 10.0 }
+        ft:   { default: 1.3 },
+        h1:   { default: 0.9 },
+        team: { default: 1.0 }
       }
     };
 
 const ANCHOR_RULES = {
-      ft:   { nbaDiff: 18, otherDiff: 25, nbaWeight: 0.5, otherWeight: 0.5 },
-      h1:   { nbaDiff: 9,  otherDiff: 12, nbaWeight: 0.5, otherWeight: 0.5 },
-      team: { nbaDiff: 10, otherDiff: 12, nbaWeight: 0.5, otherWeight: 0.5 }
+      ft:   { defaultDiff: 1.4, defaultWeight: 0.5 },
+      h1:   { defaultDiff: 0.8, defaultWeight: 0.5 },
+      team: { defaultDiff: 0.9, defaultWeight: 0.5 }
     };
 
 
 
+// League baselines = expected average TOTAL GOALS per match (used to anchor small-sample projections)
 let LEAGUE_BASES = {
-  nba: 230, ncaa: 148, nba_gl: 228, ncaaw: 144, wnba: 168, wnba_pre: 164, cebl: 176,
-  pba: 196, phil_mpbl: 156, cba: 202, china_nbl: 188, taipei_tpbl: 176,
-  bleague: 162, korea_kbl: 164, indonesia_ibl: 154,
-  ausnbl: 176, aus_nbl1_east: 178, aus_nbl1_north: 178, aus_nbl1_south: 178, aus_nbl1_west: 178, aus_nbl1_east_w: 152, aus_nbl1_north_w: 152, aus_nbl1_south_w: 152, aus_nbl1_west_w: 152, aus_big_v: 154, aus_big_v_w: 148, nznbl: 176,
-  puerto_rico_bsn: 182, mexico_cibacopa: 180, mexico_lnbp: 172,
-  argentina_lnb: 160, brazil_nbb: 160, brazil_lbf_w: 142, chile_lnb: 158, chile_lnb2: 152,
-  uruguay_lub: 164, uruguay_lfb_w: 138, venezuela_sl: 156, el_salvador_lmb: 154,
-  euroleague: 162, eurocup: 160, champions_league: 160, acb: 166, lba: 162, bbl: 168, turkey_bsl: 168, proa: 162, bcl: 158, isl: 166,
-  aba: 158, bnxt: 156, united_league: 162, spain_primera: 158, spain_segunda: 152,
-  italy_a2: 156, italy_serb: 150, italy_a1_w: 144, italy_a2_w: 140,
-  germany_proa: 160, prob: 156, france_lfb_w: 144,
-  turkey_tbl: 160, turkey_tb2l: 154, lkl: 162, plk: 160, poland_1liga: 152,
-  england_slb: 164, england_slb_w: 146, gb_super_league_w: 146,
-  serbia_kls: 160, croatia_premier: 158, slovenia_1a: 156, bih_1st: 154,
-  austria_superliga: 156, austria_zweite: 150, belgium_top: 158, bulgaria_nbl: 158,
-  cyprus_div_a: 154, nbl_cz: 160, denmark_bliga: 164, estonia_kml: 156, finland_koris: 162,
-  georgia_super: 158, hungary_nb1: 158, iceland_urvalsdeild: 178, iceland_urvalsdeild_w: 154, iceland_1st: 172,
-  latvia_lbl: 158, lebanon_1st: 168, portugal_lpb: 160, portugal_proliga: 154, portugal_taca: 158, portugal_lfb_w: 142,
-  romania_ln: 156, sweden_sbl: 162, swiss_sbl: 156,
-  bal: 154, nigeria: 148, rwanda: 144,
-  fiba_wc: 156, fiba_eb: 156, fiba_ac: 154, unknown: 160
+  premier_league: 2.82, la_liga: 2.55, bundesliga: 3.15, serie_a: 2.68, ligue_1: 2.62,
+  eredivisie: 3.05, champions_league: 2.85, europa_league: 2.75, championship: 2.55,
+  primeira_liga: 2.55, belgian_pro_league: 2.95, super_league_greece: 2.35,
+  russian_premier: 2.55, turkish_super_lig: 2.85, scottish_premiership: 2.75,
+  swiss_super_league: 2.95, austrian_bundesliga: 3.05, danish_superliga: 2.85,
+  mls: 2.95, brazil_serie_a: 2.35, argentina_primera: 2.25, liga_mx: 2.65,
+  saudi_pro_league: 2.75, j_league: 2.55, k_league: 2.45, a_league: 2.85,
+  world_cup: 2.55, euros: 2.35, copa_america: 2.25, afcon: 2.15, gold_cup: 2.35,
+  league_one: 2.55, league_two: 2.55, segunda_division: 2.35, bundesliga_2: 2.95,
+  serie_b: 2.35, ligue_2: 2.35, csl: 2.65, indian_super_league: 2.55,
+  south_african_psl: 2.15, egyptian_premier: 2.15, qatar_stars_league: 2.85,
+  croatian_hnl: 2.65, serbian_superliga: 2.55, czech_first_league: 2.75,
+  polish_ekstraklasa: 2.55, swedish_allsvenskan: 2.65, norwegian_eliteserien: 2.85,
+  ukrainian_premier: 2.45, colombia_primera_a: 2.25, chile_primera: 2.35,
+  peru_liga_1: 2.45, uruguay_primera: 2.15,
+  fa_cup: 2.65, efl_cup: 2.85, copa_del_rey: 2.55, dfb_pokal: 3.05,
+  coppa_italia: 2.55, coupe_de_france: 2.55, club_world_cup: 2.65,
+  unknown: 2.6
 };
 
 // NBA team baselines removed – football only
@@ -4050,10 +4047,7 @@ const LEAGUE_RATING_BASES = {
     }
 
 const LEAGUE_HOME_EDGE = {
-  nba: 0, ncaa: 0, wnba: 0, wnba_pre: 0, nba_gl: 0,
-  euroleague: 0, eurocup: 0, champions_league: 0,
-  acb: 0, lba: 0, bbl: 0, turkey_bsl: 0, ausnbl: 0,
-  bleague: 0, united_league: 0, proa: 0
+  default: 0
 };
 
 const LEAGUE_VOL_LIMITS = {
@@ -5691,7 +5685,7 @@ function buildFetchAuditIssues({
       const fetchBtn = document.getElementById("fetchBtn");
       const teamAName = document.getElementById("teamAName")?.value.trim() || "";
       const teamBName = document.getElementById("teamBName")?.value.trim() || ""; 
-      const supported = true; // All leagues now support auto-fetch (ESPN or API Basketball)
+      const supported = true; // Every league is enterable (manual SofaScore entry)
       const fixtureOpt = getSelectedFixtureOption();
       const hasActivity = !!teamAName || !!teamBName || !!fixtureOpt;
 
@@ -9555,7 +9549,7 @@ async function applyManualSettlementToTrackedPick(signature, resultStatus) {
     }
   }
   
-  if (touchedPick && touchedPick.league && touchedPick.league !== "nba" && touchedPick.league !== "wnba" && touchedPick.league !== "wnba_pre" && touchedPick.league !== "ncaa") {
+  if (touchedPick && touchedPick.league) {
     setTimeout(() => {
       try {
         if (typeof window.runPhase2Simulator === "function") {
@@ -9567,7 +9561,7 @@ async function applyManualSettlementToTrackedPick(signature, resultStatus) {
     }, 1000);
   }
 
-  const _isManualLeagueSettle = !["nba","ncaa","wnba","wnba_pre"].includes(touchedPick?.league || "");
+  const _isManualLeagueSettle = true; // football build: every league is manual/SofaScore
   const _retroEventIdMatch = _isManualLeagueSettle
     ? window.__lastRunLeague === touchedPick?.league
     : window.__lastRunFixtureMeta?.eventId === (touchedPick && touchedPick.eventId);
@@ -10427,7 +10421,7 @@ function getPick(edge, line, league, marketKey, context = {}) {
 
     function getTrapVolThreshold(marketType, league) {
       const bucket = TRAP_RULES.volThresholds[marketType] || TRAP_RULES.volThresholds.ft;
-      return league === "nba" ? bucket.nba : bucket.other;
+      return bucket.default;
     }
 
     function detectTrap(edge, line, pick, league, marketType, vol) {
@@ -10515,8 +10509,7 @@ function getConfidenceWinProbability(grade, edgePct, volatilityRatio, sampleTier
     const stored = localStorage.getItem("BB_CONFIDENCE_MODEL_COEFF");
     if (stored) {
       const models = JSON.parse(stored);
-      const leagueGroup = league === "nba" ? "nba"
-        : (league === "ncaa" || league === "ncaaw") ? "ncaa" : "other";
+      const leagueGroup = "other";
       const coeff = models[league] || models[leagueGroup] || models["global"];
       if (coeff) {
         const logOdds =
@@ -11525,12 +11518,13 @@ async function fetchESPN() {
   g_activeFetchController = new AbortController();
   window.__abortSignal = g_activeFetchController.signal;
 
-  // Determine if this league is one of the ESPN‑supported ones
-  const espnLeagues = new Set(["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl","euroleague","eurocup","champions_league","turkey_bsl","acb","bbl","ausnbl","lba","bleague","united_league","proa","bcl","aba","isl","cebl"]);
+  // Football build: every league is manual entry (stats pulled from SofaScore by hand).
+  // ESPN auto-fetch is fully disabled — no league auto-fetches anymore.
+  const espnLeagues = new Set();
   if (espnLeagues.has(league)) {
     await fetchESPNCore(league, teamAName, teamBName);
   } else {
-    setStatusText("This league uses manual entry. Enter team stats in the fields below, then click Run.", "ok");
+    setStatusText("Manual entry (SofaScore). Enter team stats in the fields below, then click Run.", "ok");
   }
 
   // Issue 22: 2-second cooldown before re-enabling fetch to prevent API rate-limiting.
