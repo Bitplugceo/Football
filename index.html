@@ -3641,25 +3641,8 @@ async function runRetrospectiveAnalysis(pick) {
                 line = lines.bLine;
                 edge = calc.bEdge;
                 pickDecision = getPick(edge, line, league, "team", { teamSc: calc.bS });
-              } else if (marketKey === "q1" || marketKey === "q2" || marketKey === "q3" || marketKey === "q4") { 
-const qLine = lines[marketKey + "Line"]; 
-if (!qLine) continue; 
-const aS = (parsed['a' + marketKey.toUpperCase() + 'Scored'] || []).slice(0,10); 
-const bS = (parsed['b' + marketKey.toUpperCase() + 'Scored'] || []).slice(0,10); 
-const aA = (parsed['a' + marketKey.toUpperCase() + 'Allowed'] || []).slice(0,10); 
-const bA = (parsed['b' + marketKey.toUpperCase() + 'Allowed'] || []).slice(0,10); 
-if (aS.length < 2 || bS.length < 2) continue;
-                let projA = (avgOrNaN(aS) * 0.55 + avgOrNaN(bA) * 0.45);
-                let projB = (avgOrNaN(bS) * 0.55 + avgOrNaN(aA) * 0.45);
-                projA *= injMultA;
-                projB *= injMultB;
-                const qProj = projA + projB;
-                proj = qProj;
-                line = qLine;
-                edge = qProj - qLine;
-                pickDecision = getPick(edge, line, league, marketKey, {});
               } else {
-                continue; // Unsupported market for retrospective
+                continue;
               }
             } catch(e) { continue; }
 
@@ -4075,7 +4058,6 @@ function getLeagueTrustSortRank(level) {
     const _schedCache = new Map();
     const _summaryCache = new Map();
     const _fixtureCache = new Map();
-    const _teamCatalogCache = new Map();
 let g_activeFetchController = null;
 
 let _fixtureLoadToken = 0;
@@ -4182,13 +4164,11 @@ function defaultMassacreFetchContext() {
     eventDate: "",
     A: { 
       overall: null, venue: null, lastGameDate: "", restDays: null,
-      ortg10: [], drtg10: [], pace10: [],
-      roster: [], sos: null
+      ortg10: [], drtg10: [], pace10: []
     },
     B: { 
       overall: null, venue: null, lastGameDate: "", restDays: null,
-      ortg10: [], drtg10: [], pace10: [],
-      roster: [], sos: null
+      ortg10: [], drtg10: [], pace10: []
     },
     h2hGames: [],
     refTendency: null
@@ -5245,11 +5225,7 @@ window.addEventListener("unhandledrejection", event => {
 function maybeReadH2HEnabled(kind) {
   const map = {
     ft: "useFTH2H",
-    h1: "use1HH2H",
-    q1: "useQ1H2H",
-    q2: "useQ2H2H",
-    q3: "useQ3H2H",
-    q4: "useQ4H2H"
+    h1: "use1HH2H"
   };
   const id = map[String(kind).toLowerCase()] || null;
   if (!id) return false;
@@ -5335,8 +5311,6 @@ function summarizeCalcForDebug(calc = {}) {
     bS: Number(calc?.bS),
     aS1: Number(calc?.aS1),
     bS1: Number(calc?.bS1),
-    aS2: Number(calc?.aS2),
-    bS2: Number(calc?.bS2)
   };
 }
 
@@ -5565,27 +5539,6 @@ function buildFetchAuditIssues({
     5,
     `${teamBName || "Team B"} overall FT sample`
   );
-
-  if (league === "nba" || league === "ncaa") {
-    requirePairSample(
-      aStats?.h1Scored?.length,
-      aStats?.h1Scored?.length,
-      5,
-      `${teamAName || "Team A"} overall 1H sample`
-    );
-
-    // FIX #33: dead h2Market sample-size check removed — no h2Market input element
-    // ever existed in the form, so this `if` block could never execute.
-
-    requirePairSample(
-      bStats?.h1Scored?.length,
-      bStats?.h1Scored?.length,
-      5,
-      `${teamBName || "Team B"} overall 1H sample`
-    );
-
-  }
-
 
     if ((h2hGames?.length || 0) === 0) {
       issues.push("No 2022+ H2H games were found for this matchup.");
@@ -7747,11 +7700,9 @@ function renderTrackedPicks() {
       const isZombie = gameTs > 0 && (Date.now() - gameTs) > (36 * 60 * 60 * 1000);
       const _liveClockLabel = _liveInfo
         ? (_liveInfo.clock === "HALF" ? "HALF" : (() => {
-const _regP = 4;
-            const _p = Number(_liveInfo.period || 0);
-            if (_p === 0) return "LIVE";
-            const _pLabel = _p <= _regP ? `Q${_p}` : (_p - _regP === 1 ? "OT" : `OT${_p - _regP}`);
-            return `${_pLabel} ${_liveInfo.clock}`;
+      const _p = Number(_liveInfo.period || 0);
+      if (_p === 0) return "LIVE";
+      return `${_p === 1 ? "HT" : "FT"} ${_liveInfo.clock}`;
           })())
         : null;
       const _pendingLabel = isZombie ? 'STALE' : (_liveClockLabel ? '' : 'PENDING');
@@ -7760,24 +7711,11 @@ const _regP = 4;
         : '';
       const _liveBlock = _liveClockLabel
         ? (() => {
-const _regP2 = 4;
-            const _curP2 = Number(_liveInfo.period || 0);
-            const _qH2 = _liveInfo.qScores?.home || [];
-            const _qA2 = _liveInfo.qScores?.away || [];
-            const _maxQ2 = Math.min(_curP2, _regP2, 4);
-            const _clockOnly = _liveClockLabel === "HALF" ? "HALF" : _liveClockLabel.replace(/^(Q\d+|OT\d*)\s+/i, '');
+            const _clockOnly = _liveClockLabel === "HALF" ? "HALF" : _liveClockLabel;
             const safeClock = escapeHtml(_clockOnly);
             const homeTotal = isFinite(_liveInfo.homeScore) ? Math.round(_liveInfo.homeScore) : 0;
             const awayTotal = isFinite(_liveInfo.awayScore) ? Math.round(_liveInfo.awayScore) : 0;
-            let _qRowsHtml = '';
-            for (let _qi = 0; _qi < _maxQ2; _qi++) {
-              const _qHv = Number(_qH2[_qi]);
-              const _qAv = Number(_qA2[_qi]);
-              if (isFinite(_qHv) && isFinite(_qAv) && (_qHv > 0 || _qAv > 0)) {
-                _qRowsHtml += `<div style="font-size:7px;font-weight:900;line-height:1.25;color:var(--text);white-space:nowrap;letter-spacing:0;">Q${_qi+1}<span style="display:inline-block;min-width:13px;text-align:right;">${Math.round(_qHv)}</span>:<span style="display:inline-block;min-width:13px;">${Math.round(_qAv)}</span></div>`;
-              }
-            }
-            return `<div style="color:var(--muted);font-size:8px;font-weight:900;line-height:1.0;letter-spacing:0.3px;margin-bottom:1px;">LIVE</div><div style="font-size:12px;font-weight:900;line-height:1.2;margin-bottom:2px;color:var(--tracker-strong);">${homeTotal} : ${awayTotal}</div><div style="font-size:6px;font-weight:800;line-height:1.1;margin-bottom:1px;color:var(--muted);white-space:nowrap;"><span style="font-size:5px;">⏰</span><span data-live-clk="${escapeHtml(p.eventId)}"> ${safeClock}</span></div>${_qRowsHtml}`;
+            return `<div style="color:var(--muted);font-size:8px;font-weight:900;line-height:1.0;letter-spacing:0.3px;margin-bottom:1px;">LIVE</div><div style="font-size:12px;font-weight:900;line-height:1.2;margin-bottom:2px;color:var(--tracker-strong);">${homeTotal} : ${awayTotal}</div><div style="font-size:6px;font-weight:800;line-height:1.1;margin-bottom:1px;color:var(--muted);white-space:nowrap;"><span style="font-size:5px;">⏰</span><span data-live-clk="${escapeHtml(p.eventId)}"> ${safeClock}</span></div>`;
           })()
         : '';
       statusHtml = `
@@ -8097,7 +8035,7 @@ function renderTrackerAnalytics() {
 
   function marketLabel(key) {
     const map = {
-      ft: "FT Total", h1: "1H Total", q1: "Q1 Total", q2: "Q2 Total", q3: "Q3 Total", q4: "Q4 Total", team_a: "Team A Total", team_b: "Team B Total"
+      ft: "FT Total", h1: "1H Total", team_a: "Team A Total", team_b: "Team B Total"
     };
     return map[String(key || "")] || String(key || "Other");
   }
@@ -10633,15 +10571,11 @@ function hideInjuryBox(side) {
     ? [
         "aFTScored", "aFTAllowed",
         "a1HScored", "a1HAllowed",
-        "aQ1Scored", "aQ2Scored", "aQ3Scored", "aQ4Scored",
-        "aQ1Allowed", "aQ2Allowed", "aQ3Allowed", "aQ4Allowed",
         "aFTScoredHome", "aFTAllowedHome", "aFTScoredAway", "aFTAllowedAway"
       ]
     : [
         "bFTScored", "bFTAllowed",
         "b1HScored", "b1HAllowed",
-        "bQ1Scored", "bQ2Scored", "bQ3Scored", "bQ4Scored",
-        "bQ1Allowed", "bQ2Allowed", "bQ3Allowed", "bQ4Allowed",
         "bFTScoredHome", "bFTAllowedHome", "bFTScoredAway", "bFTAllowedAway"
       ];
 
@@ -10795,10 +10729,6 @@ if (!league) {
     // [ESPN+ EXPANSION] Inner resolver — mirrors getTrackedLeagueBase. Both must stay in sync.
 
 
-    async function fetchLeagueTeamCatalog(league) {
-      // Football – no team catalog
-      return [];
-    }
 
     function highlight(name, query) {
       const rawQ = String(query || "").trim();
@@ -10814,120 +10744,9 @@ if (!league) {
       );
     }
 
-    function closeDrop(dropId) {
-      const drop = document.getElementById(dropId);
-      if (drop) { drop.style.display = "none"; drop.innerHTML = ""; }
-      if (activeDropTeam === (dropId === "dropA" ? "A" : "B")) activeDropTeam = null;
-    }
-const _dropCloseTimers = { dropA: null, dropB: null };
-
-function scheduleDropClose(dropId) {
-  if (!_dropCloseTimers.hasOwnProperty(dropId)) return;
-
-  clearTimeout(_dropCloseTimers[dropId]);
-  _dropCloseTimers[dropId] = setTimeout(() => {
-    closeDrop(dropId);
-    _dropCloseTimers[dropId] = null;
-  }, 120);
-}
-
-function cancelDropClose(dropId = null) {
-  if (dropId) {
-    if (_dropCloseTimers.hasOwnProperty(dropId)) {
-      clearTimeout(_dropCloseTimers[dropId]);
-      _dropCloseTimers[dropId] = null;
-    }
-    return;
-  }
-
-  Object.keys(_dropCloseTimers).forEach(key => {
-    clearTimeout(_dropCloseTimers[key]);
-    _dropCloseTimers[key] = null;
-  });
-}
-    function selectTeam(side, name, id) {
-  const inputId = side === "A" ? "teamAName" : "teamBName";
-  const dropId = side === "A" ? "dropA" : "dropB";
-  document.getElementById(inputId).value = name;
-  selectedTeamIds[side] = id || null;
-  closeDrop(dropId);
-  activeDropTeam = null;
-  validateFetchSection();
-updateIntelligencePack();
-}
 
 
-    function getTeamIdentityKey(name, league) {
-      const norm = normalizeTeamName(name);
-      if (!norm) return "";
-      const mappedId = lookupTeamId(norm, league);
-      return mappedId ? `${league}:${mappedId}` : `${league}:name:${norm}`;
-    }
 
-    async function onTeamInput(side) {
-      const inputId = side === "A" ? "teamAName" : "teamBName";
-      const dropId = side === "A" ? "dropA" : "dropB";
-      const input = document.getElementById(inputId);
-      const drop = document.getElementById(dropId);
-      const val = input.value.trim();
-      const league = document.getElementById("leagueSelect").value;
-      const normVal = normalizeTeamName(val);
-
-      if (normVal !== g_lastFetchedTeams[side]) {
-        if (g_lastFetchedTeams[side]) {
-          clearAutoFill(side);
-        } else {
-          setStatusText("", "");
-          setFetchAuditIssues([]);
-          resetResultsTable();
-        }
-      }
-      selectedTeamIds[side] = null;
-      validateFetchSection();
-
-          if (!val) { closeDrop(dropId); return; }
-          const espnLeagues = ["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl"];
-          if (!espnLeagues.includes(league)) { closeDrop(dropId); return; }
-
-      if (g_teamSearchControllers[side]) {
-        g_teamSearchControllers[side].abort();
-      }
-      g_teamSearchControllers[side] = new AbortController();
-      const currentSignal = g_teamSearchControllers[side].signal;
-
-      try {
-        const teams = await fetchLeagueTeamCatalog(league);
-        
-        // Bail out if a newer keystroke has aborted this specific cycle
-        if (currentSignal.aborted) return;
-
-        const matches = teams.filter(t => normalizeTeamName(t.name).includes(normVal)).slice(0, 20);
-        if (!matches.length) { closeDrop(dropId); return; }
-
-        drop.innerHTML = "";
-        const group = document.createElement("div");
-        group.className = "group-label";
-        group.textContent = league.toUpperCase();
-        drop.appendChild(group);
-
-        matches.forEach(team => {
-          const div = document.createElement("div");
-          div.dataset.id = team.id;
-          div.dataset.name = team.name;
-          div.innerHTML = highlight(team.name, val);
-          div.addEventListener("mousedown", () => selectTeam(side, team.name, team.id));
-          drop.appendChild(div);
-        });
-
-        drop.style.display = "block";
-        activeDropTeam = side;
-        validateFetchSection();
-      } catch (err) {
-        if (!currentSignal.aborted) {
-          console.error("[BB Engine] Autocomplete fetch failed", err);
-        }
-      }
-    }
 
 
     document.addEventListener("click", e => {
@@ -11034,195 +10853,10 @@ const cls =
 // diagnoseAPIBasketballLeagues permanently removed
 async function diagnoseAPIBasketballLeagues() {}
 
-    async function loadFixtures(offset = 0) {
-      // Football uses manual SofaScore only – no fixture loading
-      const sel = document.getElementById("fixtureSelect");
-      if (sel) {
-        sel.innerHTML = '<option value="">Manual entry only</option>';
-        sel.style.display = "none";
-      }
-      const toolbar = document.getElementById("fixtureToolbar");
-      if (toolbar) toolbar.style.display = "none";
-    }
-    async function loadFixturesESPN(league, offset, myToken) {
-      // No-op
-    }
 
-// [REMOVED: pickSofaScoreFixture — SofaScore removed.]
-function _removedPickSofaScore(homeName, homeId, awayName, awayId, tournamentId) {
-  closeDrop("dropA");
-  closeDrop("dropB");
-  resetResultsTable();
-  const _prevDash = document.getElementById("syndicateDashboard");
-  if (_prevDash) _prevDash.remove();
-  acknowledgeGlobalEngineAlert();
-  setFetchAuditIssues([]);
-  g_massacreFetchContext = defaultMassacreFetchContext();
-  g_injA = defaultInjuryMeta();
-  g_injB = defaultInjuryMeta();
-  g_fetchMeta = defaultFetchMeta();
-  clearSideFields("A");
-  clearSideFields("B");
-  clearH2HFields();
-  const _pFlds = ["ftMarket","h1Market","teamAMarket","teamBMarket","q1Market","q2Market","q3Market","q4Market","h1TeamAMarket","h1TeamBMarket","highQTotalMarket","lowQTotalMarket"];
-  _pFlds.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-  
-  document.getElementById("teamAName").value = homeName;
-  document.getElementById("teamBName").value = awayName;
-  document.getElementById("ssTeamAName").value = homeName;
-  document.getElementById("ssTeamBName").value = awayName;
-  document.getElementById("ssTeamAId").value = homeId;
-  document.getElementById("ssTeamBId").value = awayId;
-  document.getElementById("ssTournamentId").value = tournamentId;
-  window.__fixtureTournamentId = tournamentId;
-  updateSofascoreLinks("A");
-  updateSofascoreLinks("B");
 
-  selectedTeamIds.A = String(homeId || "");
-  selectedTeamIds.B = String(awayId || "");
-  validateFetchSection();
-  accordionOpen("espnSection");
-  setStatusHTML('<span class="spinner"></span>Match selected. Fetching stats...', "loading");
-  withErrorBoundary(fetchSofaScoreData, "fetchSofaScoreData")();
-}
 
-// [REMOVED: fetchSofaScoreData — SofaScore removed.]
-async function _removedFetchSofaScoreData() {
-  const teamAId = document.getElementById("ssTeamAId")?.value.trim();
-  const teamBId = document.getElementById("ssTeamBId")?.value.trim();
-  const teamAName = document.getElementById("ssTeamAName")?.value.trim() || "Team A";
-  const teamBName = document.getElementById("ssTeamBName")?.value.trim() || "Team B";
 
-  if (!teamAId || !teamBId) {
-    setStatusText("❌ Both team IDs required. Select a fixture or use 🔍 to find them.", "err");
-    return;
-  }
-
-  // SEQUENTIAL fetch per page with delay — prevents SofaScore rate-limiting
-  // Old code did 4 simultaneous requests (2 teams × 2 pages) which always got blocked
-  async function _fetchTeamSequential(teamId, label) {
-    const seen = new Set();
-    const merged = [];
-    for (let page = 0; page <= 1; page++) {
-      const url = `https://api.sofascore.com/api/v1/team/${teamId}/events/last/${page}`;
-      try {
-        const data = await proxyFetch(url, 18000);
-        (data?.events || []).forEach(ev => {
-          if (!ev?.id || seen.has(String(ev.id))) return;
-          seen.add(String(ev.id));
-          merged.push(ev);
-        });
-        setStatusHTML(
-          `<span class="spinner"></span>${escapeHtml(label)}: ${merged.length} events (page ${page + 1}/2)...`,
-          "loading"
-        );
-      } catch (err) {
-        engineDebug(`SofaScore page ${page} failed for ${label} (${teamId})`, err.message);
-        // Continue — one failed page is not fatal, we may still have page 0
-      }
-      // Mandatory delay between pages — SofaScore rate-limits rapid consecutive requests
-      if (page === 0) await new Promise(r => setTimeout(r, 800));
-    }
-    return { events: merged };
-  }
-
-  try {
-    setStatusHTML(`<span class="spinner"></span>Fetching ${escapeHtml(teamAName)} stats...`, "loading");
-    const dataA = await _fetchTeamSequential(teamAId, teamAName);
-
-    if (!dataA.events.length) {
-      throw new Error(
-        `No events returned for ${teamAName} (ID: ${teamAId}). ` +
-        `Check the team ID is correct and the league season is active.`
-      );
-    }
-
-    // Delay between teams — critical to avoid being rate-limited
-    await new Promise(r => setTimeout(r, 1000));
-
-    setStatusHTML(`<span class="spinner"></span>Fetching ${escapeHtml(teamBName)} stats...`, "loading");
-    const dataB = await _fetchTeamSequential(teamBId, teamBName);
-
-    if (!dataB.events.length) {
-      throw new Error(
-        `No events returned for ${teamBName} (ID: ${teamBId}). ` +
-        `Check the team ID is correct and the league season is active.`
-      );
-    }
-
-    // Feed into paste fields and parse — same pipeline as manual paste
-    const pA = document.getElementById("ssPasteA");
-    const pB = document.getElementById("ssPasteB");
-    if (pA) pA.value = JSON.stringify(dataA);
-    if (pB) pB.value = JSON.stringify(dataB);
-
-    setStatusHTML(`<span class="spinner"></span>Processing stats...`, "loading");
-    parseSofascoreIndividual("A");
-    await new Promise(r => setTimeout(r, 300));
-    parseSofascoreIndividual("B");
-
-    const aGames = (document.getElementById("aFTScored")?.value || "").split(",").filter(Boolean).length;
-    const bGames = (document.getElementById("bFTScored")?.value || "").split(",").filter(Boolean).length;
-
-    if (!aGames && !bGames) {
-      setStatusHTML(
-        `⚠️ Events fetched but no completed games found in the correct competition.<br>` +
-        `<small style="color:#d98a00;">Tournament filter may be filtering everything. Try clearing the Tournament ID field and re-fetching.</small>`,
-        "err"
-      );
-      return;
-    }
-
-    setStatusText(
-      `✅ Done! ${teamAName}: ${aGames} games · ${teamBName}: ${bGames} games`,
-      "ok"
-    );
-
-  } catch (err) {
-    setStatusHTML(
-      `❌ ${escapeHtml(err.message)}<br>` +
-      `<small style="color:#d98a00;">` +
-      `If this keeps failing: use 🔍 to find the team ID → open the 🔗 JSON link → copy all text → paste into the Paste JSON field above.` +
-      `</small>`,
-      "err"
-    );
-    engineDebug("SofaScore auto-fetch failed", { error: err.message, teamAId, teamBId });
-  }
-}
-
-    function onFixtureSelect() {
-      const select = document.getElementById("fixtureSelect");
-      const opt = select.options[select.selectedIndex];
-      if (!opt || !opt.value) return;
-      pickFixture(opt.dataset.home || "", opt.dataset.homeId || "", opt.dataset.away || "", opt.dataset.awayId || "");
-    }
-
-    function pickFixture(homeName, homeId, awayName, awayId) {
-  closeDrop("dropA");
-  closeDrop("dropB");
-  resetResultsTable();
-  const _prevDash = document.getElementById("syndicateDashboard");
-  if (_prevDash) _prevDash.remove();
-  acknowledgeGlobalEngineAlert();
-  setFetchAuditIssues([]);
-  g_massacreFetchContext = defaultMassacreFetchContext();
-  g_injA = defaultInjuryMeta();
-  g_injB = defaultInjuryMeta();
-  g_fetchMeta = defaultFetchMeta();
-  clearSideFields("A");
-  clearSideFields("B");
-  clearH2HFields();
-  const _pFlds = ["ftMarket","h1Market","teamAMarket","teamBMarket","q1Market","q2Market","q3Market","q4Market","h1TeamAMarket","h1TeamBMarket","highQTotalMarket","lowQTotalMarket"];
-  _pFlds.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-  document.getElementById("teamAName").value = homeName;
-  document.getElementById("teamBName").value = awayName;
-  selectedTeamIds.A = String(homeId || "");
-  selectedTeamIds.B = String(awayId || "");
-  validateFetchSection();
-  accordionOpen("espnSection");
-  setStatusHTML('<span class="spinner"></span>Match selected. Fetching stats...', "loading");
-  withErrorBoundary(fetchESPN, "fetchESPN_pickFixture")();
-}
 
 
 
@@ -12597,20 +12231,8 @@ function extractInputs(league) {
     bFTScored:  readSeries("bFTScored"),  bFTAllowed: readSeries("bFTAllowed"),
     a1HScored:  readSeries("a1HScored"),  a1HAllowed: readSeries("a1HAllowed"),
     b1HScored:  readSeries("b1HScored"),  b1HAllowed: readSeries("b1HAllowed"),
-    aQ1Scored:  readSeries("aQ1Scored"),  aQ1Allowed: readSeries("aQ1Allowed"),
-    aQ2Scored:  readSeries("aQ2Scored"),  aQ2Allowed: readSeries("aQ2Allowed"),
-    aQ3Scored:  readSeries("aQ3Scored"),  aQ3Allowed: readSeries("aQ3Allowed"),
-    aQ4Scored:  readSeries("aQ4Scored"),  aQ4Allowed: readSeries("aQ4Allowed"),
-    bQ1Scored:  readSeries("bQ1Scored"),  bQ1Allowed: readSeries("bQ1Allowed"),
-    bQ2Scored:  readSeries("bQ2Scored"),  bQ2Allowed: readSeries("bQ2Allowed"),
-    bQ3Scored:  readSeries("bQ3Scored"),  bQ3Allowed: readSeries("bQ3Allowed"),
-    bQ4Scored:  readSeries("bQ4Scored"),  bQ4Allowed: readSeries("bQ4Allowed"),
     aFTH2H: readSeries("aFTH2H"),  bFTH2H: readSeries("bFTH2H"),
     a1HH2H: readSeries("a1HH2H"),  b1HH2H: readSeries("b1HH2H"),
-    aQ1H2H: readSeries("aQ1H2H"),  bQ1H2H: readSeries("bQ1H2H"),
-    aQ2H2H: readSeries("aQ2H2H"),  bQ2H2H: readSeries("bQ2H2H"),
-    aQ3H2H: readSeries("aQ3H2H"),  bQ3H2H: readSeries("bQ3H2H"),
-    aQ4H2H: readSeries("aQ4H2H"),  bQ4H2H: readSeries("bQ4H2H"),
     aFTScoredHome: readSeries("aFTScoredHome"), aFTAllowedHome: readSeries("aFTAllowedHome"),
     aFTScoredAway: readSeries("aFTScoredAway"), aFTAllowedAway: readSeries("aFTAllowedAway"),
     bFTScoredHome: readSeries("bFTScoredHome"), bFTAllowedHome: readSeries("bFTAllowedHome"),
@@ -12649,10 +12271,6 @@ function validateExtractedInputs(extracted, league) {
   chk(parsed.b1HScored, "Team B 1H Scored"); chk(parsed.b1HAllowed, "Team B 1H Allowed");
   chk(parsed.aFTH2H, "FT H2H (A)");  chk(parsed.bFTH2H, "FT H2H (B)");
   chk(parsed.a1HH2H, "1H H2H (A)");  chk(parsed.b1HH2H, "1H H2H (B)");
-  ["Q1","Q2","Q3","Q4"].forEach(q => {
-    chk(parsed[`aQ${q}H2H`], q + " H2H (A)");
-    chk(parsed[`bQ${q}H2H`], q + " H2H (B)");
-  });
   const lineWarnings = validateLinesFromExtracted(league, extracted.lines || {});
   lineWarnings.forEach(w => errors.push(w));
 
@@ -12740,7 +12358,7 @@ if (_localState) {
 
     const league = document.getElementById("leagueSelect")?.value || "";
     const isNba = league === "nba";
-    const isNbaOrNcaa = ["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl"].includes(league);
+    const isNbaOrNcaa = false;
 
     if (!league) {
       engineDebug("run blocked missing league");
@@ -12964,11 +12582,6 @@ const h1Calc = compute1HProjection({
                           (g_massacreFetchContext.B.ortg10?.length >= 1);
         const hasManual1H = (safeArr(parsed.a1HScored)?.length >= 2) && (safeArr(parsed.b1HScored)?.length >= 2);
 
-        if ((league === "nba" || league === "wnba" || league === "wnba_pre") && !hasLevel2 && !hasManual1H) {
-          h1Pick = "NO PLAY";
-          h1Calc.projA1H = NaN;
-          h1Calc.projB1H = NaN;
-        }
 
         // Quarter variables removed – football has no quarters.
     if (ftCalc.ftSampleTier === "insufficient") {
@@ -13283,19 +12896,11 @@ const ftNote = ftCalc.ftNote || ftCalc.ftProjectionNote || null;
       });
     }
 
-    const isWnbaRun = league === "wnba" || league === "wnba_pre";
+    const isWnbaRun = false;
     const isManualLeagueRun = !isNbaOrNcaa;
 
-    // Streamlined allowlists — 2H, exotics, margins, race, HT-FT permanently removed
-    const wnbaAllowedMarkets   = new Set(["ft", "h1", "team_a", "team_b"]);
-    const nbaAllowedMarkets    = new Set(["ft", "h1", "team_a", "team_b", "h1_team_a", "h1_team_b"]);
-    const manualAllowedMarkets = new Set(["ft", "h1", "team_a", "team_b", "h1_team_a", "h1_team_b"]);
-
     const finalPicks = picks.filter(p => {
-      if (isWnbaRun)       return wnbaAllowedMarkets.has(p.marketKey);
-      if (isNbaOrNcaa)     return nbaAllowedMarkets.has(p.marketKey);
-      if (isManualLeagueRun) return manualAllowedMarkets.has(p.marketKey);
-      return ["ft", "team_a", "team_b"].includes(p.marketKey);
+      return ["ft", "h1", "team_a", "team_b", "h1_team_a", "h1_team_b"].includes(p.marketKey);
     });
 
     const mktOrderMap = {
@@ -13570,18 +13175,11 @@ function captureAllInputs() {
     "leagueSelect", "teamAName", "teamBName",
     "aFTScored", "aFTAllowed", "bFTScored", "bFTAllowed",
     "a1HScored", "a1HAllowed", "b1HScored", "b1HAllowed",
-    "aQ1Scored", "aQ1Allowed", "aQ2Scored", "aQ2Allowed",
-    "aQ3Scored", "aQ3Allowed", "aQ4Scored", "aQ4Allowed",
-    "bQ1Scored", "bQ1Allowed", "bQ2Scored", "bQ2Allowed",
-    "bQ3Scored", "bQ3Allowed", "bQ4Scored", "bQ4Allowed",
     "aFTH2H", "bFTH2H", "a1HH2H", "b1HH2H",
-    "aQ1H2H", "bQ1H2H", "aQ2H2H", "bQ2H2H", "aQ3H2H", "bQ3H2H", "aQ4H2H", "bQ4H2H",
     "aFTScoredHome", "aFTAllowedHome", "aFTScoredAway", "aFTAllowedAway",
     "bFTScoredHome", "bFTAllowedHome", "bFTScoredAway", "bFTAllowedAway",
     "ftMarket", "h1Market", "teamAMarket", "teamBMarket",
-    "q1Market", "q2Market", "q3Market", "q4Market",
-    "h1TeamAMarket", "h1TeamBMarket", "q1TeamAMarket", "q1TeamBMarket",
-    "highQTotalMarket", "lowQTotalMarket",
+    "h1TeamAMarket", "h1TeamBMarket",
     "ssTeamAName", "ssTeamAId", "ssTeamBName", "ssTeamBId"
   ];
   ids.forEach(id => {
@@ -13611,8 +13209,6 @@ const _aud_h1ThO  = getLeagueEdgePointThreshold(league, "h1");
 const _aud_h1ThU  = _aud_h1ThO  * UNDER_EDGE_FACTOR * _aud_underRatio;
 const _aud_tmThO  = getLeagueEdgePointThreshold(league, "team_a");
 const _aud_tmThU  = _aud_tmThO  * UNDER_EDGE_FACTOR * _aud_underRatio;
-const _aud_qThO   = getLeagueEdgePointThreshold(league, "q1");
-const _aud_qThU   = _aud_qThO   * UNDER_EDGE_FACTOR * _aud_underRatio;
 const _aud_aFTRaw = getOverallSeries("A", 10);
 const _aud_bFTRaw = getOverallSeries("B", 10);
 const _aud_aFTAll = getManualAllowedSeries("A", "ft", parsed);
@@ -13788,8 +13384,7 @@ window.__LAST_AUDIT_STATE = {
     edgeThresholds: {
       ft:   { over: _aud_ftThO, under: _aud_ftThU },
       h1:   { over: _aud_h1ThO, under: _aud_h1ThU },
-      team: { over: _aud_tmThO, under: _aud_tmThU },
-      q:    { over: _aud_qThO,  under: _aud_qThU  }
+      team: { over: _aud_tmThO, under: _aud_tmThU }
     },
     leagueEdgePointThresholds: LEAGUE_EDGE_POINT_THRESHOLDS,
     modelConfig: MODEL_CONFIG,
@@ -13945,17 +13540,8 @@ window.__LAST_AUDIT_STATE = {
       injMult: g_injB.scoringMult, sampleTier: ftCalc.ftSampleTier, h2hEnabled: ftCalc.ftHasH2H
     },
 
-    QUARTERS: {
-      Q1: q1 ? { preReconcile_projA: q1.projA, preReconcile_projB: q1.projB, preReconcile_total: q1.proj, postReconcile_total: (finalPicksForDisplay.find(x=>x.marketKey==="q1")?.proj ?? q1.proj), line: q1.line, edge: q1.edge, tier: q1.tier, hasH2H: q1.hasH2H, seriesA: safeArr(parsed.aQ1Scored) || [], seriesB: safeArr(parsed.bQ1Scored) || [], allowedA: safeArr(parsed.aQ1Allowed) || [], allowedB: safeArr(parsed.bQ1Allowed) || [] } : null,
-      Q2: q2 ? { preReconcile_projA: q2.projA, preReconcile_projB: q2.projB, preReconcile_total: q2.proj, postReconcile_total: (finalPicksForDisplay.find(x=>x.marketKey==="q2")?.proj ?? q2.proj), line: q2.line, edge: q2.edge, tier: q2.tier, hasH2H: q2.hasH2H, seriesA: safeArr(parsed.aQ2Scored) || [], seriesB: safeArr(parsed.bQ2Scored) || [], allowedA: safeArr(parsed.aQ2Allowed) || [], allowedB: safeArr(parsed.bQ2Allowed) || [] } : null,
-      Q3: q3 ? { preReconcile_projA: q3.projA, preReconcile_projB: q3.projB, preReconcile_total: q3.proj, postReconcile_total: (finalPicksForDisplay.find(x=>x.marketKey==="q3")?.proj ?? q3.proj), line: q3.line, edge: q3.edge, tier: q3.tier, hasH2H: q3.hasH2H, seriesA: safeArr(parsed.aQ3Scored) || [], seriesB: safeArr(parsed.bQ3Scored) || [], allowedA: safeArr(parsed.aQ3Allowed) || [], allowedB: safeArr(parsed.bQ3Allowed) || [] } : null,
-      Q4: q4 ? { preReconcile_projA: q4.projA, preReconcile_projB: q4.projB, preReconcile_total: q4.proj, postReconcile_total: (finalPicksForDisplay.find(x=>x.marketKey==="q4")?.proj ?? q4.proj), line: q4.line, edge: q4.edge, tier: q4.tier, hasH2H: q4.hasH2H, seriesA: safeArr(parsed.aQ4Scored) || [], seriesB: safeArr(parsed.bQ4Scored) || [], allowedA: safeArr(parsed.aQ4Allowed) || [], allowedB: safeArr(parsed.bQ4Allowed) || [] } : null
-    },
-
     reconciliation: {
       ftProjAnchor:            ftCalc.ftProj,
-      quarterScalingFormula:   "qProj *= (ftProj * (qPicks.length/4) / rawQSum) when rawQSum > 50",
-      h1TetheredToQSumFormula: "REMOVED (FIX #39): h1Proj is authoritative from compute1HProjection and is no longer overwritten by q1.proj + q2.proj",
       finalH1Proj:             h1Calc.h1Proj,
       finalFTProj:             ftCalc.ftProj,
       h1FTRatio:               isFinite(h1Calc.h1Proj) && isFinite(ftCalc.ftProj) ? (h1Calc.h1Proj / ftCalc.ftProj).toFixed(4) : null,
@@ -14189,23 +13775,6 @@ function clearAll() {
       const ssStatus = document.getElementById("ssFetchStatus");
       if (ssStatus) ssStatus.textContent = "";
 
-      // Reset quarter H2H checkboxes
-      ["useQ1H2H", "useQ2H2H", "useQ3H2H", "useQ4H2H"].forEach(id => {
-        const cb = document.getElementById(id);
-        if (cb) cb.checked = false;
-      });
-
-      // Clear quarter-by-quarter scored/allowed fields
-      const quarterFields = [
-        "aQ1Scored", "aQ1Allowed", "aQ2Scored", "aQ2Allowed",
-        "aQ3Scored", "aQ3Allowed", "aQ4Scored", "aQ4Allowed",
-        "bQ1Scored", "bQ1Allowed", "bQ2Scored", "bQ2Allowed",
-        "bQ3Scored", "bQ3Allowed", "bQ4Scored", "bQ4Allowed"
-      ];
-      quarterFields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = "";
-      });
 
       // Force UI sync for H2H checkboxes
       syncAllH2HCheckboxes(false);
@@ -14261,9 +13830,6 @@ const isWnba = false;
       const _sofaEl = document.getElementById("sofascoreSection");
       if (_sofaEl) _sofaEl.style.display = leagueVal ? "block" : "none";
 
-      // Quarter sections removed
-      document.getElementById("aQSection").style.display = "none";
-      document.getElementById("bQSection").style.display = "none";
 
       ["a1HSection", "b1HSection", "h2h1HSection"].forEach(id => {
         const el = document.getElementById(id);
@@ -14280,18 +13846,6 @@ const isWnba = false;
       const h1MarketElManual = document.getElementById("h1MarketSection");
       if (h1MarketElManual) h1MarketElManual.style.display = leagueVal ? "block" : "none";
 
-      // Quarter markets hidden
-      ["q1q2MarketSection", "q3q4MarketSection"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = "none";
-      });
-      const highLowQEl = document.getElementById("highLowQMarketSection");
-      if (highLowQEl) highLowQEl.style.display = "none";
-
-      ["q1TeamMarketSection", "exoticMarketSection"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = "none";
-      });
 
               // Always hide auto tags for football (no ESPN fetch)
           ["aAutoTag", "bAutoTag", "h2hAutoTag"].forEach(id => {
@@ -14413,43 +13967,10 @@ if (headerErrorBtn) {
       const leagueSelect = document.getElementById("leagueSelect");
       if (leagueSelect) leagueSelect.addEventListener("change", onLeagueChange);
 
-      const fixturesTodayBtn = document.getElementById("fixturesTodayBtn");
-      if (fixturesTodayBtn) fixturesTodayBtn.addEventListener("click", () => loadFixtures(0));
-
-      const fixturesTomorrowBtn = document.getElementById("fixturesTomorrowBtn");
-      if (fixturesTomorrowBtn) fixturesTomorrowBtn.addEventListener("click", () => loadFixtures(1));
-
-      const fixtureSelect = document.getElementById("fixtureSelect");
-      if (fixtureSelect) fixtureSelect.addEventListener("change", onFixtureSelect);
 
             let teamSearchTimeoutA = null;
       let teamSearchTimeoutB = null;
 
-      const teamAName = document.getElementById("teamAName");
-      if (teamAName) {
-        teamAName.addEventListener("input", () => {
-          clearTimeout(teamSearchTimeoutA);
-          teamSearchTimeoutA = setTimeout(() => onTeamInput("A"), 250);
-        });
-      }
-
-      const teamBName = document.getElementById("teamBName");
-      if (teamBName) {
-        teamBName.addEventListener("input", () => {
-          clearTimeout(teamSearchTimeoutB);
-          teamSearchTimeoutB = setTimeout(() => onTeamInput("B"), 250);
-        });
-      }
-
-      const dropA = document.getElementById("dropA");
-      if (dropA) {
-        dropA.addEventListener("mousedown", () => cancelDropClose("dropA"));
-      }
-
-      const dropB = document.getElementById("dropB");
-      if (dropB) {
-        dropB.addEventListener("mousedown", () => cancelDropClose("dropB"));
-      }
 
       const fetchBtn = document.getElementById("fetchBtn");
 if (fetchBtn) fetchBtn.addEventListener("click", withErrorBoundary(fetchESPN, "fetchESPN"));
