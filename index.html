@@ -3441,9 +3441,9 @@ function getDynamicEdgeThreshold(league, marketKey, context = null) {
 
   let key = String(marketKey || "default").toLowerCase();
   if (key === "team_a" || key === "team_b") key = "team";
-  // Remove quarter handling
-  if (key === "q1" || key === "q2" || key === "q3" || key === "q4") key = "ft"; // fallback
-  
+  // FIX: removed dead quarter (q1-q4) fallback branch — football has no quarters,
+  // this code path could never be reached and was pure basketball leftover.
+
   let basePct = rules[key] !== undefined ? rules[key] : (rules.default || EDGE_RULES_V1.default);
   let thresholdPct = basePct;
 
@@ -3701,10 +3701,14 @@ function getLeagueLearnedParams(league) {
 
 
 
+// FIX: thresholds now match getMassacreThresholdBucket's 2/3/5 goal-margin buckets.
+// The old 2/4/6 values were leftover basketball point-margin numbers that never
+// matched the bucket function below them, and a 6-goal margin is essentially the
+// outer edge of football history (a genuine rarity) rather than a routine blowout.
 const MASSACRE_TUNING = {
   lightThreshold: 2,
-  heavyThreshold: 4,
-  nuclearThreshold: 6,
+  heavyThreshold: 3,
+  nuclearThreshold: 5,
   blendWeight: 0.3
 };
 
@@ -3946,8 +3950,20 @@ let LEAGUE_BASES = {
   unknown: 2.6
 };
 
-// NBA team baselines removed – football only
-
+// NBA team baselines removed – football only.
+// FIX: LEAGUE_PACE_BASES and LEAGUE_RATING_BASES were referenced throughout the audit
+// dump (window.__LAST_AUDIT_STATE) and in _tickLiveClocks via LEAGUE_FETCH_RULES, but
+// were never declared after the basketball tables were deleted. Every "Run" click threw
+// an uncaught ReferenceError inside runEngine's audit block, which the outer try/catch
+// surfaced as "⚠ Unexpected engine error" — this was the root cause of the engine
+// appearing broken. Football has no pace/rating advanced-stats concept, so these are
+// intentionally empty; all lookups against them (`LEAGUE_PACE_BASES[league] || 74`)
+// safely fall back to their defaults.
+const LEAGUE_PACE_BASES = {};
+const LEAGUE_RATING_BASES = {};
+// LEAGUE_FETCH_RULES also referenced (regulationPeriods) but never declared — same
+// crash risk inside _tickLiveClocks. Football is 2 halves, not 4 basketball quarters.
+const LEAGUE_FETCH_RULES = {};
 
     function getLeagueRecencyDefaults(league) {
       // Football recency defaults remain the same
@@ -5211,8 +5227,9 @@ function isIgnoredEngineWatchLine(line = "") {
     text.includes("worker timeout") ||
     text.includes("fallback proxy") ||
     text.includes("http 400") ||
-    text.includes("http 403") ||
-    text.includes("nba-g-league");
+    text.includes("http 403");
+    // FIX: removed dead "nba-g-league" string filter — a basketball leftover with
+    // no possible match now that all leagues are football.
 }
 
 window.addEventListener("unhandledrejection", event => {
@@ -5665,11 +5682,13 @@ function safeText(str) {
 }
 
     function normalizeTeamName(name) {
+      // FIX: removed the "a&m" → "a and m" rule — that was a Texas A&M
+      // (NCAA basketball/college-sports) naming quirk, irrelevant to global
+      // football club names and not worth the false-positive risk.
       return String(name || "")
         .toLowerCase()
         .replace(/[.''()<>&"]/g, "")
         .replace(/\bsaint\b/g, "st")
-        .replace(/\ba&m\b/g, "a and m")
         .replace(/&/g, " and ")
         .replace(/\s+/g, " ")
         .trim();
@@ -6779,7 +6798,7 @@ function _tickLiveClocks() {
     const currentSecs = Math.max(0, origSecs - elapsedSecs);
 
     if (info.clockFrozen) {
-      const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 4;
+      const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 2;
       const _p = Number(info.period || 0);
       const _frozenSecs = parseClockToSeconds(info.clock);
       if (_p === 0) {
@@ -6791,10 +6810,10 @@ function _tickLiveClocks() {
     }
 
                           if (currentSecs <= 0) {
-              const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 4;
+              const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 2;
               const _p = Number(info.period || 0);
               if (_p > 0 && _p < _regP) {
-                el.textContent = `Q${_p} Break`;
+                el.textContent = "HT";
               } else {
                 el.textContent = "Settling";
                 if (!info._expiredAt) {
@@ -6803,7 +6822,7 @@ function _tickLiveClocks() {
                 }
               }
             } else {
-            const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 4;
+            const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 2;
             const _p = Number(info.period || 0);
             if (_p === 0) {
               el.textContent = "LIVE";
@@ -9186,6 +9205,16 @@ function applySoftTrackerInfluenceToPicks(picks, fixtureMeta, phase2Activation =
 // lockRestricted picks) is the single remaining selectLock definition.
 // DO NOT re-add a second selectLock definition.
 
+// FIX: getTrackedLeagueBase was called constantly (settlement, live polling, tracker
+// refresh) but was never defined anywhere in this file — a dangling reference to
+// deleted basketball/ESPN plumbing. Football settlement is 100% manual (SofaScore
+// paste), so there is no ESPN base URL for any league; this always returns null,
+// which correctly short-circuits isTrackerSupportedLeague, refreshTrackedPickResults,
+// and pollLiveGameClocks so they no longer attempt ESPN fetches for football leagues.
+function getTrackedLeagueBase(league) {
+  return null;
+}
+
 function isTrackerSupportedLeague(league) {
   return !!getTrackedLeagueBase(String(league || "").toLowerCase());
 }
@@ -11188,7 +11217,9 @@ function getMassacreThresholdBucket(margin) {
 
 function getMassacreRuns() { return 500; }
 
-function getMassacreModelRangeLimit() { return 120; }
+// FIX: 120 was a basketball total-points range cap, meaningless for football goals
+// (realistic range is roughly 0–10). 15 gives a safe buffer above any plausible score.
+function getMassacreModelRangeLimit() { return 15; }
 
 function getH2HSeasonDecayWeight(dateStr) {
   // [FIX 6/15: SEASON DECAY WEIGHT] Maps each H2H game's season to its decay multiplier.
@@ -14765,10 +14796,11 @@ panel.innerHTML = '<div style="background:#080808;border-bottom:1px solid #222;p
     const league = document.getElementById('leagueSelect') && document.getElementById('leagueSelect').value;
     const tA = document.getElementById('teamAName') && document.getElementById('teamAName').value;
     const tB = document.getElementById('teamBName') && document.getElementById('teamBName').value;
-    // LOCK: fetchESPN is only called for leagues that actually support it.
-    // Previously AFDB would call fetchESPN for manual leagues, silently overwriting
-    // user-typed data with a failed fetch result. Do not remove the isEspnLeague guard.
-    const isEspnLeague = ['nba','ncaa','wnba','wnba_pre','ncaaw','nba_gl'].includes(String(league || '').toLowerCase());
+    // FIX: hardcoded basketball league list (nba/ncaa/wnba/wnba_pre/ncaaw/nba_gl) could
+    // never match any football league value in the dropdown, and fetchESPN itself is
+    // dead ESPN plumbing for this football build — every league here is manual
+    // SofaScore entry, so this always stays false and the dead branch never runs.
+    const isEspnLeague = false;
     if (isEspnLeague && tA && tB) {
       try { await fetchESPN(); }
       catch(e) { log('ERROR','NETWORK','Live sweep failed: ' + e.message); totalSuspects++; }
