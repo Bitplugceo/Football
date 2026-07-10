@@ -3181,24 +3181,6 @@ function parseSofascoreIndividual(side) {
           g_massacreFetchContext.A.overall.h1Scored10 = stats.h1ScoredList;
           g_massacreFetchContext.A.overall.h1Allowed10 = stats.h1AllowedList;
         }
-        if (stats.q1ScoredList?.length >= 2) {
-          document.getElementById("aQ1Scored").value = stats.q1ScoredList.slice(0, 10).join(",");
-          document.getElementById("aQ2Scored").value = stats.q2ScoredList.slice(0, 10).join(",");
-          document.getElementById("aQ3Scored").value = stats.q3ScoredList.slice(0, 10).join(",");
-          document.getElementById("aQ4Scored").value = stats.q4ScoredList.slice(0, 10).join(",");
-          document.getElementById("aQ1Allowed").value = stats.q1AllowedList.slice(0, 10).join(",");
-          document.getElementById("aQ2Allowed").value = stats.q2AllowedList.slice(0, 10).join(",");
-          document.getElementById("aQ3Allowed").value = stats.q3AllowedList.slice(0, 10).join(",");
-          document.getElementById("aQ4Allowed").value = stats.q4AllowedList.slice(0, 10).join(",");
-          g_massacreFetchContext.A.q1Scored = stats.q1ScoredList.slice(0, 10);
-          g_massacreFetchContext.A.q2Scored = stats.q2ScoredList.slice(0, 10);
-          g_massacreFetchContext.A.q3Scored = stats.q3ScoredList.slice(0, 10);
-          g_massacreFetchContext.A.q4Scored = stats.q4ScoredList.slice(0, 10);
-          g_massacreFetchContext.A.q1Allowed = stats.q1AllowedList.slice(0, 10);
-          g_massacreFetchContext.A.q2Allowed = stats.q2AllowedList.slice(0, 10);
-          g_massacreFetchContext.A.q3Allowed = stats.q3AllowedList.slice(0, 10);
-          g_massacreFetchContext.A.q4Allowed = stats.q4AllowedList.slice(0, 10);
-        }
       } else {
         if (displayS.length) document.getElementById("bFTScored").value = displayS.join(",");
       }
@@ -3224,16 +3206,6 @@ if (mergedStats.h1ScoredList?.length >= 2) {
 document.getElementById("a1HScored").value = mergedStats.h1ScoredList.slice(0, 10).join(","); 
 document.getElementById("a1HAllowed").value = mergedStats.h1AllowedList.slice(0, 10).join(","); 
 } 
-if (mergedStats.q1ScoredList?.length >= 2) { 
-document.getElementById("aQ1Scored").value = mergedStats.q1ScoredList.slice(0, 10).join(","); 
-document.getElementById("aQ2Scored").value = mergedStats.q2ScoredList.slice(0, 10).join(","); 
-document.getElementById("aQ3Scored").value = mergedStats.q3ScoredList.slice(0, 10).join(","); 
-document.getElementById("aQ4Scored").value = mergedStats.q4ScoredList.slice(0, 10).join(","); 
-document.getElementById("aQ1Allowed").value = mergedStats.q1AllowedList.slice(0, 10).join(","); 
-document.getElementById("aQ2Allowed").value = mergedStats.q2AllowedList.slice(0, 10).join(","); 
-document.getElementById("aQ3Allowed").value = mergedStats.q3AllowedList.slice(0, 10).join(","); 
-document.getElementById("aQ4Allowed").value = mergedStats.q4AllowedList.slice(0, 10).join(","); 
-} 
 g_massacreFetchContext.A.overall.ftScored10 = mergedStats.scoredList; 
 g_massacreFetchContext.A.overall.ftAllowed10 = mergedStats.allowedList; 
 g_massacreFetchContext.A.overall.scored10 = mergedStats.scoredList; 
@@ -3246,16 +3218,6 @@ if (mergedDisplay5A.length) document.getElementById("bFTAllowed").value = merged
 if (mergedStats.h1ScoredList?.length >= 2) { 
 document.getElementById("b1HScored").value = mergedStats.h1ScoredList.slice(0, 10).join(","); 
 document.getElementById("b1HAllowed").value = mergedStats.h1AllowedList.slice(0, 10).join(","); 
-} 
-if (mergedStats.q1ScoredList?.length >= 2) { 
-document.getElementById("bQ1Scored").value = mergedStats.q1ScoredList.slice(0, 10).join(","); 
-document.getElementById("bQ2Scored").value = mergedStats.q2ScoredList.slice(0, 10).join(","); 
-document.getElementById("bQ3Scored").value = mergedStats.q3ScoredList.slice(0, 10).join(","); 
-document.getElementById("bQ4Scored").value = mergedStats.q4ScoredList.slice(0, 10).join(","); 
-document.getElementById("bQ1Allowed").value = mergedStats.q1AllowedList.slice(0, 10).join(","); 
-document.getElementById("bQ2Allowed").value = mergedStats.q2AllowedList.slice(0, 10).join(","); 
-document.getElementById("bQ3Allowed").value = mergedStats.q3AllowedList.slice(0, 10).join(","); 
-document.getElementById("bQ4Allowed").value = mergedStats.q4AllowedList.slice(0, 10).join(","); 
 } 
 g_massacreFetchContext.B.overall.ftScored10 = mergedStats.scoredList; 
 g_massacreFetchContext.B.overall.ftAllowed10 = mergedStats.allowedList; 
@@ -3305,7 +3267,7 @@ function extractH2HFromPastedEvents() {
       window.__h2hEntryCache = [];
       const h2hTag = document.getElementById("h2hAutoTag");
       if (h2hTag) h2hTag.style.display = "none";
-      ["aFTH2H","bFTH2H","a1HH2H","b1HH2H","aQ1H2H","bQ1H2H","aQ2H2H","bQ2H2H","aQ3H2H","bQ3H2H","aQ4H2H","bQ4H2H"].forEach(id => {
+      ["aFTH2H","bFTH2H","a1HH2H","b1HH2H"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = "";
       });
@@ -3313,10 +3275,6 @@ function extractH2HFromPastedEvents() {
       if (ftCb) ftCb.checked = false;
       const h1Cb = document.getElementById("use1HH2H");
       if (h1Cb) h1Cb.checked = false;
-      ["useQ1H2H","useQ2H2H","useQ3H2H","useQ4H2H"].forEach(id => {
-        const cb = document.getElementById(id);
-        if (cb) cb.checked = false;
-      });
     }
     return;
   }
@@ -3379,22 +3337,14 @@ function extractH2HFromPastedEvents() {
       const myFT = Number(myScoreObj?.normaltime ?? myScoreObj?.current ?? myScoreObj?.display ?? 0);
       const oppFT = Number(oppScoreObj?.normaltime ?? oppScoreObj?.current ?? oppScoreObj?.display ?? 0);
       if (myFT > 0) {
-        const mQ1 = Number(myScoreObj?.period1 ?? 0);
-        const mQ2 = Number(myScoreObj?.period2 ?? 0);
-        const mQ3 = Number(myScoreObj?.period3 ?? 0);
-        const mQ4 = Number(myScoreObj?.period4 ?? 0);
-        const oQ1 = Number(oppScoreObj?.period1 ?? 0);
-        const oQ2 = Number(oppScoreObj?.period2 ?? 0);
-        const oQ3 = Number(oppScoreObj?.period3 ?? 0);
-        const oQ4 = Number(oppScoreObj?.period4 ?? 0);
+        const mH1 = Number(myScoreObj?.period1 ?? 0);
+        const oH1 = Number(oppScoreObj?.period1 ?? 0);
         newEntries.push({
           id: m.id,
           ts: m.startTimestamp || 0,
           aFT: myFT, bFT: oppFT,
-          aH1: mQ1 + mQ2, bH1: oQ1 + oQ2,
-          aQ1: mQ1, bQ1: oQ1, aQ2: mQ2, bQ2: oQ2,
-          aQ3: mQ3, bQ3: oQ3, aQ4: mQ4, bQ4: oQ4,
-          hasQ: mQ1 > 0 || mQ2 > 0
+          aH1: mH1, bH1: oH1,
+          hasH1: true
         });
       }
     });
@@ -3410,16 +3360,8 @@ function extractH2HFromPastedEvents() {
     const merged = window.__h2hEntryCache;
     const h2hA = merged.map(e => e.aFT);
     const h2hB = merged.map(e => e.bFT);
-    const h2hA1H = merged.filter(e => e.hasQ).map(e => e.aH1);
-    const h2hB1H = merged.filter(e => e.hasQ).map(e => e.bH1);
-    const h2hAQ1 = merged.filter(e => e.hasQ).map(e => e.aQ1);
-    const h2hBQ1 = merged.filter(e => e.hasQ).map(e => e.bQ1);
-    const h2hAQ2 = merged.filter(e => e.hasQ).map(e => e.aQ2);
-    const h2hBQ2 = merged.filter(e => e.hasQ).map(e => e.bQ2);
-    const h2hAQ3 = merged.filter(e => e.hasQ).map(e => e.aQ3);
-    const h2hBQ3 = merged.filter(e => e.hasQ).map(e => e.bQ3);
-    const h2hAQ4 = merged.filter(e => e.hasQ).map(e => e.aQ4);
-    const h2hBQ4 = merged.filter(e => e.hasQ).map(e => e.bQ4);
+    const h2hA1H = merged.filter(e => e.hasH1).map(e => e.aH1);
+    const h2hB1H = merged.filter(e => e.hasH1).map(e => e.bH1);
 
     if (h2hA.length >= 2) {
       document.getElementById("aFTH2H").value = h2hA.join(",");
@@ -3538,8 +3480,8 @@ function getDynamicEdgeThreshold(league, marketKey, context = null) {
     };
 
 const MODEL_TUNING = {
-  anchorEnabled: { ft: true, h1: true, h2: true, team: true },
-  anchorScale: { ft: 0.75, h1: 0.75, h2: 0.75, team: 0.85 },
+  anchorEnabled: { ft: true, h1: true, team: true },
+  anchorScale: { ft: 0.75, h1: 0.75, team: 0.85 },
   h2hMaxWeight: 0.30,
   recencyWeights: [1.35, 1.20, 1.00, 0.85, 0.70, 0.56, 0.44, 0.33, 0.24, 0.16]
 };
@@ -3972,7 +3914,6 @@ function getLeagueEdgePointThreshold(league, marketKey) {
   const thresholds = LEAGUE_EDGE_POINT_THRESHOLDS[lk] || LEAGUE_EDGE_POINT_THRESHOLDS.default;
   let key = marketKey;
   if (marketKey === "team_a" || marketKey === "team_b") key = "team";
-  else if (marketKey && marketKey.startsWith("q")) key = "q";
   else if (marketKey === "h1") key = "h1";
   else key = "ft";
   return thresholds[key] ?? thresholds.ft;
@@ -4023,13 +3964,7 @@ let LEAGUE_BASES = {
 };
 
 // NBA team baselines removed – football only
-const NBA_2026_TEAM_BASELINES = {};
-const _NBA_NAME_TO_ABV = {};
-function getNBASeasonBaseline(teamName, league) { return null; }
 
-// Football conversion: removed pace/rating constants as they are not used.
-const LEAGUE_PACE_BASES = {};
-const LEAGUE_RATING_BASES = {};
 
     function getLeagueRecencyDefaults(league) {
       // Football recency defaults remain the same
@@ -4133,13 +4068,9 @@ function getLeagueTrustSortRank(level) {
 }
 
 
-// LEAGUE_FETCH_RULES removed – no ESPN auto-fetch for football
-const LEAGUE_FETCH_RULES = {};
 
 // Basketball team maps removed – football only
-const NBA_TEAM_MAP = {};
-const NCAA_TEAM_MAP = {};
-const WNBA_TEAM_MAP = {};
+// Football conversion: team maps removed – all teams are manually entered via SofaScore.
 
     const _schedCache = new Map();
     const _summaryCache = new Map();
@@ -4180,7 +4111,7 @@ let g_lastFetchedTeams = { A: "", B: "" };
 
     let g_fetchMeta = defaultFetchMeta();
 
-const g_h2hManualPreference = { ft: null, h1: null, q1: null, q2: null, q3: null, q4: null };
+const g_h2hManualPreference = { ft: null, h1: null };
 
 function getH2HFieldIds(kind) {
   const map = {
@@ -4230,7 +4161,7 @@ function syncH2HCheckbox(kind, forceAuto = false) {
 }
 
 function syncAllH2HCheckboxes(forceAuto = false) {
-  ["ft", "h1", "q1", "q2", "q3", "q4"].forEach(kind => syncH2HCheckbox(kind, forceAuto));
+  ["ft", "h1"].forEach(kind => syncH2HCheckbox(kind, forceAuto));
 }
 
 function queueH2HCheckboxSync(forceAuto = false) {
@@ -4252,15 +4183,11 @@ function defaultMassacreFetchContext() {
     A: { 
       overall: null, venue: null, lastGameDate: "", restDays: null,
       ortg10: [], drtg10: [], pace10: [],
-      q1Scored: [], q2Scored: [], q3Scored: [], q4Scored: [],
-      q1Allowed: [], q2Allowed: [], q3Allowed: [], q4Allowed: [],
       roster: [], sos: null
     },
     B: { 
       overall: null, venue: null, lastGameDate: "", restDays: null,
       ortg10: [], drtg10: [], pace10: [],
-      q1Scored: [], q2Scored: [], q3Scored: [], q4Scored: [],
-      q1Allowed: [], q2Allowed: [], q3Allowed: [], q4Allowed: [],
       roster: [], sos: null
     },
     h2hGames: [],
@@ -4936,7 +4863,7 @@ function buildTrackerDerivedStateFromPicks(inputPicks = []) {
 
     const marketKey = String(pick.marketKey || "");
 
-    if (["ft", "h1", "h2"].includes(marketKey)) {
+    if (["ft", "h1"].includes(marketKey)) {
       if (pick.homeTeamKey) {
         const homeBucketKey = `${pick.league || "unknown"}:${pick.homeTeamKey}`;
         upsertDerivedBucket(teamMap, homeBucketKey, pick.homeTeam || pick.homeTeamKey, pick);
@@ -6139,14 +6066,8 @@ function getRawMarketInputMap() {
   return {
     ft: document.getElementById("ftMarket")?.value || "",
     h1: document.getElementById("h1Market")?.value || "",
-    // FIX #33: h2 entry removed — no h2Market input element ever existed, and no pick
-    // is ever generated with marketKey "h2", so this key was never read.
     team_a: document.getElementById("teamAMarket")?.value || "",
-    team_b: document.getElementById("teamBMarket")?.value || "",
-    q1: document.getElementById("q1Market")?.value || "",
-    q2: document.getElementById("q2Market")?.value || "",
-    q3: document.getElementById("q3Market")?.value || "",
-    q4: document.getElementById("q4Market")?.value || ""
+    team_b: document.getElementById("teamBMarket")?.value || ""
   };
 }
 
@@ -7826,7 +7747,7 @@ function renderTrackedPicks() {
       const isZombie = gameTs > 0 && (Date.now() - gameTs) > (36 * 60 * 60 * 1000);
       const _liveClockLabel = _liveInfo
         ? (_liveInfo.clock === "HALF" ? "HALF" : (() => {
-            const _regP = LEAGUE_FETCH_RULES[_liveInfo.league || ""]?.regulationPeriods ?? 4;
+const _regP = 4;
             const _p = Number(_liveInfo.period || 0);
             if (_p === 0) return "LIVE";
             const _pLabel = _p <= _regP ? `Q${_p}` : (_p - _regP === 1 ? "OT" : `OT${_p - _regP}`);
@@ -7839,7 +7760,7 @@ function renderTrackedPicks() {
         : '';
       const _liveBlock = _liveClockLabel
         ? (() => {
-            const _regP2 = LEAGUE_FETCH_RULES[_liveInfo.league || ""]?.regulationPeriods ?? 4;
+const _regP2 = 4;
             const _curP2 = Number(_liveInfo.period || 0);
             const _qH2 = _liveInfo.qScores?.home || [];
             const _qA2 = _liveInfo.qScores?.away || [];
@@ -8935,10 +8856,9 @@ function quickMCWinProb(proj, line, vol, nRuns, side) {
 }
 
 function getTrackerFeedbackMinSample(marketKey) {
-  // Gap 2 Bayesian: Bayesian prior absorbs early noise — lower gates let signal emerge sooner
   if (marketKey === "ft") return 5;
   if (marketKey === "team_a" || marketKey === "team_b") return 5;
-  if (marketKey === "h1" || marketKey === "h2") return 4;
+  if (marketKey === "h1") return 4;
   return 5;
 }
 
@@ -9317,10 +9237,6 @@ function applySoftTrackerInfluenceToPicks(picks, fixtureMeta, phase2Activation =
     };
   });
 }
-function getTrackedLeagueBase(league) {
-  // Football – no ESPN auto-fetch; manual SofaScore only
-  return "";
-}
 
 // [DELETED] FIX #25: selectLock (dead duplicate) – unused function.
 // This earlier definition was always shadowed by the second selectLock declared
@@ -9644,16 +9560,12 @@ function handleTrackedPicksActionClick(event) {
       return total;
     }
 
-// Football conversion: simplified period completion logic – only HT and FT.
-function isPickPeriodComplete(marketKey, currentPeriod, isHalfTime, isGameFinal, regulationPeriods) {
+function isPickPeriodComplete(marketKey, currentPeriod, isHalfTime, isGameFinal) {
   if (isGameFinal) return true;
   const p = Number(currentPeriod || 0);
-  // Football: period 1 = first half, period 2 = second half (or half-time when isHalfTime true).
-  // HT markets complete at half-time (period 2 or isHalfTime true), FT markets only at final.
   if (marketKey === 'h1' || marketKey === 'h1_team_a' || marketKey === 'h1_team_b') {
     return p >= 2 || isHalfTime;
   }
-  // For FT and team totals, only complete at final.
   return isGameFinal;
 }
 
@@ -9849,7 +9761,7 @@ function settleTrackedPickFromCompetition(pick, competition, allowPartialSettlem
                         const period = competition?.status?.period;
                         const stateName = competition?.status?.type?.state;
                         const statusName = competition?.status?.type?.name;
-                        const _regPeriodsForSettle = LEAGUE_FETCH_RULES[pick.league || ""]?.regulationPeriods ?? 4;
+const _regPeriodsForSettle = 4;
                         const forceSettle = (clock === "0.0" || clock === "0:00") && period >= _regPeriodsForSettle;
 
                                 if (apiFinal || forceSettle) {
@@ -9908,9 +9820,9 @@ function settleTrackedPickFromCompetition(pick, competition, allowPartialSettlem
                                 _expiredAt: _existingLive?._expiredAt ?? null
                               });
                             }
-                                const _regPeriods = LEAGUE_FETCH_RULES[pick.league || ""]?.regulationPeriods ?? 4;
+const _regPeriods = 4;
                                 const _periodDone = isPickPeriodComplete(pick.marketKey, Number(period || 0), _isHalf, false, _regPeriods);
-                                const _isPeriodMarket = ["q1","q2","q3","h1","q1_team_a","q1_team_b","h1_team_a","h1_team_b"].includes(pick.marketKey);
+                                const _isPeriodMarket = ["h1","h1_team_a","h1_team_b"].includes(pick.marketKey);
                                 if (_periodDone && _isPeriodMarket) {
                                   const midSettled = settleTrackedPickFromCompetition(pick, competition, true);
                                   if (midSettled && midSettled !== "pending" && pick.resultStatus !== midSettled) {
@@ -9922,19 +9834,6 @@ function settleTrackedPickFromCompetition(pick, competition, allowPartialSettlem
                                     g_liveGameStatus.delete(pick.eventId);
                                     g_settlementDebugLog.set(_dbgKey, { pick: `${pick.homeTeam} vs ${pick.awayTeam} · ${pick.marketKey}`, eventId: pick.eventId, status: `✅ PERIOD SETTLED: ${midSettled.toUpperCase()}`, apiFinal: false, clock, period, settled: midSettled, actual: pick.actualScore, line: pick.lineAtPick || pick.line, ts: new Date().toLocaleTimeString([], {hour12:false}) });
                                     trackerDebug("period-settled pick", { eventId: pick.eventId, market: pick.marketKey, result: midSettled, actual: pick.actualScore });
-                                  }
-                                }
-                                if (["high_q_ou", "low_q_ou"].includes(pick.marketKey) && Number(period || 0) >= 2) {
-                                  const _qouEarly = settleTrackedPickFromCompetition(pick, competition, true);
-                                  if (_qouEarly && _qouEarly !== "pending" && pick.resultStatus !== _qouEarly) {
-                                    pick.resultStatus = _qouEarly;
-                                    pick.settledAt = new Date().toISOString();
-                                    pick.settlementSource = "api_early_qou";
-                                    pick.settledVersion = ENGINE_MODEL_VERSION;
-                                    changed = true;
-                                    g_liveGameStatus.delete(pick.eventId);
-                                    g_settlementDebugLog.set(_dbgKey, { pick: `${pick.homeTeam} vs ${pick.awayTeam} · ${pick.marketKey}`, eventId: pick.eventId, status: `✅ EARLY QOU: ${_qouEarly.toUpperCase()}`, apiFinal: false, clock, period, settled: _qouEarly, actual: pick.actualScore, line: pick.lineAtPick || pick.line, ts: new Date().toLocaleTimeString([], {hour12:false}) });
-                                    trackerDebug("early qou settled", { eventId: pick.eventId, market: pick.marketKey, result: _qouEarly, actual: pick.actualScore });
                                   }
                                 }
                               }
@@ -10146,7 +10045,7 @@ function addTrackedPicks(newPicks) {
 }
 
 
-    function getH2HWeight(lenA, lenB, marketType = "ft", sampleTier = "thin", divergence = 0, league = "unknown", baselineForMarket = null, factor = 1.0, context = null) {
+function getH2HWeight(lenA, lenB, marketType = "ft", sampleTier = "thin", divergence = 0, league = "unknown", baselineForMarket = null, factor = 1.0, context = null) {
   const minLen = Math.min(Number(lenA) || 0, Number(lenB) || 0);
   if (minLen < 2) return 0;
   let weight = (Math.log1p(minLen - 1) / Math.log1p(9)) * 0.35;
@@ -10158,7 +10057,7 @@ function addTrackedPicks(newPicks) {
     const volRatio = context.volRatio ?? 1.0;
     weight *= Math.max(0.5, 1.2 - volRatio * 0.4);
     const blowoutGap = context.blowoutGap ?? 0;
-    if (blowoutGap > 15) weight *= 0.8;
+    if (blowoutGap > 2) weight *= 0.8; // football blowout threshold lower
     const paceGapRisk = context.paceGapRisk ?? false;
     if (paceGapRisk) weight *= 0.85;
   }
@@ -10209,10 +10108,8 @@ function getVolatilityRatioForSeries(series, leagueVolLimit) {
     // over‑anchoring to league average pace. Do not narrow without historical
     // pace distribution analysis.
     // Issue 18: Widened to ±35% to capture extreme games and reduce over-anchoring to league average.
-function getEffectivePaceClamp(league) {
-  // Football has no pace; return neutral values
-  return { min: 0.9, max: 1.1 };
-}
+// Deleted: pace clamp – not used.
+function getEffectivePaceClamp(league) { return { min: 1.0, max: 1.0 }; }
 
 
     // [FIXED: WNBA_THRESHOLD_ROUTING] — WNBA and WNBA_PRE were falling through to
@@ -10225,7 +10122,7 @@ function getEffectivePaceClamp(league) {
     
 
 function getLineSanityBands(league) {
-  // Football: goals ranges, not points
+  // Football: goals ranges
   return { ft: [0, 20], h1: [0, 10], team: [0, 10] };
 }
 
@@ -10896,19 +10793,7 @@ if (!league) {
     }
 
     // [ESPN+ EXPANSION] Inner resolver — mirrors getTrackedLeagueBase. Both must stay in sync.
-    function getLeagueBase(league) {
-      // Football has no ESPN base – return empty
-      return "";
-    }
 
-    function getCurrentSeasonYear(league) {
-      // Football: most leagues run Aug–May; if before August, we're in previous season
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = now.getUTCMonth();
-      if (month < 8) return year - 1;
-      return year;
-    }
 
     async function fetchLeagueTeamCatalog(league) {
       // Football – no team catalog
@@ -10971,10 +10856,6 @@ function cancelDropClose(dropId = null) {
 updateIntelligencePack();
 }
 
-    function lookupTeamId(name, leagueHint) {
-      // Football has no hardcoded team IDs – always return null
-      return null;
-    }
 
     function getTeamIdentityKey(name, league) {
       const norm = normalizeTeamName(name);
@@ -11113,20 +10994,8 @@ btn.addEventListener("click", () => { section.classList.toggle("collapsed"); });
       });
     }
 
-    function validateTeamId(id, league) {
-      // Football – no team ID validation needed
-      return false;
-    }
 
-    async function searchTeamFromAPI(base, name, league) {
-      // Football – no team search needed
-      return null;
-    }
 
-// fetchInjuryMeta permanently removed – football injuries not supported
-async function fetchInjuryMeta(base, teamId, teamAvgScored, league) {
-  return { scoringMult: 1, notes: [], outCount: 0, dtdCount: 0, unknownImpactCount: 0, hasUnknownImpact: false, highUncertainty: false };
-}
 
 
     function stripOTFromScores(scoreA, scoreB, linesA, linesB, regulationPeriods) {
@@ -11146,25 +11015,6 @@ async function fetchInjuryMeta(base, teamId, teamAvgScored, league) {
 
     // V3 + V6 + V7: shared fetch core using LEAGUE_FETCH_RULES
 
-// fetchScheduleCore permanently removed – football uses manual SofaScore only
-async function fetchScheduleCore(base, teamId, leagueKey, requiredVenue, allowFallback = true) {
-  return null;
-}
-
-// fetchH2HCore permanently removed – football uses manual SofaScore only
-async function fetchH2HCore(base, teamAId, teamBId, leagueKey) {
-  return [];
-}
-
-
-
-async function fetchNcaaSchedule(base, teamId, requiredVenue, allowFallback = true, leagueKey = "ncaa") {
-  return fetchScheduleCore(base, teamId, leagueKey, requiredVenue, allowFallback);
-}
-
-async function fetchNcaaH2H(base, teamAId, teamBId, leagueKey = "ncaa") {
-  return fetchH2HCore(base, teamAId, teamBId, leagueKey);
-}
 
 function renderInjuryBox(boxId, contentId, inj) {
       const box = document.getElementById(boxId);
@@ -11374,29 +11224,7 @@ async function _removedFetchSofaScoreData() {
   withErrorBoundary(fetchESPN, "fetchESPN_pickFixture")();
 }
 
-// Football conversion: ESPN auto-fetch permanently removed – use manual SofaScore entry only.
-async function fetchESPN() {
-  const league = document.getElementById("leagueSelect").value;
-  const teamAName = document.getElementById("teamAName").value.trim();
-  const teamBName = document.getElementById("teamBName").value.trim();
 
-  if (!teamAName || !teamBName) {
-    setStatusText("❌ Enter both team names first.", "err");
-    return;
-  }
-
-  setStatusText("Manual entry (SofaScore). Enter team stats in the fields below, then click Run.", "ok");
-  resetResultsTable();
-  const btn = document.getElementById("fetchBtn");
-  if (btn) btn.disabled = false;
-}
-
-// Original ESPN fetch logic moved into this helper
-// Football conversion: ESPN auto-fetch permanently removed – use manual SofaScore entry only.
-async function fetchESPNCore(league, teamAName, teamBName) {
-  // No-op: ESPN data fetching is not used in football.
-  setStatusText("Manual entry (SofaScore). Enter team stats in the fields below, then click Run.", "ok");
-}
 
 
 
@@ -11457,7 +11285,7 @@ function getFixtureSideRole(side) {
 function getFetchedSeries(side, scope, marketKey, metric) { 
   const ctx = g_massacreFetchContext?.[side]?.[scope]; 
   if (!ctx) return []; 
-  const prefix = marketKey === "ft" ? "ft" : marketKey === "h1" ? "h1" : "h2"; 
+  const prefix = marketKey === "ft" ? "ft" : "h1"; 
   const suffix = metric === "allowed" ? "Allowed10" : "Scored10"; 
   const arr = ctx?.[prefix + suffix]; 
   return Array.isArray(arr) ? arr.map(Number).filter(v => isFinite(v) && v > 0).slice(0, 10) : []; 
@@ -11470,13 +11298,6 @@ function getManualSeries(side, marketKey, parsed) {
   if (side === "B" && marketKey === "ft") return safeArr(parsed.bFTScored) || [];
   if (side === "A" && marketKey === "h1") return safeArr(parsed.a1HScored) || [];
   if (side === "B" && marketKey === "h1") return safeArr(parsed.b1HScored) || [];
-  if (marketKey.startsWith("q")) {
-    const pKey = side.toLowerCase() + marketKey.toUpperCase() + "Scored";
-    if (parsed[pKey] && parsed[pKey].length) return safeArr(parsed[pKey]);
-  }
-  const qKey = marketKey + "Scored";
-  const qData = g_massacreFetchContext[side][qKey];
-  if (Array.isArray(qData) && qData.length) return qData;
   return [];
 }
 
@@ -11502,10 +11323,6 @@ function getH2HSeries(side, marketKey, parsed) {
   if (side === "B" && marketKey === "ft") return safeArr(parsed.bFTH2H) || [];
   if (side === "A" && marketKey === "h1") return safeArr(parsed.a1HH2H) || [];
   if (side === "B" && marketKey === "h1") return safeArr(parsed.b1HH2H) || [];
-  if (marketKey.startsWith("q")) {
-    const pKey = side.toLowerCase() + marketKey.toUpperCase() + "H2H";
-    if (parsed[pKey] && parsed[pKey].length) return safeArr(parsed[pKey]);
-  }
   return [];
 }
 
@@ -11721,14 +11538,16 @@ function compute1HProjection({ league, parsed, lines, injMultA = 1, injMultB = 1
 
 
 function getMarketVolLimit(league, marketKey) {
+  // Football: fixed volatility limit for goals (simplified)
   return 1.2;
 }
 
 
+// Football conversion: margins are goal differentials. Thresholds adjusted to 2, 3, 5 goals.
 function getMassacreThresholdBucket(margin) {
   const m = Math.abs(Number(margin) || 0);
-  if (m >= 6) return "nuclear";
-  if (m >= 4) return "heavy";
+  if (m >= 5) return "nuclear";
+  if (m >= 3) return "heavy";
   if (m >= 2) return "light";
   return "none";
 }
@@ -11818,9 +11637,9 @@ function getMassacreH2HSeries(marketKey, fixtureMeta, parsed) {
 }
 
 
-function getMassacreMarketWindowSet() {
-  return ["ft", "h1"];
-}
+// Football conversion: only FT and HT markets are used.
+// Deleted: only ft and h1 used.
+function getMassacreMarketWindowSet() { return ["ft", "h1"]; }
 
 function _getMassacreBlendWeight(severity) {
   if (severity === "nuclear") return 0.6;
@@ -12214,7 +12033,7 @@ function applyLeagueTrustToPicks(picks, league) {
 
 
 function getTrackedInputSource(marketKey = "ft") {
-  const bucket = marketKey === "h1" ? "h1" : marketKey === "h2" ? "h2" : "ft";
+  const bucket = marketKey === "h1" ? "h1" : "ft";
   const aSource = String(g_fetchMeta?.A?.[bucket]?.source || "").trim().toLowerCase();
   const bSource = String(g_fetchMeta?.B?.[bucket]?.source || "").trim().toLowerCase();
   const rawSources = [aSource, bSource].filter(Boolean);
@@ -12381,7 +12200,7 @@ function buildTrackedPickPayload({ pickRow, isLock, fixtureMeta: originalFixture
     return "extreme";
   }
 
-    function getLineBucket(market, line) {
+function getLineBucket(market, line) {
     if (!isFinite(line)) return "unknown";
 
     if (market === "ft") {
@@ -13151,11 +12970,7 @@ const h1Calc = compute1HProjection({
           h1Calc.projB1H = NaN;
         }
 
-    // Quarter variables removed – football has no quarters.
-    const q1 = null, q2 = null, q3 = null, q4 = null;
-
-    // All quarter-related code removed – football has no quarters.
-
+        // Quarter variables removed – football has no quarters.
     if (ftCalc.ftSampleTier === "insufficient") {
       ftPick = "NO PLAY";
       aPick = "NO PLAY";
@@ -13171,11 +12986,6 @@ const h1Calc = compute1HProjection({
       ftCalc.aEdge = NaN;
       ftCalc.projBFT = NaN;
       ftCalc.bEdge = NaN;
-
-      if (q1) { q1.proj = NaN; q1.edge = NaN; q1.pick = "NO PLAY"; }
-      if (q2) { q2.proj = NaN; q2.edge = NaN; q2.pick = "NO PLAY"; }
-      if (q3) { q3.proj = NaN; q3.edge = NaN; q3.pick = "NO PLAY"; }
-      if (q4) { q4.proj = NaN; q4.edge = NaN; q4.pick = "NO PLAY"; }
     }
 
     if (h1Calc.h1SampleTier === "insufficient") h1Pick = "NO PLAY";
@@ -13543,25 +13353,6 @@ await applyMassacreFrameworkToPicks(finalPicksForDisplay, league, parsed, fixtur
 // Q1-Q4 scaling against the FT anchor is preserved, but H1 itself is no longer
 // touched here.
 
-// FINAL RECONCILIATION (Last Step: Robust Alignment) 
-const fP = finalPicksForDisplay.find(x => x.marketKey === 'ft'); 
-if (fP && isFinite(fP.proj)) { 
-// Shield Fix: Only scale row where the line is significantly smaller than the FT total
-const qPicks = finalPicksForDisplay.filter(x => ['q1','q2','q3','q4'].includes(x.marketKey) && isFinite(x.proj) && x.line < (fP.line * 0.45)); 
-const rawQSum = qPicks.reduce((s, x) => s + x.proj, 0);
-
-if (rawQSum > 50 && qPicks.length > 0) { 
-const gameCoverageShare = qPicks.length / 4; 
-const scale = (fP.proj * gameCoverageShare) / rawQSum;
-
-qPicks.forEach(q => {
-  q.proj *= scale;
-  q.edge = q.proj - q.line;
-  q.pick = getPick(q.edge, q.line, league, "h1", {});
-});
-
-}
-} 
 
 
 
@@ -13732,10 +13523,6 @@ const markets = finalPicksForDisplay.map(p => ({
       h1ProjectionOnly: h1Calc.h1ProjectionOnly,
       ftHasH2H: ftCalc.ftHasH2H,
       h1HasH2H: h1Calc.h1HasH2H,
-      q1HasH2H: !!q1?.hasH2H,
-      q2HasH2H: !!q2?.hasH2H,
-      q3HasH2H: !!q3?.hasH2H,
-      q4HasH2H: !!q4?.hasH2H,
     pace: ftCalc.pace,
     paceGapRisk: ftCalc.paceGapRisk,
     h1PaceGapRisk: h1Calc.paceGapRisk,
@@ -14181,16 +13968,12 @@ window.__LAST_AUDIT_STATE = {
   // ═══════════════════════════════════════════════════
         confidenceBuild: {
         gradeThresholds: _aud_gradeThresholds,
-        scoringFormula: "score += 2.0 (fullModel+fullSample), +1.0 (fullModel or fullSample), -2 (thin) / -4 (insufficient), -1.0 (projectionOnly), +clamp((edgePct-0.050)/0.03,-1,2), +0.40*|q4EdgeNorm| and +0.75 if q4 agrees with ft side (ft only), +0.20*|q2EdgeNorm| (h1 only), +1.0 H2H else -0.15, then threshold: score>=aThresh->A, >=bThresh->B, >=cThresh->C else D. Trap penalty and isH2 branch were removed (FIX #26/#33) and no longer apply.",
+        scoringFormula: "score += 2.0 (fullModel+fullSample), +1.0 (fullModel or fullSample), -2 (thin) / -4 (insufficient), -1.0 (projectionOnly), +clamp((edgePct-0.050)/0.03,-1,2), +1.0 H2H else -0.15, then threshold: score>=aThresh->A, >=bThresh->B, >=cThresh->C else D. Trap penalty and isH2 branch were removed (FIX #26/#33) and no longer apply.",
         markets: {
           FT:     { pick: ftPick,  note: ftNote,  line: ftLine,  edge: ftCalc.ftEdge,  edgePct: isFinite(ftCalc.ftEdge)  && ftLine  ? Math.abs(ftCalc.ftEdge  / ftLine)  : null, sampleTier: ftCalc.ftSampleTier,  projectionOnly: ftCalc.ftProjectionOnly,  fullModel: ftCalc.ftFullModel,  trap: false, hasH2H: ftCalc.ftHasH2H,  marketKey: "ft",     finalGrade: ftConfidence      },
           H1:     { pick: h1Pick,  note: h1Note,  line: h1Line,  edge: h1Calc.h1Edge,  edgePct: isFinite(h1Calc.h1Edge)  && h1Line  ? Math.abs(h1Calc.h1Edge  / h1Line)  : null, sampleTier: h1Calc.h1SampleTier,  projectionOnly: h1Calc.h1ProjectionOnly,  fullModel: h1Calc.h1FullModel,  trap: false, hasH2H: h1Calc.h1HasH2H,  marketKey: "h1",     finalGrade: h1ConfidenceFinal },
           TEAM_A: { pick: aPick,   note: ftNote,  line: aLine,   edge: ftCalc.aEdge,   edgePct: isFinite(ftCalc.aEdge)   && aLine   ? Math.abs(ftCalc.aEdge   / aLine)   : null, sampleTier: ftCalc.ftSampleTier,  projectionOnly: ftCalc.ftProjectionOnly,  fullModel: ftCalc.teamFullModel,  trap: false, hasH2H: ftCalc.ftHasH2H,  marketKey: "team_a", finalGrade: aConfidence },
-          TEAM_B: { pick: bPick,   note: ftNote,  line: bLine,   edge: ftCalc.bEdge,   edgePct: isFinite(ftCalc.bEdge) && bLine ? Math.abs(ftCalc.bEdge / bLine) : null, sampleTier: ftCalc.ftSampleTier,  projectionOnly: ftCalc.ftProjectionOnly,  fullModel: ftCalc.teamFullModel,  trap: false, hasH2H: ftCalc.ftHasH2H,  marketKey: "team_b", finalGrade: bConfidence },
-          Q1:     { pick: q1?.pick || "NO PLAY", note: null, line: q1?.line, edge: q1?.edge, edgePct: isFinite(q1?.edge) && q1?.line ? Math.abs(q1.edge / q1.line) : null, sampleTier: q1?.tier, projectionOnly: ftCalc.ftProjectionOnly, fullModel: ftCalc.ftFullModel, trap: false, hasH2H: q1?.hasH2H, marketKey: "q1", finalGrade: q1?.confidence || "NaN" },
-          Q2:     { pick: q2?.pick || "NO PLAY", note: null, line: q2?.line, edge: q2?.edge, edgePct: isFinite(q2?.edge) && q2?.line ? Math.abs(q2.edge / q2.line) : null, sampleTier: q2?.tier, projectionOnly: ftCalc.ftProjectionOnly, fullModel: ftCalc.ftFullModel, trap: false, hasH2H: q2?.hasH2H, marketKey: "q2", finalGrade: q2?.confidence || "NaN" },
-          Q3:     { pick: q3?.pick || "NO PLAY", note: null, line: q3?.line, edge: q3?.edge, edgePct: isFinite(q3?.edge) && q3?.line ? Math.abs(q3.edge / q3.line) : null, sampleTier: q3?.tier, projectionOnly: ftCalc.ftProjectionOnly, fullModel: ftCalc.ftFullModel, trap: false, hasH2H: q3?.hasH2H, marketKey: "q3", finalGrade: q3?.confidence || "NaN" },
-          Q4:     { pick: q4?.pick || "NO PLAY", note: null, line: q4?.line, edge: q4?.edge, edgePct: isFinite(q4?.edge) && q4?.line ? Math.abs(q4.edge / q4.line) : null, sampleTier: q4?.tier, projectionOnly: ftCalc.ftProjectionOnly, fullModel: ftCalc.ftFullModel, trap: false, hasH2H: q4?.hasH2H, marketKey: "q4", finalGrade: q4?.confidence || "NaN" }
+          TEAM_B: { pick: bPick,   note: ftNote,  line: bLine,   edge: ftCalc.bEdge,   edgePct: isFinite(ftCalc.bEdge) && bLine ? Math.abs(ftCalc.bEdge / bLine) : null, sampleTier: ftCalc.ftSampleTier,  projectionOnly: ftCalc.ftProjectionOnly,  fullModel: ftCalc.teamFullModel,  trap: false, hasH2H: ftCalc.ftHasH2H,  marketKey: "team_b", finalGrade: bConfidence }
         }
       },
 
@@ -14303,19 +14086,9 @@ if (trackedToSave.length) {
 }
 
 // All API Basketball helpers permanently removed – not used in football
-const RAPID_API_KEY = "";
-const RAPID_API_HOST = "";
-const RAPID_API_BASE = "";
-const THESPORTSDB_LEAGUE_MAP = {};
-const LEAGUE_ID_MAP = {};
-async function apiBasketballFetch(url, timeoutMs) { return null; }
-async function searchAPIbasketballTeam(league, teamName) { return null; }
-async function fetchAPIbasketballSchedule(teamId, league, limit) { return null; }
-async function fetchAPIbasketballH2H(teamAId, teamBId, league) { return []; }
-async function fetchAPIbasketball(league, teamAName, teamBName) { /* no-op */ }
-function getAPIBasketballSeasonParam(league) { return ""; }
+// Deleted: all RapidAPI basketball helpers – not used in football.
 
-  function clearAll() {
+function clearAll() {
       acknowledgeGlobalEngineAlert();
       _fixtureLoadToken++;
       unlockFetchBtn();
@@ -14323,7 +14096,7 @@ function getAPIBasketballSeasonParam(league) { return ""; }
       g_lastFetchedTeams = { A: "", B: "" };
       g_fetchMeta = defaultFetchMeta();
       g_massacreFetchContext = defaultMassacreFetchContext();
-      Object.assign(g_h2hManualPreference, { ft: null, h1: null, q1: null, q2: null, q3: null, q4: null });
+      Object.assign(g_h2hManualPreference, { ft: null, h1: null });
 
       const ls = document.getElementById("leagueSelect");
       if (ls) ls.value = "";
@@ -14496,11 +14269,6 @@ const isWnba = false;
         const el = document.getElementById(id);
         if (el) el.style.display = leagueVal ? "block" : "none";
       });
-      // 2H sections permanently hidden
-      ["a2HSection", "b2HSection", "h2h2HSection"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = "none";
-      });
       const h2hQ = document.getElementById("h2hQSection");
       if (h2hQ) h2hQ.style.display = "none";
       
@@ -14532,11 +14300,6 @@ const isWnba = false;
           });
 
           syncH2HCheckbox("h1", false);
-          // Quarter checkboxes hidden
-          syncH2HCheckbox("q1", false);
-          syncH2HCheckbox("q2", false);
-          syncH2HCheckbox("q3", false);
-          syncH2HCheckbox("q4", false);
 
         ["aVenueSplitWrapper", "bVenueSplitWrapper"].forEach(id => {
           const el = document.getElementById(id);
@@ -14549,7 +14312,6 @@ const isWnba = false;
         g_massacreFetchContext = defaultMassacreFetchContext();
         g_h2hManualPreference.ft = null;
         g_h2hManualPreference.h1 = null;
-        g_h2hManualPreference.h2 = null;
 
         syncAllH2HCheckboxes(false);
 
