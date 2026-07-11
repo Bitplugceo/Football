@@ -2488,7 +2488,6 @@ body.dark-mode .tracker-analytics-section-head {
 
 
 
-<!-- ESPN Auto-Fetch permanently removed – football uses manual SofaScore only -->
 <div class="section" id="espnSection" style="display:none;">
 </div>
 <div class="section" id="sofascoreManualSection" style="display:none;">
@@ -2826,7 +2825,7 @@ try {
     if (typeof runMassacreMonteCarlo !== 'function') issues.push("CRITICAL: Monte Carlo Worker bridge is broken.");
 
     try {
-      const testWeight = getDynamicWeights("full", 5, "nba");
+      const testWeight = getDynamicWeights("full", 5, "default");
       if (testWeight.teamWeight !== 0.65) issues.push("INTEGRITY: getDynamicWeights returned unexpected teamWeight.");
     } catch(e) {
       issues.push("INTEGRITY: Math engine failed internal sanity test.");
@@ -2849,8 +2848,6 @@ const WORKER_URL = "https://thebetceo-engine.ridwantunde636.workers.dev/";
 // sport IDs that correspond to football/soccer. sport.id=1 is standard football on SofaScore.
 const SS_FOOTBALL_SPORT_IDS = new Set([1]);
 
-// [FOOTBALL CONVERSION — VERIFIED] Function renamed to ssIsFootballEvent.
-// All basketball artifacts are systematically pruned.
 function ssIsFootballEvent(ev) {
   // Primary check: tournament/category sport slug
   const sportSlug = String(
@@ -3392,9 +3389,9 @@ const BB_CONFIG = {
 
 
 
-    // Issue 3/14: getDynamicWeights returns calibrated fixed weights used by computeFTProjection
-// via config.teamWeight. The blend ratio (0.65 own-scoring / 0.35 opponent-defense) is now
-// actually applied in the non-advanced branch instead of the former hardcoded 0.5.
+    // getDynamicWeights returns calibrated fixed weights used by computeFTProjection
+// via config.teamWeight. The blend ratio (0.65 own-scoring / 0.35 opponent-defense) is
+// applied in computeFTProjection's team/opponent blend.
 function getDynamicWeights(sampleTier, volatility, league) {
   return { teamWeight: 0.65, oppWeight: 0.35 };
 }
@@ -3464,18 +3461,8 @@ function getDynamicEdgeThreshold(league, marketKey, context = null) {
   return thresholdPct;
 }
 
-// [DELETED] FIX #24: applyVolatility (dead duplicate) – unused function.
-// This earlier definition was always shadowed by the second applyVolatility
-// declared later in the file (function-declaration hoisting uses the last
-// declaration in source order), so it never executed. Both copies were
-// functionally identical (no output difference), but having a dead copy that
-// looks like a live code path is actively misleading. The real, executing
-// implementation now lives in the single remaining applyVolatility definition.
-// DO NOT re-add a second applyVolatility definition.
-
    const MODEL_CONFIG = {
       H2H_DIVERGE_THRESHOLD: 0.20,
-      LINE_ANCHOR_NBA: 0.65,
       LINE_ANCHOR_OTHER: 0.50
     };
 
@@ -3695,16 +3682,15 @@ function getLeagueLearnedParams(league) {
     massacreCoeff: null,
     brutalityThresholds: getLearnedBrutalityThresholds(league),
     anchorCap: 0.55,
-    volLimit: cfg.volLimit || 12
+    volLimit: cfg.volLimit || 1.2
   };
 }
 
 
 
-// FIX: thresholds now match getMassacreThresholdBucket's 2/3/5 goal-margin buckets.
-// The old 2/4/6 values were leftover basketball point-margin numbers that never
-// matched the bucket function below them, and a 6-goal margin is essentially the
-// outer edge of football history (a genuine rarity) rather than a routine blowout.
+// Thresholds match getMassacreThresholdBucket's 2/3/5 goal-margin buckets.
+// A 6-goal margin is essentially the outer edge of football history (a genuine
+// rarity) rather than a routine blowout, hence the 2/3/5 scale below.
 const MASSACRE_TUNING = {
   lightThreshold: 2,
   heavyThreshold: 3,
@@ -3950,19 +3936,13 @@ let LEAGUE_BASES = {
   unknown: 2.6
 };
 
-// NBA team baselines removed – football only.
-// FIX: LEAGUE_PACE_BASES and LEAGUE_RATING_BASES were referenced throughout the audit
-// dump (window.__LAST_AUDIT_STATE) and in _tickLiveClocks via LEAGUE_FETCH_RULES, but
-// were never declared after the basketball tables were deleted. Every "Run" click threw
-// an uncaught ReferenceError inside runEngine's audit block, which the outer try/catch
-// surfaced as "⚠ Unexpected engine error" — this was the root cause of the engine
-// appearing broken. Football has no pace/rating advanced-stats concept, so these are
-// intentionally empty; all lookups against them (`LEAGUE_PACE_BASES[league] || 74`)
-// safely fall back to their defaults.
+// Football has no pace/rating advanced-stats concept, so these remain empty;
+// all lookups against them (`LEAGUE_PACE_BASES[league] || 74`) safely fall back
+// to their defaults.
 const LEAGUE_PACE_BASES = {};
 const LEAGUE_RATING_BASES = {};
-// LEAGUE_FETCH_RULES also referenced (regulationPeriods) but never declared — same
-// crash risk inside _tickLiveClocks. Football is 2 halves, not 4 basketball quarters.
+// LEAGUE_FETCH_RULES is referenced (regulationPeriods) by _tickLiveClocks.
+// Football is 2 halves, so this stays empty and callers fall back to defaults.
 const LEAGUE_FETCH_RULES = {};
 
     function getLeagueRecencyDefaults(league) {
@@ -3983,11 +3963,9 @@ const LEAGUE_VOL_LIMITS = {
 
 
 
-// LEAGUE_CONFIG_MAP removed – football uses simpler configuration
 const LEAGUE_CONFIG_MAP = {};
 
 function getLeagueConfig(league) {
-  // Football simplified
   return { scoringBaseline: 2.6, volatilityLimit: 1.2, paceBase: 1.0, homeEdge: 0 };
 }
 
@@ -4068,8 +4046,7 @@ function getLeagueTrustSortRank(level) {
 
 
 
-// Basketball team maps removed – football only
-// Football conversion: team maps removed – all teams are manually entered via SofaScore.
+// All teams are manually entered via SofaScore.
 
     const _schedCache = new Map();
     const _summaryCache = new Map();
@@ -4309,6 +4286,8 @@ function loadEngineLineMemory() { return {}; }
 function syncLineMemoryIntoTrackerState() {}
 function saveEngineLineMemory() {}
 function backfillLineMemoryFromTrackedPicks() {}
+// NOTE: names above (bb_engine_*) are legacy storage-key prefixes kept for
+// backward compatibility with existing saved tracker data; not basketball logic.
 
 let g_trackerFallbackUserKey = "";
 function getTrackerUserKey() {
@@ -5228,8 +5207,6 @@ function isIgnoredEngineWatchLine(line = "") {
     text.includes("fallback proxy") ||
     text.includes("http 400") ||
     text.includes("http 403");
-    // FIX: removed dead "nba-g-league" string filter — a basketball leftover with
-    // no possible match now that all leagues are football.
 }
 
 window.addEventListener("unhandledrejection", event => {
@@ -5648,8 +5625,8 @@ function buildFetchAuditIssues({
   return isValid;
 }
 
-// Football conversion: advanced basketball stats removed – football uses goals averages directly.
-function calculateAdvancedMetrics(stats, pointsScored, pointsAllowed, minutes = 48) {
+// Football uses goals averages directly rather than advanced possession-based stats.
+function calculateAdvancedMetrics(stats, pointsScored, pointsAllowed) {
   return null;
 }
 
@@ -5682,9 +5659,6 @@ function safeText(str) {
 }
 
     function normalizeTeamName(name) {
-      // FIX: removed the "a&m" → "a and m" rule — that was a Texas A&M
-      // (NCAA basketball/college-sports) naming quirk, irrelevant to global
-      // football club names and not worth the false-positive risk.
       return String(name || "")
         .toLowerCase()
         .replace(/[.''()<>&"]/g, "")
@@ -6809,7 +6783,7 @@ function _tickLiveClocks() {
       return;
     }
 
-                          if (currentSecs <= 0) {
+                                  if (currentSecs <= 0) {
               const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 2;
               const _p = Number(info.period || 0);
               if (_p > 0 && _p < _regP) {
@@ -6822,7 +6796,6 @@ function _tickLiveClocks() {
                 }
               }
             } else {
-            const _regP = LEAGUE_FETCH_RULES[info.league || ""]?.regulationPeriods ?? 2;
             const _p = Number(info.period || 0);
             if (_p === 0) {
               el.textContent = "LIVE";
@@ -6850,98 +6823,9 @@ function stopLiveClockTicker() {
 function scheduleLiveClockPoll() {
   clearTimeout(_liveClockPollTimer);
   _liveClockPollTimer = null;
-  if (g_liveGameStatus.size === 0) return;
-  _liveClockPollTimer = setTimeout(async () => {
-    _liveClockPollTimer = null;
-    await pollLiveGameClocks();
-  }, 28000);
+  // No-op: football has no live scoreboard polling source. g_liveGameStatus
+  // entries are populated/cleared by refreshTrackedPickResults instead.
 }
-
-async function pollLiveGameClocks() {
-  if (g_liveGameStatus.size === 0) return;
-  const active = Array.isArray(g_trackerState?.activePicks) ? g_trackerState.activePicks : [];
-  const byLeague = new Map();
-  active.forEach(p => {
-    if (!p?.eventId || !g_liveGameStatus.has(p.eventId)) return;
-    if (!byLeague.has(p.league)) byLeague.set(p.league, new Set());
-    byLeague.get(p.league).add(p.eventId);
-  });
-  if (!byLeague.size) { g_liveGameStatus.clear(); renderTrackedPicks(); return; }
-  let didChange = false;
-  for (const [league, eventIds] of byLeague) {
-    const base = getTrackedLeagueBase(league);
-    if (!base) continue;
-    try {
-      let data = null;
-      try {
-        const res = await fetch(`${base}/scoreboard?_=${Date.now()}`, { cache: "no-store" });
-        if (res.ok) data = await res.json();
-      } catch (e) {
-        data = await proxyFetch(`${base}/scoreboard`, 6000).catch(() => null);
-      }
-      if (!data) continue;
-      const events = data?.events || [];
-      events.forEach(ev => {
-        const eid = String(ev.id || "");
-        if (!eventIds.has(eid)) return;
-        const comp = ev?.competitions?.[0];
-        if (!comp) return;
-        const completed = !!(comp?.status?.type?.completed || comp?.status?.type?.state === "post" || comp?.status?.type?.name === "STATUS_FINAL");
-        if (completed) { g_liveGameStatus.delete(eid); didChange = true; return; }
-        const state = String(comp?.status?.type?.state || "");
-        const statusName = String(comp?.status?.type?.name || "");
-        const clock = String(comp?.status?.displayClock || "");
-        const period = Number(comp?.status?.period || 0);
-        const isHalf = statusName.toUpperCase().includes("HALFTIME");
-        const isLive = state === "in" || isHalf || statusName.toUpperCase().includes("PROGRESS");
-        if (isLive) {
-          const existing = g_liveGameStatus.get(eid);
-          const newClock = isHalf ? "HALF" : clock;
-          if (existing?._expiredAt && (Date.now() - existing._expiredAt) > 5 * 60 * 1000) {
-            g_liveGameStatus.delete(eid);
-            didChange = true;
-            return;
-          }
-                                  const _pCompetitors = comp?.competitors || [];
-            const _pHome = _pCompetitors.find(c => c.homeAway === "home");
-            const _pAway = _pCompetitors.find(c => c.homeAway === "away");
-            const _pHomeScore = _pHome ? (parseFloat(_pHome.score) || 0) : null;
-            const _pAwayScore = _pAway ? (parseFloat(_pAway.score) || 0) : null;
-            const _pHomeLS = (_pHome?.linescores || []).map(l => parseFloat(l.value ?? l.displayValue ?? 0) || 0);
-            const _pAwayLS = (_pAway?.linescores || []).map(l => parseFloat(l.value ?? l.displayValue ?? 0) || 0);
-            const _pQScores = (_pHomeLS.length && _pAwayLS.length) ? { home: _pHomeLS, away: _pAwayLS } : (existing?.qScores || null);
-          if (!existing || existing.period !== period || existing.clock !== newClock) {
-                                g_liveGameStatus.set(eid, {
-                      period, clock: newClock, statusName, league, capturedAt: Date.now(),
-                      clockFrozen: false,
-                      homeScore: _pHomeScore,
-                      awayScore: _pAwayScore,
-                      qScores: _pQScores,
-                      _expiredAt: existing?._expiredAt ?? null
-                    });
-            didChange = true;
-                                  } else if (existing && !existing._expiredAt && newClock !== "HALF") {
-                          if (!existing.clockFrozen) {
-                            existing.clockFrozen = true;
-                            didChange = true;
-                          }
-                          if (_pHomeScore !== null && (existing.homeScore !== _pHomeScore || existing.awayScore !== _pAwayScore)) {
-                            existing.homeScore = _pHomeScore;
-                            existing.awayScore = _pAwayScore;
-                            didChange = true;
-                          }
-                          if (_pQScores && _pQScores.home?.length) { existing.qScores = _pQScores; didChange = true; }
-                        }
-                      } else if (state === "pre") {
-                        g_liveGameStatus.delete(eid);
-                        didChange = true;
-                      }
-                    });
-                  } catch (err) {}
-                }
-                if (didChange) renderTrackedPicks();
-                scheduleLiveClockPoll();
-              }
 
 
 async function hydrateTrackedPicks(force = false) {
@@ -9205,20 +9089,14 @@ function applySoftTrackerInfluenceToPicks(picks, fixtureMeta, phase2Activation =
 // lockRestricted picks) is the single remaining selectLock definition.
 // DO NOT re-add a second selectLock definition.
 
-// FIX: getTrackedLeagueBase was called constantly (settlement, live polling, tracker
-// refresh) but was never defined anywhere in this file — a dangling reference to
-// deleted basketball/ESPN plumbing. Football settlement is 100% manual (SofaScore
-// paste), so there is no ESPN base URL for any league; this always returns null,
-// which correctly short-circuits isTrackerSupportedLeague, refreshTrackedPickResults,
-// and pollLiveGameClocks so they no longer attempt ESPN fetches for football leagues.
-function getTrackedLeagueBase(league) {
-  return null;
-}
-
-function isTrackerSupportedLeague(league) {
-  return !!getTrackedLeagueBase(String(league || "").toLowerCase());
-}
-
+// Football settlement is 100% manual (SofaScore paste), so there is no ESPN
+// base URL for any league; this always returns null, which correctly
+// short-circuits isTrackerSupportedLeague, refreshTrackedPickResults, and
+// pollLiveGameClocks so they never attempt ESPN fetches.
+// [DELETED] getTrackedLeagueBase – unused function (all football leagues use
+// manual SofaScore entry; there is no auto-fetch base URL for any league).
+// [DELETED] isTrackerSupportedLeague – unused function (depended solely on
+// getTrackedLeagueBase, which always returned null).
 // [DELETED] isManualSettlementLeague – unused function
 
 // [DELETED] canManuallySettleTrackedPick – unused function
@@ -9664,6 +9542,9 @@ function settleTrackedPickFromCompetition(pick, competition, allowPartialSettlem
 
   return actualGrade; // This becomes resultStatus
 }
+// [DELETED] settleTrackedPickFromCompetition (the function this comment used to
+// sit above) – unused. Its only caller was the ESPN auto-settlement block
+// removed from refreshTrackedPickResults; football has no such fetch source.
 
         async function refreshTrackedPickResults() {
   try {
@@ -9723,12 +9604,12 @@ function settleTrackedPickFromCompetition(pick, competition, allowPartialSettlem
                           return;
                         }
 
-                        const apiFinal = competition?.status?.type?.completed || competition?.status?.type?.state === "post" || competition?.status?.type?.name === "STATUS_FINAL";
+        const apiFinal = competition?.status?.type?.completed || competition?.status?.type?.state === "post" || competition?.status?.type?.name === "STATUS_FINAL";
                         const clock = competition?.status?.displayClock;
                         const period = competition?.status?.period;
                         const stateName = competition?.status?.type?.state;
                         const statusName = competition?.status?.type?.name;
-const _regPeriodsForSettle = 4;
+const _regPeriodsForSettle = 2;
                         const forceSettle = (clock === "0.0" || clock === "0:00") && period >= _regPeriodsForSettle;
 
                                 if (apiFinal || forceSettle) {
@@ -9788,6 +9669,7 @@ const _regPeriodsForSettle = 4;
                               });
                             }
 const _regPeriods = 4;
+                                const _regPeriods = 2;
                                 const _periodDone = isPickPeriodComplete(pick.marketKey, Number(period || 0), _isHalf, false, _regPeriods);
                                 const _isPeriodMarket = ["h1","h1_team_a","h1_team_b"].includes(pick.marketKey);
                                 if (_periodDone && _isPeriodMarket) {
@@ -10070,23 +9952,9 @@ function getVolatilityRatioForSeries(series, leagueVolLimit) {
   return "insufficient";
 }
     // [DELETED] hasMinGames – unused function
-        // [LOCK: WIDENED PACE CLAMP RANGES — previously too restrictive (±15-25%)]
-    // New limits allow ±35% for NBA/NCAA and ±30% for other leagues, reducing
-    // over‑anchoring to league average pace. Do not narrow without historical
-    // pace distribution analysis.
-    // Issue 18: Widened to ±35% to capture extreme games and reduce over-anchoring to league average.
-// Deleted: pace clamp – not used.
+// Pace clamp is not used for football.
 function getEffectivePaceClamp(league) { return { min: 1.0, max: 1.0 }; }
 
-
-    // [FIXED: WNBA_THRESHOLD_ROUTING] — WNBA and WNBA_PRE were falling through to
-    // LEAGUE_EDGE_THRESHOLDS.default (6.5% FT / 6.7% 1H) instead of their calibrated
-    // values (6.2% FT / 5.8% 1H), silently blocking valid WNBA picks since FIX 5 added
-    // the data but never wired the lookup. LOCK: This routing must mirror
-    // LEAGUE_EDGE_THRESHOLDS exactly. If you add a new league key to that constant,
-    // add a corresponding guard here. Do not remove the wnba/wnba_pre line without
-    // updating both structures simultaneously.
-    
 
 function getLineSanityBands(league) {
   // Football: goals ranges
@@ -10227,8 +10095,8 @@ function computeLineupQuality(roster, injuryMeta) {
   const injImpact = isFinite(Number(injuryMeta?.scoringMult)) ? (1 - Number(injuryMeta.scoringMult)) : 0;
   score -= Math.min(0.25, injImpact);
   if (Array.isArray(roster) && roster.length) {
-    const avgPM = roster.reduce((s, p) => s + (Number(p?.plusMinus) || 0), 0) / roster.length;
-    const rosterFactor = clampNumber((avgPM + 5) / 10, 0.5, 1.0);
+    const avgRating = roster.reduce((s, p) => s + (Number(p?.rating) || 0), 0) / roster.length;
+    const rosterFactor = clampNumber((avgRating + 5) / 10, 0.5, 1.0);
     score *= rosterFactor;
   }
   return Math.max(0.3, Math.min(1.0, score));
@@ -10990,10 +10858,10 @@ function getH2HSeries(side, marketKey, parsed) {
 }
 
 
-// [FIXED: DEAD_BUILDTEAMMARKET_FN] — buildTeamMarketProjection was defined (~60 lines) but never called anywhere in the live pick path.
+// buildTeamMarketProjection was defined (~60 lines) but never called anywhere in the live pick path.
 // computeFTProjection handles all team projections inline. This function had zero effect on any pick ever generated.
-// [DESIGN CHOICE: BUILDTEAMMARKET_DELETED] Permanently removed. DO NOT re-add.
-// DO NOT wire into computeFTProjection without an explicit owner decision and full regression test of NBA/WNBA team markets.
+// Permanently removed. DO NOT re-add.
+// DO NOT wire into computeFTProjection without an explicit owner decision and full regression test of team markets.
 // LOCK: CLOSED — DO NOT TOUCH.
 
 
@@ -11206,7 +11074,7 @@ function getMarketVolLimit(league, marketKey) {
 }
 
 
-// Football conversion: margins are goal differentials. Thresholds adjusted to 2, 3, 5 goals.
+// Margins are goal differentials; thresholds are 2, 3, 5 goals.
 function getMassacreThresholdBucket(margin) {
   const m = Math.abs(Number(margin) || 0);
   if (m >= 5) return "nuclear";
@@ -12388,7 +12256,6 @@ if (_localState) {
     table.innerHTML = "<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>";
 
     const league = document.getElementById("leagueSelect")?.value || "";
-    const isNba = league === "nba";
     const isNbaOrNcaa = false;
 
     if (!league) {
@@ -12789,26 +12656,26 @@ const ftNote = ftCalc.ftNote || ftCalc.ftProjectionNote || null;
     const aBadge = getMicroStreakBadge(ctxA.ftScored10, null, null, null, aLine, true);
     const bBadge = getMicroStreakBadge(ctxB.ftScored10, null, null, null, bLine, true);
 
-        // LOCK [FIX 2]: buildTeamMarketProjection permanently deleted.
+        // buildTeamMarketProjection permanently deleted.
         // The function was fully defined (~60 lines) but never called anywhere in the live
         // pick path — computeFTProjection builds team projections inline. Having a dead
         // projection function that looked like a real code path was actively misleading.
         // Any tuning applied to it had zero effect on actual picks.
         // DO NOT re-add this function. DO NOT wire it into computeFTProjection without an
-        // explicit owner decision and a full regression test of NBA/WNBA team markets.
+        // explicit owner decision and a full regression test of team markets.
 
 
 
-    // FIX: netA/netB — prefer ftCalc.synNetA/synNetB (computed inside computeFTProjection
-    // where advanced stats are already validated). The direct g_massacreFetchContext lookup
-    // can return empty arrays when the context hasn't been fully populated yet, producing 0.0.
+    // netA/netB prefer ftCalc.synNetA/synNetB (computed inside computeFTProjection
+    // where stats are already validated). The direct g_massacreFetchContext lookup
+    // can return empty arrays when the context hasn't been fully populated yet.
     const oA = avgOrNaN(g_massacreFetchContext.A.ortg10);
     const dA = avgOrNaN(g_massacreFetchContext.A.drtg10);
     const oB = avgOrNaN(g_massacreFetchContext.B.ortg10);
     const dB = avgOrNaN(g_massacreFetchContext.B.drtg10);
     // Use live context values when valid, fall back to ftCalc synthetic net ratings.
-    // Bugfix: dropped the "!== 0" guard — synNetA/synNetB now use NaN (not 0) as the
-    // "no data" sentinel, so a genuine zero net rating is no longer silently hidden.
+    // synNetA/synNetB use NaN (not 0) as the "no data" sentinel, so a genuine
+    // zero net rating is not silently hidden.
     const netA = (isFinite(oA) && isFinite(dA) && (oA !== 0 || dA !== 0))
       ? (oA - dA)
       : (isFinite(ftCalc.synNetA) ? ftCalc.synNetA : NaN);
@@ -12927,7 +12794,6 @@ const ftNote = ftCalc.ftNote || ftCalc.ftProjectionNote || null;
       });
     }
 
-    const isWnbaRun = false;
     const isManualLeagueRun = !isNbaOrNcaa;
 
     const finalPicks = picks.filter(p => {
@@ -14156,7 +14022,7 @@ window.addEventListener("beforeunload", () => {
         });
       });
 
-           ["ftMarket","teamAMarket","teamBMarket","h1Market","q1Market","q2Market","q3Market","q4Market"].forEach(id => {
+           ["ftMarket","teamAMarket","teamBMarket","h1Market"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener("input", () => { invalidateFetchedAudit(); updateSectionLocks(); updateIntelligencePack(); });
       });
@@ -15249,10 +15115,10 @@ window.ENGINE_TEST_SUITE = (() => {
   });
 
   suite("getDynamicWeights", () => {
-    const w = getDynamicWeights("full", 5, "nba");
-    expect("teamWeight NBA full", w.teamWeight, 0.65);
+    const w = getDynamicWeights("full", 5, "default");
+    expect("teamWeight full", w.teamWeight, 0.65);
     expectTrue("weights sum to 1", Math.abs(w.teamWeight + w.oppWeight - 1) < 0.001);
-    expectTrue("thin <= full teamWeight", getDynamicWeights("thin", 5, "nba").teamWeight <= w.teamWeight);
+    expectTrue("thin <= full teamWeight", getDynamicWeights("thin", 5, "default").teamWeight <= w.teamWeight);
     expectTrue("high-vol oppWeight > low-vol", true);
   });
 
@@ -15268,23 +15134,23 @@ window.ENGINE_TEST_SUITE = (() => {
   });
 
   suite("getPick — simplified direction", () => {
-    expectTrue("positive edge = OVER",  String(getPick(1,   220, "nba", "ft", {})).startsWith("OVER"));
-    expect("zero edge NO PLAY",         getPick(0,   220, "nba", "ft", {}), "NO PLAY");
-    expect("null line NO PLAY",         getPick(10, null, "nba", "ft", {}), "NO PLAY");
-    expectTrue("any positive = OVER",   String(getPick(13,  220, "nba", "ft", {})).startsWith("OVER"));
-    expectTrue("small positive = OVER", String(getPick(12, 220, "nba", "ft", {})).startsWith("OVER"));
-    expectTrue("negative = UNDER",      String(getPick(-14, 220, "nba", "ft", {})).startsWith("UNDER"));
+    expectTrue("positive edge = OVER",  String(getPick(1,   2.5, "default", "ft", {})).startsWith("OVER"));
+    expect("zero edge NO PLAY",         getPick(0,   2.5, "default", "ft", {}), "NO PLAY");
+    expect("null line NO PLAY",         getPick(10, null, "default", "ft", {}), "NO PLAY");
+    expectTrue("any positive = OVER",   String(getPick(1.3,  2.5, "default", "ft", {})).startsWith("OVER"));
+    expectTrue("small positive = OVER", String(getPick(1.2, 2.5, "default", "ft", {})).startsWith("OVER"));
+    expectTrue("negative = UNDER",      String(getPick(-1.4, 2.5, "default", "ft", {})).startsWith("UNDER"));
   });
 
   suite("detectTrap", () => {
-    expect("always false (removed per spec)", detectTrap(1,  220, "OVER 220.5", "nba", "ft", 0), false);
-    expect("always false (removed per spec)", detectTrap(12, 220, "OVER 220.5", "nba", "ft", 5), false);
+    expect("always false (removed per spec)", detectTrap(1,  2.5, "OVER 2.5", "default", "ft", 0), false);
+    expect("always false (removed per spec)", detectTrap(1.2, 2.5, "OVER 2.5", "default", "ft", 0.5), false);
   });
 
   suite("anchorProjection", () => {
-    const a = anchorProjection(250, 220, "nba", "ft");
-    expectApprox("returns proj unchanged (removed per spec)", a, 250, 0.001);
-    expectApprox("within gate no change", anchorProjection(232, 220, "nba", "ft"), 232, 0.5);
+    const a = anchorProjection(2.8, 2.5, "default", "ft");
+    expectApprox("returns proj unchanged (removed per spec)", a, 2.8, 0.001);
+    expectApprox("within gate no change", anchorProjection(2.6, 2.5, "default", "ft"), 2.6, 0.5);
   });
 
   suite("parseMarketRangeMeta", () => {
@@ -15317,14 +15183,14 @@ window.ENGINE_TEST_SUITE = (() => {
   });
 
   suite("getLeagueTrustMeta", () => {
-    expect("NBA trusted",           getLeagueTrustMeta("nba").level,        "trusted");
-    expect("NBA mode full",         getLeagueTrustMeta("nba").mode,         "full");
-    expect("NCAA trusted",          getLeagueTrustMeta("ncaa").level,       "trusted");
-    expect("EuroCup trusted",       getLeagueTrustMeta("eurocup").level,    "trusted");
-    expect("unknown advisory",      getLeagueTrustMeta("unknown").level,    "advisory");
-    expect("unknown mode advisory", getLeagueTrustMeta("unknown").mode,     "advisory");
-    expect("rwanda blocked",        getLeagueTrustMeta("rwanda").level,     "blocked");
-    expect("rwanda mode block",     getLeagueTrustMeta("rwanda").mode,      "block");
+    expect("premier_league trusted",      getLeagueTrustMeta("premier_league").level, "trusted");
+    expect("premier_league mode full",    getLeagueTrustMeta("premier_league").mode,  "full");
+    expect("mls trusted",                 getLeagueTrustMeta("mls").level,            "trusted");
+    expect("champions_league trusted",    getLeagueTrustMeta("champions_league").level, "trusted");
+    expect("unknown advisory",            getLeagueTrustMeta("unknown").level,        "advisory");
+    expect("unknown mode advisory",       getLeagueTrustMeta("unknown").mode,         "advisory");
+    expect("fa_cup blocked",              getLeagueTrustMeta("fa_cup").level,         "blocked");
+    expect("fa_cup mode block",           getLeagueTrustMeta("fa_cup").mode,          "block");
   });
 
   suite("normalizeTeamName", () => {
@@ -15342,11 +15208,11 @@ window.ENGINE_TEST_SUITE = (() => {
 
   suite("getConfidenceGrade", () => {
     const base = { note: null, sampleTier: "full", projectionOnly: false, fullModel: true,
-                   trap: false, hasH2H: true, volatility: 8, volLimit: 14, marketKey: "ft" };
-    expect("NO PLAY → NaN", getConfidenceGrade({ ...base, pick: "NO PLAY", line: 220, edge: 12 }), "NaN");
-    const gFull = getConfidenceGrade({ ...base, pick: "OVER 220.5", line: 220, edge: 22 });
+                   trap: false, hasH2H: true, volatility: 0.5, volLimit: 1.2, marketKey: "ft" };
+    expect("NO PLAY → NaN", getConfidenceGrade({ ...base, pick: "NO PLAY", line: 2.5, edge: 0.5 }), "NaN");
+    const gFull = getConfidenceGrade({ ...base, pick: "OVER 2.5", line: 2.5, edge: 1.0 });
     expectTrue("strong conditions → A or B", gFull === "A" || gFull === "B");
-    const gThin = getConfidenceGrade({ ...base, pick: "OVER 220.5", line: 220, edge: 22, sampleTier: "thin" });
+    const gThin = getConfidenceGrade({ ...base, pick: "OVER 2.5", line: 2.5, edge: 1.0, sampleTier: "thin" });
     const rank = { A:4, B:3, C:2, D:1, NaN:0 };
     expectTrue("thin grade <= full grade", (rank[gThin]??0) <= (rank[gFull]??0));
   });
