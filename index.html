@@ -1,18 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="FB Engine" />
-<meta name="theme-color" content="#1c8a4c" />
-<title>Football Prediction Engine</title>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+  />
+<script>
+    
+  </script>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FB Engine" />
+  <meta name="theme-color" content="#d4af37" />
 
-<style>
-/* ============================================================
-   THEME TOKENS
-   ============================================================ */
+  <link rel="manifest" href="manifest.json?v=fb_tracker_cleanup_v1" />
+  <link rel="apple-touch-icon" href="0A45F320-A89F-4851-AA4E-CE22138FD52F.jpeg?v=fb_tracker_cleanup_v1" />
+  <link rel="icon" type="image/jpeg" href="0A45F320-A89F-4851-AA4E-CE22138FD52F.jpeg?v=fb_tracker_cleanup_v1" />
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js?v=fb_tracker_cleanup_v1")
+          .then(function (reg) {
+            if (typeof engineDebug === "function") {
+              engineDebug("Service worker registered", { scope: reg.scope });
+            }
+          })
+          .catch(function (err) {
+            if (typeof engineDebug === "function") {
+              engineDebug("Service worker registration failed (non-fatal)", { error: err?.message || String(err) });
+            }
+          });
+      });
+    }
+  </script>
+
+  <title>Football Prediction Engine</title>
+
+  <style>
 :root {
   --bg: #efefef;
   --text: #1f2430;
@@ -22,15 +48,15 @@
   --panel-soft-2: #eceff3;
   --input-bg: #ffffff;
   --input-border: #cfd4da;
-  --table-head: #1c3a2b;
+  --table-head: #3a404c;
   --muted: #7b8088;
   --chip-text: #2a2f38;
-  --shadow: 0 2px 8px rgba(0,0,0,0.05);
-  --section-toggle-text: #20242c;
-  --section-toggle-icon: #1c8a4c;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    --section-toggle-text: #20242c;
+  --section-toggle-icon: #d91f26;
   --injury-title: #20242c;
   --table-border: #dfe2e7;
-  --tracker-head-bg: #1c3a2b;
+  --tracker-head-bg: #3a404c;
   --tracker-head-text: #ffffff;
   --tracker-summary-bg: #f6f7f9;
   --tracker-chip-bg: #f6f7f9;
@@ -49,7 +75,7 @@ body.tracker-open {
 }
 body.dark-mode {
   --bg: #111;
-  --text: #3ddc84;
+  --text: #d4af37;
   --panel: #1a1a1a;
   --panel-border: #333;
   --panel-soft: #151515;
@@ -58,39 +84,55 @@ body.dark-mode {
   --input-border: #444;
   --table-head: #111;
   --muted: #9aa0a8;
-  --chip-text: #3ddc84;
-  --shadow: 0 2px 8px rgba(0,0,0,0.22);
-  --section-toggle-text: #3ddc84;
-  --section-toggle-icon: #3ddc84;
+  --chip-text: #d4af37;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+    --section-toggle-text: #d4af37;
+  --section-toggle-icon: #d4af37;
   --injury-title: #aac;
   --table-border: #333;
   --tracker-head-bg: #111;
-  --tracker-head-text: #3ddc84;
+  --tracker-head-text: #d4af37;
   --tracker-summary-bg: #151515;
   --tracker-chip-bg: #151515;
   --tracker-chip-border: #333;
-  --tracker-strong: #3ddc84;
-  --tracker-subtext: #2fae68;
+  --tracker-strong: #d4af37;
+  --tracker-subtext: #c3aa55;
   --tracker-mini-head-bg: #111;
-  --tracker-mini-head-text: #3ddc84;
+  --tracker-mini-head-text: #d4af37;
 }
 
-button, input, select, .section, table, th, td, .tracker-panel, .fixture-day, .autocomplete-list, .league-box {
-  border-radius: 0;
-}
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html { -webkit-text-size-adjust: 100%; }
-body {
-  margin: 0; padding: 0;
-  background: var(--bg); color: var(--text);
+    button,
+    input,
+    select,
+    .section,
+    table,
+    th,
+    td,
+    .tracker-panel,
+    .fixture-day,
+    .autocomplete-list,
+    .league-box {
+      border-radius: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
   font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   -webkit-text-size-adjust: 100%;
 }
-
-/* ============================================================
-   HEADER
-   ============================================================ */
-.app-header {
+     .app-header {
   position: relative;
   display: flex;
   align-items: center;
@@ -101,213 +143,883 @@ body {
   padding-right: max(14px, env(safe-area-inset-right));
   padding-bottom: 10px;
   min-height: 54px;
-  background: linear-gradient(90deg, #0f6b36 0%, #1c8a4c 50%, #0d5c2d 100%);
+  background: linear-gradient(90deg, #0b6e2f 0%, #0e8a3a 50%, #0a5c27 100%);
   color: #fff;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
 }
-.brand-name { font-size: 15px; font-weight: 800; letter-spacing: 0.3px; color: #fff; }
-.brand-right {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
-  color: rgba(255,255,255,0.85); text-transform: uppercase;
+
+    .brand-name {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      color: #fff;
+    }
+
+    .brand-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: rgba(255, 255, 255, 0.85);
+      text-transform: uppercase;
+    }
+
+    .theme-toggle {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 1.5px !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-transform: uppercase !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
 }
-.theme-toggle {
-  background: none !important; border: none !important; box-shadow: none !important;
-  padding: 0 !important; margin: 0 !important;
-  font-size: 11px !important; font-weight: 700 !important; letter-spacing: 1.5px !important;
-  color: rgba(255,255,255,0.85) !important; text-transform: uppercase !important;
-  cursor: pointer !important; opacity: 1 !important;
-}
+
 .header-center {
-  position: absolute; left: 50%; top: 50%;
+  position: absolute;
+  left: 50%;
+  top: 50%;
   transform: translate(-50%, -50%);
-  display: flex; align-items: center; gap: 10px;
-}
-.header-error-btn {
-  background: none !important; border: none !important; box-shadow: none !important;
-  padding: 0 !important; margin: 0 !important;
-  font-size: 18px !important; line-height: 1 !important; cursor: pointer !important;
-  opacity: 0; pointer-events: none;
-}
-.header-error-btn.active { opacity: 1; pointer-events: auto; }
-
-/* ============================================================
-   LAYOUT / SECTIONS
-   ============================================================ */
-.wrapper { padding: 0 12px 90px 12px; max-width: 640px; margin: 0 auto; }
-
-.section {
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  box-shadow: var(--shadow);
-  padding: 12px;
-  margin-bottom: 10px;
-}
-.section h3 {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--section-toggle-text);
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-.autofill-indicator {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--section-toggle-icon);
-  text-transform: none;
-  letter-spacing: 0;
+  gap: 10px;
 }
 
-label {
-  display: block;
-  font-size: 11px;
+.header-error-btn {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.header-error-btn.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.engine-battery {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
   font-weight: 700;
-  color: var(--muted);
-  margin: 6px 0 3px 0;
-  text-transform: uppercase;
+  color: #fff;
   letter-spacing: 0.3px;
 }
-input, select, textarea {
-  width: 100%;
-  background: var(--input-bg);
-  color: var(--text);
-  border: 1px solid var(--input-border);
-  padding: 8px 9px;
-  font-size: 13px;
-  margin-bottom: 6px;
-  font-family: inherit;
-}
-input::placeholder { color: #9aa0a8; font-size: 12px; }
-select.league-box { padding: 9px; font-size: 13px; }
 
-.actions {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0 16px 0;
-  flex-wrap: wrap;
-}
-button {
-  cursor: pointer;
-  border: none;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  background: var(--panel-soft-2);
-  color: var(--text);
-}
-#runBtn {
-  background: linear-gradient(90deg, #0f6b36, #1c8a4c);
-  color: #fff;
-  flex: 1;
-}
-#clearBtn {
-  background: var(--panel-soft-2);
-  color: var(--text);
-}
-.fetch-btn {
-  background: #1c3a2b;
-  color: #fff;
-  width: 100%;
-  padding: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  margin-top: 4px;
+.engine-battery-shell {
+  width: 22px;
+  height: 11px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
+  position: relative;
+  padding: 1px;
 }
 
-/* ============================================================
-   FIXTURE TOOLBAR / AUTOCOMPLETE
-   ============================================================ */
-.fixture-toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
-.fixture-day {
-  flex: 1;
-  padding: 7px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  background: var(--panel-soft);
-  border: 1px solid var(--panel-border);
-  color: var(--muted);
-  cursor: pointer;
-}
-.fixture-day.active {
-  background: #1c8a4c;
-  color: #fff;
-  border-color: #1c8a4c;
-}
-.autocomplete-wrap { position: relative; }
-.autocomplete-list {
+.engine-battery-shell::after {
+  content: '';
   position: absolute;
-  top: 100%; left: 0; right: 0;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  max-height: 180px;
-  overflow-y: auto;
-  z-index: 50;
-  display: none;
-  box-shadow: var(--shadow);
-}
-.autocomplete-list.open { display: block; }
-.autocomplete-item {
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  border-bottom: 1px solid var(--panel-border);
-}
-.autocomplete-item:hover { background: var(--panel-soft); }
-
-#fetchStatus, #ssFetchStatus {
-  font-size: 11px;
-  color: var(--muted);
-  min-height: 14px;
-  margin-top: 4px;
+  right: -3px;
+  top: 3px;
+  width: 2px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 0 1px 1px 0;
 }
 
-.injury-box {
-  margin-top: 8px;
-  padding: 8px;
-  background: var(--panel-soft);
-  border: 1px solid var(--panel-border);
-  display: none;
-}
-.injury-box.show { display: block; }
-.inj-title {
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--injury-title);
-  margin-bottom: 4px;
+.engine-battery-fill {
+  height: 100%;
+  border-radius: 1px;
+  background: #49d45f;
+  transition: width 0.4s ease, background-color 0.4s ease;
 }
 
-/* ============================================================
-   RESULTS TABLE
-   ============================================================ */
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th, td {
-  border: 1px solid var(--table-border);
-  padding: 7px 6px;
+.engine-battery-pct {
+  min-width: 26px;
   text-align: left;
 }
-th {
-  background: var(--table-head);
-  color: #fff;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.pred-over { color: #1c8a4c; font-weight: 800; }
-.pred-under { color: #d91f26; font-weight: 800; }
-.pred-noplay { color: var(--muted); font-weight: 700; }
 
-/* ============================================================
-   TRACKER MODAL
-   ============================================================ */
+    .wrapper {
+      max-width: 760px;
+      margin: 10px auto;
+      padding: 0 10px;
+    }
+
+   .section {
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  margin: 8px auto;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+       .section-toggle {
+      width: 100%;
+      background: none !important;
+      border: none;
+      padding: 12px 10px;
+      margin: 0 !important;
+      color: var(--section-toggle-text) !important;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+      cursor: pointer;
+    }
+
+       .section-toggle .toggle-title {
+      display: block;
+      font-weight: 800;
+      color: var(--section-toggle-text) !important;
+    }
+
+    .section-toggle .toggle-icon {
+      font-size: 15px;
+      line-height: 1;
+      transition: transform 0.2s ease;
+      color: var(--section-toggle-icon) !important;
+    }
+
+    .section-body {
+      padding: 0 10px 10px;
+      margin-top: 0;
+    }
+
+    .section.collapsed .section-body {
+      display: none;
+    }
+
+    .section.collapsed .section-toggle .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .section.locked .section-body {
+      display: none !important;
+    }
+
+    .section.locked .section-toggle {
+      opacity: 0.4 !important;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .section.locked .section-toggle .toggle-icon {
+      display: none;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+h3 span,
+label span,
+small {
+  color: var(--muted);
+}
+
+    input,
+    .league-box,
+    .autocomplete-wrap {
+      width: 100%;
+      max-width: 260px;
+      box-sizing: border-box;
+    }
+
+input,
+    .league-box {
+      display: block;
+      padding: 6px 8px;
+      font-size: 12px;
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--input-border);
+      margin-bottom: 6px;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+    }
+    input::placeholder {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #0e8a3a;
+      box-shadow: 0 0 0 2px rgba(14, 138, 58, 0.12);
+    }
+
+    input[type="checkbox"] {
+      width: 12px !important;
+      height: 12px !important;
+      min-width: 12px !important;
+      min-height: 12px !important;
+      max-width: 12px !important;
+      max-height: 12px !important;
+      margin-right: 6px !important;
+      vertical-align: middle !important;
+      appearance: checkbox !important;
+      -webkit-appearance: checkbox !important;
+    }
+
+    button {
+      padding: 8px 16px;
+      margin: 6px;
+      font-weight: 700;
+      background: #313744;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.95;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .fetch-btn {
+      background: #0e8a3a !important;
+      color: #fff !important;
+      padding: 6px 12px !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      border: none !important;
+      cursor: pointer;
+      margin-top: 4px;
+      box-shadow: 0 2px 6px rgba(14, 138, 58, 0.2);
+    }
+
+    .fixture-toolbar {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0 8px;
+      flex-wrap: wrap;
+    }
+
+    .fixture-day {
+      background: #eceff3 !important;
+      color: #2a2f38 !important;
+      border: 1px solid #d7dbe1 !important;
+      padding: 6px 10px !important;
+      font-size: 12px !important;
+      font-weight: 700;
+      margin: 0;
+      min-width: 90px !important;
+      text-align: center;
+    }
+
+    .fixture-day.active {
+      background: #0e8a3a !important;
+      color: #fff !important;
+      border-color: #0e8a3a !important;
+    }
+
+    .autocomplete-wrap {
+      position: relative;
+      margin-bottom: 4px;
+    }
+
+    .autocomplete-wrap input {
+      width: 100%;
+      margin-bottom: 0;
+      box-sizing: border-box;
+    }
+
+   .autocomplete-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--input-border);
+  border-top: none;
+  z-index: 999;
+  max-height: 180px;
+  overflow-y: auto;
+  display: none;
+}
+
+  .autocomplete-list div {
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+    .autocomplete-list div:hover,
+    .autocomplete-list div.active {
+      background: #0e8a3a !important;
+      color: #fff !important;
+    }
+
+   .autocomplete-list div.group-label {
+  color: var(--muted) !important;
+  font-size: 10px;
+  padding: 4px 8px;
+  cursor: default;
+  background: var(--panel-soft) !important;
+  pointer-events: none;
+}
+
+    .autocomplete-list strong {
+      color: inherit;
+      font-weight: 800;
+      text-decoration: underline;
+    }
+
+   .injury-box {
+  background: var(--panel-soft);
+  border: 1px solid var(--panel-border);
+  padding: 6px;
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.8;
+  display: none;
+}
+
+    .injury-box .inj-title {
+      color: var(--injury-title);
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+
+    .inj-out {
+      color: #d92d2a;
+    }
+
+    .inj-dtd {
+      color: #d98a00;
+    }
+
+    #fetchStatus {
+      font-size: 10px;
+      margin-top: 6px;
+      min-height: 16px;
+    }
+
+    #fetchStatus.ok {
+      color: #0e8a3a;
+    }
+
+    #fetchStatus.err {
+      color: #d92d2a;
+    }
+
+    #fetchStatus.loading {
+      color: #d98a00;
+    }
+
+    .autofill-indicator {
+      font-size: 10px;
+      color: #0e8a3a;
+      display: none;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 10px;
+      height: 8px;
+      border: 2px solid #0e8a3a;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .actions {
+      text-align: center;
+      padding-bottom: 20px;
+    }
+
+    #runBtn,
+    #clearBtn {
+      opacity: 1 !important;
+      border: none !important;
+      cursor: pointer !important;
+      padding: 5px 14px !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      min-width: 0 !important;
+      width: auto !important;
+    }
+
+    #runBtn {
+      background: #0e8a3a !important;
+      color: #fff !important;
+      box-shadow: 0 2px 8px rgba(14, 138, 58, 0.35) !important;
+    }
+
+    #clearBtn {
+      background: #3a404c !important;
+      color: #fff !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 0 6px 10px;
+    }
+
+    table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+  background: var(--panel) !important;
+}
+
+                th,
+td {
+  border: 1px solid var(--table-border);
+  padding: 10px 8px !important;
+  text-align: center;
+  vertical-align: middle;
+}
+
+    th {
+  background: var(--table-head) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+    td {
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  font-weight: 600 !important;
+}
+
+    .pred-over {
+      background: #0e8a3a !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+    .pred-under {
+      background: #c91920 !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+    .pred-noplay {
+      background: transparent !important;
+      color: var(--muted) !important;
+      font-weight: 700 !important;
+    }
+    
+    tr:has(td.pred-noplay) td {
+      background: transparent !important;
+    }
+    td.pred-noplay {
+      background: transparent !important;
+      color: var(--muted) !important;
+      font-weight: 700 !important;
+    }
+    small.error-note {
+      color: #c91920 !important;
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      display: block;
+      margin-top: 3px;
+    }
+
+    small.warn-note {
+      color: #d98a00 !important;
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      display: block;
+      margin-top: 3px;
+    }
+
+    small.info-note {
+      color: #0e8a3a !important;
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      display: block;
+      margin-top: 3px;
+    }
+
+    small.muted-note {
+      color: var(--muted) !important;
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      display: block;
+      margin-top: 3px;
+    }
+
+    .conf-a {
+      background: #0e7a35 !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+    .conf-b {
+      background: #16a349 !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+    .conf-c {
+      background: #d98a00 !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+    .conf-d {
+      background: #c91920 !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+   .conf-none {
+  background: var(--panel-soft-2) !important;
+  color: var(--muted) !important;
+  font-weight: 700 !important;
+}
+
+.conf-provisional-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.4;
+  color: var(--muted);
+  border: 1px dashed var(--muted);
+  border-radius: 0;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.conf-default-coeff-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.4;
+  color: #ffa500;
+  border: 1px dashed #ffa500;
+  border-radius: 0;
+  vertical-align: middle;
+  cursor: help;
+}
+
+    body.dark-mode .conf-none {
+      background: #2a2f3a !important;
+      color: #9aa0a8 !important;
+    }
+
+   .lock {
+  font-size: 4px !important;
+  display: inline-block;
+  vertical-align: middle;
+  transform: translateY(-1px);
+  margin-left: 4px;
+  margin-right: 0;
+}
+
+    .why-pick-details {
+      display: block;
+      margin-top: 0;
+      font-size: 10px;
+      font-weight: 600;
+      white-space: normal;
+    }
+    .why-pick-details[open] {
+      margin-top: 6px;
+    }
+    .why-pick-details summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      list-style: none;
+      outline: none;
+      display: none;
+    }
+    .why-pick-details summary::-webkit-details-marker { display: none; }
+    .why-pick-details[open] summary { color: var(--text); }
+    .why-pick-body {
+      margin-top: 4px;
+      padding: 6px 8px;
+      background: var(--panel-soft);
+      border: 1px solid var(--table-border);
+    }
+    .why-pick-list {
+      margin: 0;
+      padding-left: 14px;
+      display: grid;
+      gap: 4px;
+    }
+    .why-pick-list li {
+      color: var(--text);
+      font-size: 10px;
+      line-height: 1.35;
+      font-weight: 600;
+    }
+    .why-pick-note {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .track-pending {
+      background: #eceff3 !important;
+      color: #2a2f38 !important;
+      font-weight: 800 !important;
+    }
+
+    .track-win {
+      background: #0e8a3a !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+    .track-loss {
+      background: #c91920 !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+    .track-push {
+      background: #3a404c !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+    }
+
+.tracker-status-stack {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.tracker-manual-settle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tracker-manual-btn {
+  background: #eceff3 !important;
+  color: #2a2f38 !important;
+  border: 1px solid #d7dbe1 !important;
+  box-shadow: none !important;
+  padding: 3px 6px !important;
+  margin: 0 !important;
+  min-width: 26px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+
+body.dark-mode .tracker-manual-btn {
+  background: #151515 !important;
+  color: #d4af37 !important;
+  border-color: #333 !important;
+}
+
+.tracker-manual-hint {
+  font-size: 9px;
+  line-height: 1.2;
+  color: var(--tracker-subtext);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tracker-debug-panel {
+  display: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--tracker-summary-bg);
+}
+
+.tracker-debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tracker-debug-title {
+  color: var(--tracker-strong);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.tracker-debug-meta {
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tracker-debug-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.tracker-debug-log li {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+  color: var(--text);
+  padding: 7px 8px;
+  font-size: 10px;
+  line-height: 1.35;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.report-debug-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.report-debug-empty {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+  color: var(--tracker-subtext);
+  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.debug-ok {
+  border-left: 3px solid #0e8a3a !important;
+}
+
+.debug-warn {
+  border-left: 3px solid #d98a00 !important;
+  color: #8a5a00 !important;
+  background: rgba(217, 138, 0, 0.08) !important;
+}
+
+.debug-error {
+  border-left: 4px solid #ff0000 !important;
+  background: #fff0f0 !important;
+  color: #d10000 !important;
+  font-weight: 900 !important;
+}
+.debug-critical {
+  border: 2px solid #ff0000 !important;
+  border-left: 10px solid #ff0000 !important;
+  background: #000000 !important;
+  color: #ff0000 !important;
+  font-weight: 900 !important;
+  text-transform: uppercase;
+  animation: pulse-red 1s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0px rgba(255, 0, 0, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+  100% { box-shadow: 0 0 0 0px rgba(255, 0, 0, 0); }
+}
+
+body.dark-mode .debug-warn {
+  color: #ffcf73 !important;
+  background: rgba(217, 138, 0, 0.14) !important;
+}
+
+body.dark-mode .debug-error {
+  color: #ff5c61 !important;
+  background: rgba(201, 25, 32, 0.18) !important;
+}
+
+@keyframes engineAlertPulse {
+  from {
+    box-shadow: 0 0 0 0 rgba(217, 31, 38, 0.10);
+  }
+  to {
+    box-shadow: 0 0 0 1px rgba(217, 31, 38, 0.30), 0 0 24px rgba(217, 31, 38, 0.14);
+  }
+}
+
+body.engine-alert {
+  background: #2a0608 !important;
+}
+
+body.engine-alert .app-header {
+  background: linear-gradient(90deg, #7b0007 0%, #cf1119 52%, #820008 100%) !important;
+  animation: engineAlertPulse 1.15s ease-in-out infinite alternate;
+}
+
+body.engine-alert .section,
+body.engine-alert .table-wrap,
+body.engine-alert .actions {
+  border-color: #d91f26 !important;
+  animation: engineAlertPulse 1.15s ease-in-out infinite alternate;
+}
+
+body.engine-alert .section {
+  background: #fff6f6 !important;
+}
+
+body.engine-alert #trackerToggleBtn,
+body.engine-alert #headerErrorBtn.active {
+  color: #ffffff !important;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.55);
+}
+
+body.engine-alert #runBtn,
+body.engine-alert #clearBtn {
+  box-shadow: 0 0 0 1px rgba(217, 31, 38, 0.40), 0 0 18px rgba(217, 31, 38, 0.18) !important;
+}
+
+body.dark-mode.engine-alert {
+  background: #140203 !important;
+}
+
+body.dark-mode.engine-alert .section {
+  background: #220b0d !important;
+  border-color: #ff3a41 !important;
+}
+
 .tracker-modal {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.45);
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
   display: none;
   align-items: flex-start;
   justify-content: center;
@@ -318,7 +1030,9 @@ th {
   z-index: 9999;
   overscroll-behavior: none;
 }
-.tracker-modal.open { display: flex; }
+.tracker-modal.open {
+  display: flex;
+}
 .tracker-panel {
   width: min(100vw, 560px);
   height: calc(100dvh - 16px);
@@ -326,12 +1040,29 @@ th {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--panel-border);
-  box-shadow: 0 8px 28px rgba(0,0,0,0.22);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.tracker-head {
+
+.tracker-body-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.tracker-table-wrap {
+  margin: 0;
+  padding-bottom: 0;
+}
+    .tracker-head {
   position: relative;
   display: flex;
   align-items: center;
@@ -343,946 +1074,1521 @@ th {
   font-weight: 800;
   font-size: 13px;
 }
-.tracker-head-actions { display: flex; align-items: center; gap: 10px; }
+
+.tracker-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tracker-close,
 .tracker-insights-btn {
   background: none !important;
   border: none !important;
-  color: var(--tracker-head-text) !important;
-  font-size: 15px !important;
-  cursor: pointer !important;
-  padding: 0 !important;
-}
-.tracker-close {
-  background: none !important;
-  border: none !important;
+  box-shadow: none !important;
   color: var(--tracker-head-text) !important;
   font-size: 18px !important;
-  cursor: pointer !important;
+  line-height: 1 !important;
   padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
 }
+
+.tracker-insights-btn {
+  font-size: 18px !important;
+  opacity: 0.88;
+}
+
+.tracker-insights-btn.state-good:not(.active) {
+  color: #49d45f !important;
+  text-shadow: 0 0 10px rgba(73, 212, 95, 0.28);
+}
+
+.tracker-insights-btn.state-error:not(.active) {
+  color: #ff3b30 !important;
+  text-shadow: 0 0 10px rgba(255, 59, 48, 0.30);
+}
+
+.tracker-insights-btn.state-idle:not(.active) {
+  color: var(--tracker-head-text) !important;
+}
+
+.tracker-insights-btn.active {
+  opacity: 1;
+  color: var(--tracker-head-text) !important;
+  text-shadow: none !important;
+}
+
 .tracker-summary {
-  padding: 8px 16px;
+  padding: 14px 16px;
   background: var(--tracker-summary-bg);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--tracker-subtext);
+  color: var(--tracker-strong);
   border-bottom: 1px solid var(--panel-border);
+  font-size: 12px;
+  font-weight: 800;
 }
+
 .tracker-market-summary {
-  display: none;
-  gap: 6px;
+  display: flex;
   flex-wrap: wrap;
-  padding: 6px 16px;
+  gap: 12px;
+  padding: 16px;
   border-bottom: 1px solid var(--panel-border);
 }
+
+.tracker-analytics-title {
+  margin-bottom: 4px;
+  color: var(--tracker-strong);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.tracker-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .tracker-market-chip {
-  background: var(--tracker-chip-bg);
-  border: 1px solid var(--tracker-chip-border);
-  color: var(--chip-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 11px;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f7f9 100%);
+  border: 1px solid #d9dee5;
+  color: var(--tracker-strong);
   font-size: 10px;
   font-weight: 800;
-  padding: 3px 7px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
 }
-.tracker-body-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px 16px 24px 16px;
-}
-.tracker-empty {
-  text-align: center;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 40px 10px;
-}
-.tracker-table-wrap table { font-size: 11px; }
-.tracker-table-wrap th {
-  background: var(--tracker-mini-head-bg);
-  color: var(--tracker-mini-head-text);
-  font-size: 9px;
-}
-.tracker-analytics-panel:empty { display: none; }
 
-.track-win { color: #1c8a4c; font-weight: 800; }
-.track-loss { color: #d91f26; font-weight: 800; }
-.track-push { color: #b58a1c; font-weight: 800; }
-.track-pending { color: var(--muted); font-weight: 700; }
-
-.pick-row-actions { display: flex; gap: 6px; }
-.pick-row-actions button {
-  font-size: 10px;
-  padding: 4px 7px;
-  font-weight: 700;
+body.dark-mode .tracker-market-chip {
+  background: linear-gradient(180deg, #171717 0%, #121212 100%);
+  border-color: #2f3338;
 }
-.btn-win { background: #1c8a4c !important; color: #fff !important; }
-.btn-loss { background: #d91f26 !important; color: #fff !important; }
-.btn-push { background: #b58a1c !important; color: #fff !important; }
-.btn-del { background: #555 !important; color: #fff !important; }
 
-/* toast */
-#uiToast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1c3a2b;
+.tracker-market-chip.good {
+  background: linear-gradient(180deg, rgba(14,138,58,0.16) 0%, rgba(14,138,58,0.08) 100%);
+  border-color: rgba(14, 138, 58, 0.38);
+  color: #0e5e28;
+}
+
+.tracker-market-chip.warn {
+  background: linear-gradient(180deg, rgba(217,138,0,0.16) 0%, rgba(217,138,0,0.08) 100%);
+  border-color: rgba(217, 138, 0, 0.36);
+  color: #9a6200;
+}
+
+.tracker-market-chip.neutral {
+  background: linear-gradient(180deg, rgba(58, 64, 76, 0.07) 0%, rgba(58, 64, 76, 0.03) 100%);
+}
+
+body.dark-mode .tracker-market-chip.good {
+  color: #8fe29b;
+  background: linear-gradient(180deg, rgba(14,138,58,0.25) 0%, rgba(14,138,58,0.14) 100%);
+  border-color: rgba(143, 226, 155, 0.24);
+}
+
+body.dark-mode .tracker-market-chip.warn {
+  color: #ffcf73;
+  background: linear-gradient(180deg, rgba(217,138,0,0.22) 0%, rgba(217,138,0,0.12) 100%);
+  border-color: rgba(255, 207, 115, 0.22);
+}
+
+.tracker-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tracker-report-card {
+  border: 1px solid #d9dee5;
+  border-top: 3px solid #d91f26;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+  padding: 12px;
+  min-width: 0;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+}
+
+body.dark-mode .tracker-report-card {
+  border-color: #2f3338;
+  border-top-color: #d91f26;
+  background: linear-gradient(180deg, #171717 0%, #121212 100%);
+  box-shadow: none;
+}
+
+.tracker-report-card.hero {
+  background: linear-gradient(135deg, #0e8a3a 0%, #0a6b2c 100%);
+  border-color: #0a6b2c;
+  border-top-color: #0a6b2c;
   color: #fff;
-  padding: 10px 18px;
+  box-shadow: 0 6px 18px rgba(10,107,44,0.22);
+}
+
+.tracker-report-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  opacity: 0.82;
+  margin-bottom: 6px;
+}
+
+.tracker-report-card.hero .tracker-report-label {
+  color: rgba(255,255,255,0.82);
+}
+
+.tracker-report-value {
+  font-size: 16px;
+  line-height: 1.08;
+  font-weight: 900;
+  color: inherit;
+}
+
+.tracker-report-sub {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: inherit;
+  opacity: 0.96;
+}
+
+.tracker-report-section {
+  margin-top: 12px;
+  border: 1px solid #d9dee5;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.025);
+}
+
+body.dark-mode .tracker-report-section {
+  border-color: #2f3338;
+  background: linear-gradient(180deg, #171717 0%, #121212 100%);
+  box-shadow: none;
+}
+
+.tracker-report-section-head {
+  padding: 10px 12px;
+  border-bottom: 1px solid #d9dee5;
+  background: linear-gradient(90deg, #3a404c 0%, #2f3440 100%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+body.dark-mode .tracker-report-section-head {
+  border-bottom-color: #2f3338;
+  background: linear-gradient(90deg, #111 0%, #1a1a1a 100%);
+}
+
+.tracker-report-section-body {
+  padding: 10px;
+}
+
+.tracker-report-list {
+  display: grid;
+  gap: 5px;
+}
+
+.tracker-report-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 700;
+  color: var(--tracker-strong);
+}
+
+.tracker-report-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  background: #17903f;
+  flex: 0 0 8px;
+}
+
+.tracker-report-dot.warn {
+  background: #d98a00;
+}
+
+.tracker-report-dot.neutral {
+  background: #3a404c;
+}
+
+body.dark-mode .tracker-report-dot.neutral {
+  background: #d4af37;
+}
+
+.tracker-recommendation {
+  padding: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+  border: 1px solid #d9dee5;
+  color: var(--tracker-strong);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+body.dark-mode .tracker-recommendation {
+  background: linear-gradient(180deg, #171717 0%, #121212 100%);
+  border-color: #2f3338;
+}
+
+@media (max-width: 560px) {
+  .tracker-report-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tracker-empty {
+  padding: 18px 16px;
+  color: var(--tracker-subtext);
   font-size: 12px;
   font-weight: 700;
-  z-index: 100000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-  max-width: 90vw;
+}
+
+body.dark-mode .tracker-analytics-panel {
+  background: var(--tracker-summary-bg);
+}
+
+.tracker-report-subtitle {
+  margin: 0 0 10px 0;
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.tracker-report-inline-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+    .tracker-report-table-wrap {
+      margin: 0;
+      overflow-x: auto;
+    }
+
+.tracker-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 10px;
+  line-height: 1.2;
+  background: var(--panel);
+}
+
+.tracker-report-table th,
+.tracker-report-table td {
+  border: 1px solid var(--table-border);
+  padding: 5px 4px;
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.tracker-report-table th {
+  background: var(--table-head);
+  color: #fff;
+  font-weight: 800;
+}
+
+.tracker-report-table td {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.tracker-report-table td.num,
+.tracker-report-table th.num {
+  text-align: center;
+  width: 12%;
+}
+
+.tracker-report-table td.rate,
+.tracker-report-table th.rate {
+  text-align: center;
+  width: 16%;
+}
+
+.tracker-report-table td.note {
+  color: var(--tracker-subtext);
+  font-weight: 700;
+}
+
+.tracker-report-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.tracker-report-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tracker-report-empty-row {
+  color: var(--tracker-subtext);
+}
+
+.tracker-report-table th,
+.tracker-report-table td,
+.tracker-analytics-table th,
+.tracker-analytics-table td,
+.tracker-rate-table th,
+.tracker-rate-table td {
+  max-width: none;
+}
+
+@media (min-width: 700px) {
+  .tracker-report-mini-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.league-trust-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 4px 8px;
+  border: 1px solid var(--table-border);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.league-trust-pill.trust-trusted {
+  background: rgba(14,138,58,0.14);
+  border-color: rgba(14,138,58,0.34);
+  color: #0e5e28;
+}
+
+.league-trust-pill.trust-advisory {
+  background: rgba(217,138,0,0.14);
+  border-color: rgba(217,138,0,0.34);
+  color: #9a6200;
+}
+
+.league-trust-pill.trust-blocked {
+  background: rgba(201,25,32,0.14);
+  border-color: rgba(201,25,32,0.30);
+  color: #b11a20;
+}
+
+body.dark-mode .league-trust-pill.trust-trusted {
+  color: #9ae2a7;
+  border-color: rgba(154,226,167,0.24);
+  background: rgba(14,138,58,0.22);
+}
+
+body.dark-mode .league-trust-pill.trust-advisory {
+  color: #ffcf73;
+  border-color: rgba(255,207,115,0.24);
+  background: rgba(217,138,0,0.22);
+}
+
+body.dark-mode .league-trust-pill.trust-blocked {
+  color: #ff8f95;
+  border-color: rgba(255,143,149,0.24);
+  background: rgba(201,25,32,0.24);
+}
+
+.league-trust-note {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--tracker-subtext);
+  font-weight: 700;
+}
+
+.tracker-analytics-shell {
+  display: grid;
+  gap: 8px;
+}
+.tracker-analytics-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tracker-analytics-heading {
+  display: grid;
+  gap: 4px;
+}
+.tracker-analytics-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tracker-analytics-subtitle {
+  margin: 0;
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+.tracker-analytics-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.tracker-analytics-tab {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+  color: var(--tracker-strong);
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.tracker-analytics-tab.active {
+  background: var(--tracker-head-bg);
+  color: var(--tracker-head-text);
+  border-color: var(--tracker-head-bg);
+}
+.tracker-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.tracker-kpi-card {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+.tracker-kpi-card.featured {
+  background: linear-gradient(135deg, #0e8a3a 0%, #0a6b2c 100%);
+  border-color: #0e8a3a;
+  color: #fff;
+}
+body.dark-mode .tracker-kpi-card.featured {
+  background: linear-gradient(135deg, #0d7a33 0%, #095b25 100%);
+  border-color: #0d7a33;
+}
+.tracker-kpi-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tracker-kpi-card.featured .tracker-kpi-label,
+.tracker-kpi-card.featured .tracker-kpi-sub {
+  color: rgba(255,255,255,0.9);
+}
+.tracker-kpi-value {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--tracker-strong);
+}
+.tracker-kpi-card.featured .tracker-kpi-value {
+  color: #fff;
+}
+.tracker-kpi-sub {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tracker-subtext);
+  line-height: 1.25;
+}
+.tracker-analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.tracker-analytics-card {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+}
+.tracker-analytics-card-head {
+  padding: 9px 10px 8px;
+  border-bottom: 1px solid var(--table-border);
+  background: linear-gradient(90deg, var(--tracker-head-bg) 0%, #434b5a 100%);
+  color: var(--tracker-head-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+body.dark-mode .tracker-analytics-card-head {
+  background: linear-gradient(90deg, #111 0%, #1a1a1a 100%);
+}
+.tracker-analytics-card-title {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+}
+.tracker-analytics-card-meta {
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.82);
+}
+.tracker-analytics-card-body {
+  padding: 10px;
+}
+.tracker-mini-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.tracker-mini-stat {
+  border: 1px solid var(--table-border);
+  background: var(--panel-soft);
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+.tracker-mini-stat .name {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.tracker-mini-stat .value {
+  color: var(--tracker-strong);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+.tracker-mini-stat .sub {
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  font-weight: 700;
+}
+.tracker-progress-card {
+  display: grid;
+  gap: 8px;
+}
+.tracker-progress-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tracker-progress-value {
+  color: var(--tracker-strong);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+}
+.tracker-progress-sub {
+  color: var(--tracker-subtext);
+  font-size: 12px;
+  font-weight: 700;
+}
+.tracker-progress-track {
+  height: 8px;
+  border: 1px solid var(--table-border);
+  background: var(--panel-soft);
+}
+.tracker-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #16a349 0%, #0e8a3a 100%);
+}
+.tracker-insight-list {
+  display: grid;
+  gap: 8px;
+}
+.tracker-insight-row {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.tracker-insight-dot {
+  width: 10px;
+  height: 8px;
+  margin-top: 4px;
+  background: #16a349;
+}
+.tracker-insight-dot.warn {
+  background: #d98a00;
+}
+.tracker-insight-dot.neutral {
+  background: #4b5568;
+}
+.tracker-insight-text strong {
+  display: block;
+  color: var(--tracker-strong);
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 2px;
+}
+.tracker-insight-text span {
+  color: var(--tracker-subtext);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.tracker-analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 9px;
+  line-height: 1.15;
+  background: var(--panel);
+}
+.tracker-analytics-table th,
+.tracker-analytics-table td {
+  border: 1px solid var(--table-border);
+  padding: 4px 3px;
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+.tracker-analytics-table th {
+  background: var(--table-head);
+  color: #fff;
+  font-weight: 800;
+}
+.tracker-analytics-table td {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 700;
+}
+.tracker-analytics-table td.num,
+.tracker-analytics-table th.num,
+.tracker-analytics-table td.rate,
+.tracker-analytics-table th.rate {
   text-align: center;
 }
-#uiToast.show { opacity: 1; }
+.tracker-analytics-table td.note {
+  color: var(--tracker-subtext);
+}
+
+.tracker-review-list {
+  display: grid;
+  gap: 10px;
+}
+.tracker-review-row {
+  border: 1px solid var(--table-border);
+  background: var(--panel-soft);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+.tracker-review-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tracker-review-area {
+  color: var(--tracker-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+.tracker-review-status {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+  color: var(--tracker-strong);
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.tracker-review-status.confirmed {
+  border-color: #17973f;
+  color: #17973f;
+}
+.tracker-review-status.candidate {
+  border-color: #d98a00;
+  color: #d98a00;
+}
+.tracker-review-status.watching {
+  border-color: #4b5568;
+  color: #4b5568;
+}
+.tracker-review-text {
+  color: var(--tracker-strong);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.tracker-review-action {
+  color: var(--tracker-subtext);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow: hidden;
+}
+
+.tracker-line-list {
+  display: grid;
+  gap: 8px;
+}
+.tracker-line-row {
+  display: grid;
+  gap: 6px;
+}
+.tracker-line-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tracker-line-name {
+  color: var(--tracker-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+.tracker-line-meta {
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  font-weight: 700;
+}
+.tracker-line-track {
+  height: 8px;
+  border: 1px solid var(--table-border);
+  background: var(--panel-soft);
+}
+.tracker-line-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4ea9ff 0%, #2976d6 100%);
+}
+.tracker-table-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.tracker-empty-note {
+  color: var(--tracker-subtext);
+  font-size: 12px;
+  font-weight: 700;
+}
+@media (min-width: 720px) {
+  .tracker-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .tracker-analytics-grid.two {
+    grid-template-columns: 1.2fr 1fr;
+  }
+  .tracker-table-grid.two {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
+
+.tracker-panel.analytics-view #trackerSummary,
+.tracker-panel.analytics-view #trackerMarketSummary,
+.tracker-panel.analytics-view #trackerEmpty,
+.tracker-panel.analytics-view .tracker-table-wrap {
+  display: none !important;
+}
+
+.tracker-panel.analytics-view #trackerAnalyticsPanel {
+  display: block !important;
+}
+
+.tracker-panel:not(.analytics-view) #trackerAnalyticsPanel,
+.tracker-panel:not(.analytics-view) #trackerCopyDataBtn,
+.tracker-panel:not(.analytics-view) #trackerCopyDataJsonBtn {
+  display: none !important;
+}
+
+.tracker-panel:not(.health-view) #engineHealthBatteryWrap {
+  display: none !important;
+}
+
+.tracker-panel.health-view #trackerMilitaryRaidBtn,
+.tracker-panel.health-view #trackerHealthBtn,
+.tracker-panel.health-view #trackerConfigBtn,
+.tracker-panel.health-view #trackerCopyDataBtn,
+.tracker-panel.health-view #trackerCopyDataJsonBtn {
+  display: none !important;
+}
+
+.tracker-panel.analytics-view .tracker-body-scroll {
+  padding-top: 0;
+}
+
+.tracker-analytics-panel {
+  padding: 10px;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--tracker-summary-bg);
+}
+.tracker-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.tracker-summary-cell {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+  padding: 9px 10px;
+  display: grid;
+  gap: 3px;
+}
+.tracker-summary-cell.primary {
+  background: linear-gradient(135deg, #0e8a3a 0%, #0a6b2c 100%);
+  border-color: #0e8a3a;
+}
+body.dark-mode .tracker-summary-cell.primary {
+  background: linear-gradient(135deg, #0d7a33 0%, #095b25 100%);
+  border-color: #0d7a33;
+}
+.tracker-summary-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tracker-summary-cell.primary .tracker-summary-label,
+.tracker-summary-cell.primary .tracker-summary-sub,
+.tracker-summary-cell.primary .tracker-summary-value {
+  color: #fff;
+}
+.tracker-summary-value {
+  color: var(--tracker-strong);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+.tracker-summary-sub {
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.tracker-analytics-section {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+}
+.tracker-analytics-section-head {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--table-border);
+  background: linear-gradient(90deg, var(--tracker-head-bg) 0%, #434b5a 100%);
+  color: var(--tracker-head-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+body.dark-mode .tracker-analytics-section-head {
+  background: linear-gradient(90deg, #111 0%, #1a1a1a 100%);
+}
+.tracker-analytics-section-title {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.tracker-analytics-section-meta {
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.85);
+}
+.tracker-analytics-section-body {
+  padding: 10px;
+}
+.tracker-rate-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.tracker-rate-table th,
+.tracker-rate-table td {
+  border: 1px solid var(--table-border);
+  padding: 5px 4px;
+  text-align: left;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+.tracker-rate-table th {
+  background: var(--table-head);
+  color: #fff;
+  font-weight: 800;
+}
+.tracker-rate-table td {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 700;
+}
+.tracker-rate-table td.center,
+.tracker-rate-table th.center {
+  text-align: center;
+}
+
+.tracker-report-table td.num,
+.tracker-report-table th.num,
+.tracker-report-table td.rate,
+.tracker-report-table th.rate,
+.tracker-analytics-table td.num,
+.tracker-analytics-table th.num,
+.tracker-analytics-table td.rate,
+.tracker-analytics-table th.rate,
+.tracker-rate-table td.center,
+.tracker-rate-table th.center {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.league-trust-pill {
+  font-size: 9px;
+  line-height: 1.1;
+  padding: 4px 6px;
+}
+
+.league-trust-desktop-table {
+  display: none;
+}
+
+.league-trust-mobile-list {
+  display: grid;
+  gap: 8px;
+}
+
+.league-trust-mobile-card {
+  border: 1px solid var(--table-border);
+  background: var(--panel-soft);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.league-trust-mobile-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.league-trust-mobile-league {
+  color: var(--tracker-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.league-trust-mobile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.league-trust-mobile-stat {
+  border: 1px solid var(--table-border);
+  background: var(--panel);
+  padding: 6px 5px;
+  display: grid;
+  gap: 3px;
+}
+
+.league-trust-mobile-stat strong {
+  color: var(--tracker-subtext);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.league-trust-mobile-stat span {
+  color: var(--tracker-strong);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.league-trust-mobile-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.league-trust-mobile-guidance {
+  color: var(--tracker-strong);
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .tracker-report-table,
+  .tracker-analytics-table,
+  .tracker-rate-table {
+    font-size: 8.5px;
+    line-height: 1.15;
+  }
+
+  .tracker-report-table th,
+  .tracker-report-table td,
+  .tracker-analytics-table th,
+  .tracker-analytics-table td,
+  .tracker-rate-table th,
+  .tracker-rate-table td {
+    padding: 4px 3px;
+  }
+
+  .tracker-analytics-table th {
+    white-space: normal;
+  }
+
+  .tracker-analytics-table td.note,
+  .tracker-analytics-table td:first-child {
+    white-space: normal;
+  }
+
+  .tracker-analytics-section-head,
+  .tracker-analytics-card-head {
+    padding: 7px 8px;
+    display: grid;
+    gap: 4px;
+    justify-items: start;
+  }
+
+  .tracker-analytics-card-title {
+    letter-spacing: 0.5px;
+  }
+
+  .tracker-analytics-section-meta,
+  .tracker-analytics-card-meta {
+    font-size: 9px;
+    line-height: 1.2;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .league-trust-desktop-table {
+    display: none;
+  }
+
+  .league-trust-mobile-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .league-trust-pill {
+    font-size: 8px;
+    padding: 3px 5px;
+  }
+}
+.tracker-horizontal-bars {
+  display: grid;
+  gap: 8px;
+}
+.tracker-hbar-row {
+  display: grid;
+  gap: 4px;
+}
+.tracker-hbar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tracker-hbar-name {
+  color: var(--tracker-strong);
+  font-size: 11px;
+  font-weight: 800;
+}
+.tracker-hbar-value {
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  font-weight: 800;
+}
+.tracker-hbar-track {
+  height: 8px;
+  border: 1px solid var(--table-border);
+  background: var(--panel-soft);
+}
+.tracker-hbar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4ea9ff 0%, #2976d6 100%);
+}
+.tracker-hbar-fill.good {
+  background: linear-gradient(90deg, #16a349 0%, #0e8a3a 100%);
+}
+.tracker-hbar-fill.warn {
+  background: linear-gradient(90deg, #f0ad2f 0%, #d98a00 100%);
+}
+.tracker-two-col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.tracker-insight-item {
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+.tracker-insight-title {
+  color: var(--tracker-strong);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+.tracker-insight-text {
+  color: var(--tracker-subtext);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+@media (min-width: 720px) {
+  .tracker-summary-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .tracker-two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.tracker-hidden {
+  display: none !important;
+}
+
+    #trackedPicksTable {
+      width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse;
+      margin-top: 0;
+    }
+    #trackedPicksTable th,
+    #trackedPicksTable td {
+      border: 1px solid var(--table-border);
+      padding: 10px 2px !important; 
+      text-align: center;
+      vertical-align: middle;
+      line-height: 1.25;
+      font-size: 10px !important; 
+      white-space: normal !important;
+      word-break: normal !important;
+      overflow-wrap: anywhere !important;
+    }
+    #trackedPicksTable th:nth-child(1) { width: 12%; }
+    #trackedPicksTable th:nth-child(2) { width: 12%; }
+    #trackedPicksTable th:nth-child(3) { width: 12%; }
+    #trackedPicksTable th:nth-child(4) { width: 12%; }
+    #trackedPicksTable th:nth-child(5) { width: 12%; }
+    #trackedPicksTable th:nth-child(6) { width: 12%; }
+    #trackedPicksTable th:nth-child(7) { width: 12%; }
+    #trackedPicksTable th:nth-child(8) { width: 12%; }
+    #trackedPicksTable td:nth-child(2) { font-weight: 800; }
+    #trackedPicksTable td:nth-child(3) { font-weight: 900; text-transform: uppercase; padding: 10px 1px !important; }
+    #trackedPicksTable td:nth-child(4) { font-weight: 800; }
+    #trackedPicksTable td:nth-child(6) { font-weight: 900; }
+    #trackedPicksTable td:nth-child(7) { font-weight: 800; opacity: 0.8; }
+    #trackedPicksTable td:nth-child(8) { font-weight: 900; }
+
+.lock-celebration {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10000;
+  overflow: hidden;
+}
+.lock-celebration .particle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, #ffd700, #ff8c00);
+  border-radius: 50%;
+  opacity: 0;
+  animation: burst 1.5s ease-out forwards;
+}
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(0);
+  }
+}
 </style>
+
 </head>
 <body>
+ <header class="app-header">
+  <span class="brand-name">TheBetCeo ⚡️</span>
 
-<header class="app-header">
-  <span class="brand-name">TheBetCeo ⚡️ Football</span>
-  <span class="header-center">
-    <button class="header-error-btn" type="button" id="headerErrorBtn" title="Show fetch/input issues">⚠️</button>
-  </span>
+<span class="header-center">
+  <button class="header-error-btn" type="button" id="headerErrorBtn" title="Show fetch/input issues">⚠️</button>
+</span>
+
   <span class="brand-right">
+
     <button class="theme-toggle" type="button" id="themeToggleBtn" title="Toggle dark/light mode">⚽</button>
     <button class="theme-toggle" type="button" id="trackerToggleBtn" title="Open tracked picks">📊</button>
+    <button class="theme-toggle" type="button" id="afdbBtn" title="Auto-Fetch Debugger" onclick="if(typeof AFDB!=='undefined'&&AFDB.open)AFDB.open()">🔬</button>
+    
     PREDICTIONS
   </span>
 </header>
 
-<div class="wrapper">
+  <div class="wrapper">
 
-  <!-- ============================================================
-       LEAGUE SELECT
-       ============================================================ -->
-  <div class="section" id="leagueSection">
-    <h3>League / Competition</h3>
-    <label>Select League</label>
-    <select id="leagueSelect" class="league-box">
-      <option value="">- Select League -</option>
-      <optgroup label="── Top 5 ──────────────">
-        <option value="epl">England - Premier League</option>
-        <option value="championship">England - Championship</option>
-        <option value="laliga">Spain - La Liga</option>
-        <option value="laliga2">Spain - La Liga 2</option>
-        <option value="bundesliga">Germany - Bundesliga</option>
-        <option value="bundesliga2">Germany - 2. Bundesliga</option>
-        <option value="serie_a">Italy - Serie A</option>
-        <option value="serie_b">Italy - Serie B</option>
-        <option value="ligue1">France - Ligue 1</option>
-        <option value="ligue2">France - Ligue 2</option>
-      </optgroup>
-      <optgroup label="── Other Europe ───────">
-        <option value="eredivisie">Netherlands - Eredivisie</option>
-        <option value="primeira_liga">Portugal - Primeira Liga</option>
-        <option value="super_lig">Turkey - Super Lig</option>
-        <option value="belgium_pro">Belgium - Pro League</option>
-        <option value="scottish_prem">Scotland - Premiership</option>
-        <option value="swiss_super">Switzerland - Super League</option>
-        <option value="austria_bundesliga">Austria - Bundesliga</option>
-        <option value="greece_super">Greece - Super League</option>
-      </optgroup>
-      <optgroup label="── International ──────">
-        <option value="ucl">UEFA Champions League</option>
-        <option value="uel">UEFA Europa League</option>
-        <option value="uecl">UEFA Conference League</option>
-        <option value="world_cup">FIFA World Cup</option>
-        <option value="euros">UEFA European Championship</option>
-        <option value="copa_america">Copa America</option>
-        <option value="nations_league">UEFA Nations League</option>
-      </optgroup>
-      <optgroup label="── Americas ───────────">
-        <option value="mls">USA - MLS</option>
-        <option value="liga_mx">Mexico - Liga MX</option>
-        <option value="brasileirao">Brazil - Brasileirao</option>
-        <option value="argentina_liga">Argentina - Liga Profesional</option>
-      </optgroup>
-      <optgroup label="── Other ──────────────">
-        <option value="saudi_pro">Saudi Arabia - Pro League</option>
-        <option value="j_league">Japan - J1 League</option>
-        <option value="a_league">Australia - A-League</option>
-      </optgroup>
-    </select>
+<div class="section" id="leagueSection">
+  <h3>League Tier</h3>
+  <label>Select League</label>
+  <select id="leagueSelect" class="league-box">
+    <option value="">- Select League -</option>
+    <optgroup label="── Top Tier / International ──">
+      <option value="epl">England - Premier League</option>
+      <option value="championship">England - Championship</option>
+      <option value="league_one">England - League One</option>
+      <option value="league_two">England - League Two</option>
+      <option value="la_liga">Spain - La Liga</option>
+      <option value="la_liga2">Spain - Segunda Division</option>
+      <option value="bundesliga">Germany - Bundesliga</option>
+      <option value="bundesliga2">Germany - 2. Bundesliga</option>
+      <option value="serie_a">Italy - Serie A</option>
+      <option value="serie_b">Italy - Serie B</option>
+      <option value="ligue_1">France - Ligue 1</option>
+      <option value="ligue_2">France - Ligue 2</option>
+      <option value="eredivisie">Netherlands - Eredivisie</option>
+      <option value="primeira_liga">Portugal - Primeira Liga</option>
+      <option value="champions_league">UEFA Champions League</option>
+      <option value="europa_league">UEFA Europa League</option>
+      <option value="conference_league">UEFA Conference League</option>
+      <option value="world_cup">FIFA World Cup</option>
+      <option value="euros">UEFA European Championship</option>
+      <option value="nations_league">UEFA Nations League</option>
+    </optgroup>
+    <optgroup label="── Americas ──">
+      <option value="mls">USA - MLS</option>
+      <option value="usl_championship">USA - USL Championship</option>
+      <option value="liga_mx">Mexico - Liga MX</option>
+      <option value="brazil_serie_a">Brazil - Serie A</option>
+      <option value="brazil_serie_b">Brazil - Serie B</option>
+      <option value="argentina_liga">Argentina - Liga Profesional</option>
+      <option value="copa_libertadores">Copa Libertadores</option>
+      <option value="copa_sudamericana">Copa Sudamericana</option>
+      <option value="mls_leagues_cup">Leagues Cup</option>
+    </optgroup>
+    <optgroup label="── Rest of Europe ──">
+      <option value="scot_prem">Scotland - Premiership</option>
+      <option value="belgium_pro">Belgium - Pro League</option>
+      <option value="turkey_super_lig">Turkiye - Super Lig</option>
+      <option value="greece_super_league">Greece - Super League</option>
+      <option value="switzerland_super_league">Switzerland - Super League</option>
+      <option value="austria_bundesliga">Austria - Bundesliga</option>
+      <option value="denmark_superliga">Denmark - Superliga</option>
+      <option value="norway_eliteserien">Norway - Eliteserien</option>
+      <option value="sweden_allsvenskan">Sweden - Allsvenskan</option>
+      <option value="poland_ekstraklasa">Poland - Ekstraklasa</option>
+      <option value="ukraine_premier">Ukraine - Premier League</option>
+      <option value="russia_premier">Russia - Premier League</option>
+      <option value="croatia_hnl">Croatia - HNL</option>
+      <option value="serbia_superliga">Serbia - SuperLiga</option>
+      <option value="czech_first_league">Czechia - First League</option>
+      <option value="ireland_prem">Ireland - Premier Division</option>
+    </optgroup>
+    <optgroup label="── Rest of World ──">
+      <option value="saudi_pro_league">Saudi Arabia - Pro League</option>
+      <option value="j_league">Japan - J1 League</option>
+      <option value="k_league">Korea - K League 1</option>
+      <option value="china_super_league">China - Super League</option>
+      <option value="a_league">Australia - A-League</option>
+      <option value="egypt_premier">Egypt - Premier League</option>
+      <option value="south_africa_psl">South Africa - PSL</option>
+      <option value="india_isl">India - Indian Super League</option>
+    </optgroup>
+    <optgroup label="── Women's Football ──">
+      <option value="nwsl">USA - NWSL</option>
+      <option value="wsl">England - Women's Super League</option>
+      <option value="womens_champions_league">UEFA Women's Champions League</option>
+    </optgroup>
+    <optgroup label="── Other ──">
+      <option value="unknown">Other / Mixed League</option>
+    </optgroup>
+  </select>
+</div>
+
+<div class="section" id="espnSection">
+  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(Premier League · La Liga · Serie A · Bundesliga · Ligue 1 · MLS · Champions League)</span></h3>
+
+  <div id="fixtureToolbar" class="fixture-toolbar">
+    <button type="button" class="fixture-day active" id="fixturesTodayBtn">Today</button>
+    <button type="button" class="fixture-day" id="fixturesTomorrowBtn">Tomorrow</button>
   </div>
 
-  <!-- ============================================================
-       FIXTURE / TEAM LOOKUP  (auto-fetch UI shell only — no logic wired)
-       ============================================================ -->
-  <div class="section" id="fixtureSection">
-    <h3>⚡ Fixture Lookup <span style="font-size:11px;color:#aaa;">(auto-fetch not wired — placeholder)</span></h3>
+<label id="fixtureSelectLabel" style="font-size:12px;">Select match</label>
+<select id="fixtureSelect" class="league-box">
 
-    <div id="fixtureToolbar" class="fixture-toolbar">
-      <button type="button" class="fixture-day active" id="fixturesTodayBtn">Today</button>
-      <button type="button" class="fixture-day" id="fixturesTomorrowBtn">Tomorrow</button>
-    </div>
+<option value="">- Select match -</option>
+</select>
 
-    <label id="fixtureSelectLabel" style="font-size:12px;">Select match</label>
-    <select id="fixtureSelect" class="league-box">
-      <option value="">- Select match -</option>
-    </select>
+<label id="teamALabel" style="font-size:12px;">Team A Name (Home)</label>
 
-    <label id="teamALabel" style="font-size:12px;">Team A Name (Home)</label>
-    <div class="autocomplete-wrap">
-      <input id="teamAName" placeholder="e.g. Arsenal" autocomplete="off" />
-      <div class="autocomplete-list" id="dropA"></div>
-    </div>
-
-    <label id="teamBLabel" style="font-size:12px;margin-top:6px;">Team B Name (Away)</label>
-    <div class="autocomplete-wrap">
-      <input id="teamBName" placeholder="e.g. Chelsea" autocomplete="off" />
-      <div class="autocomplete-list" id="dropB"></div>
-    </div>
-
-    <button class="fetch-btn" id="fetchBtn" type="button">📡 Fetch Stats</button>
-    <div id="fetchStatus"></div>
-
-    <div class="injury-box" id="injuryBoxA">
-      <div class="inj-title">Team A - Injury / Suspension Report</div>
-      <div id="injuryContentA"></div>
-    </div>
-    <div class="injury-box" id="injuryBoxB">
-      <div class="inj-title">Team B - Injury / Suspension Report</div>
-      <div id="injuryContentB"></div>
-    </div>
+  <div class="autocomplete-wrap">
+    <input id="teamAName" placeholder="e.g. Arsenal" autocomplete="off" />
+    <div class="autocomplete-list" id="dropA"></div>
   </div>
 
-  <!-- ============================================================
-       SOFASCORE MANUAL LOOKUP (shell only — no fetch logic wired)
-       ============================================================ -->
-  <div class="section" id="sofascoreManualSection">
-    <h3>🔍 Team Lookup <span style="font-size:11px;color:#aaa;">(Manual leagues — SofaScore)</span></h3>
+<label id="teamBLabel" style="font-size:12px;margin-top:6px;">Team B Name (Away)</label>
 
-    <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
-      <label>Team A (Home)</label>
-      <div style="display:flex;gap:6px;margin-bottom:4px;">
-        <input id="ssTeamAName" placeholder="Team A" style="margin-bottom:0;flex:1;" />
-        <input id="ssPasteA" placeholder="Paste JSON A" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-        <button type="button" style="background:#1c3a2b;color:#fff;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search team">🔍</button>
-        <button type="button" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input id="ssTeamAId" placeholder="Enter Numerical ID" style="margin-bottom:0;font-size:11px;padding:4px 6px;" />
-        <a id="ssTeamALink" href="#" target="_blank" style="color:#4ea9ff;font-size:10px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON A</a>
-      </div>
-    </div>
-
-    <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
-      <label>Team B (Away)</label>
-      <div style="display:flex;gap:6px;margin-bottom:4px;">
-        <input id="ssTeamBName" placeholder="Team B" style="margin-bottom:0;flex:1;" />
-        <input id="ssPasteB" placeholder="Paste JSON B" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-        <button type="button" style="background:#1c3a2b;color:#fff;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search team">🔍</button>
-        <button type="button" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input id="ssTeamBId" placeholder="Enter Numerical ID" style="margin-bottom:0;font-size:11px;padding:4px 6px;" />
-        <a id="ssTeamBLink" href="#" target="_blank" style="color:#4ea9ff;font-size:10px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON B</a>
-      </div>
-    </div>
-
-    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--panel-border);">
-      <label style="font-size:11px;font-weight:800;">Tournament ID <span style="color:var(--muted);font-weight:600;">(auto-detected from paste · enter manually to override)</span></label>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <input id="ssTournamentId" placeholder="e.g. 17" style="margin-bottom:0;font-size:11px;padding:4px 6px;width:180px;flex-shrink:0;" />
-        <span id="ssTournamentName" style="font-size:10px;font-weight:800;color:var(--muted);"></span>
-      </div>
-    </div>
-    <div id="ssFetchStatus"></div>
+  <div class="autocomplete-wrap">
+    <input id="teamBName" placeholder="e.g. Chelsea" autocomplete="off" />
+    <div class="autocomplete-list" id="dropB"></div>
   </div>
 
-  <!-- ============================================================
-       MARKET LINES
-       ============================================================ -->
-  <div class="section" id="marketSection">
-    <h3>Market Lines</h3>
+<button class="fetch-btn" id="fetchBtn" type="button">📡 Fetch Stats</button>
 
-    <div id="ftH1MarketRow" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <div><label id="ftMarketLabel">Full-Time Goals Total</label><input id="ftMarket" placeholder="2.5 - 3.5" /></div>
-      <div id="h1MarketSection"><label>1st Half Goals Total</label><input id="h1Market" placeholder="0.5 - 1.5" /></div>
+  <div id="fetchStatus"></div>
+
+  <div class="injury-box" id="injuryBoxA">
+    <div class="inj-title">Team A - Injury / Suspension Report</div>
+    <div id="injuryContentA"></div>
+  </div>
+
+  <div class="injury-box" id="injuryBoxB">
+    <div class="inj-title">Team B - Injury / Suspension Report</div>
+    <div id="injuryContentB"></div>
+  </div>
+</div>
+<div class="section" id="sofascoreManualSection" style="display:none;">
+  <h3>🔍 Team Lookup <span style="font-size:11px;color:#aaa;">(Manual leagues — SofaScore)</span></h3>
+
+  <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
+    <label>Team A Name (Home)</label>
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      <input id="ssTeamAName" placeholder="Team A" style="margin-bottom:0;flex:1;" />
+      <input id="ssPasteA" placeholder="Paste JSON A" oninput="parseSofascoreIndividual('A')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
+      <button type="button" onclick="searchSofascorePlayer('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team">🔍</button>
+      <button type="button" onclick="clearPasteJSON('A')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
     </div>
-
-    <div id="teamMarketSection" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-      <div><label id="teamAMarketLabel">Team A Goals Total</label><input id="teamAMarket" placeholder="1.5" /></div>
-      <div><label id="teamBMarketLabel">Team B Goals Total</label><input id="teamBMarket" placeholder="1.5" /></div>
-    </div>
-
-    <div id="btts1x2Section" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-      <div><label>BTTS (Yes/No) Price</label><input id="bttsMarket" placeholder="Yes -120 / No +100" /></div>
-      <div><label>1X2 Moneyline</label><input id="moneylineMarket" placeholder="Home -110 / Draw +240 / Away +260" /></div>
-    </div>
-
-    <div id="ahSection" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-      <div><label>Asian Handicap Line</label><input id="ahMarket" placeholder="Home -0.5" /></div>
-      <div><label>Corners Total</label><input id="cornersMarket" placeholder="9.5" /></div>
-    </div>
-
-    <div id="cardsSection" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-      <div><label>Cards Total</label><input id="cardsMarket" placeholder="4.5" /></div>
-      <div><label>H1 Team A Goals</label><input id="h1TeamAMarket" placeholder="0.5" /></div>
-    </div>
-
-    <div id="h1TeamBSection" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-      <div><label>H1 Team B Goals</label><input id="h1TeamBMarket" placeholder="0.5" /></div>
-      <div><label>H2 Goals Total</label><input id="h2Market" placeholder="1.5" /></div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input id="ssTeamAId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('A')" style="margin-bottom:0;font-size:11px;padding:4px 6px;" />
+      <a id="ssTeamALink" href="#" target="_blank" style="color:#4ea9ff;font-size:10px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON A</a>
     </div>
   </div>
 
-  <!-- ============================================================
-       TEAM A STATS
-       ============================================================ -->
-  <div class="section" id="teamASection">
-    <h3>Team A - Last 10 Overall <span class="autofill-indicator" id="aAutoTag">✅ Auto-filled</span></h3>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-      <div>
-        <label id="aFTScoredLabel">Goals Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-        <input id="aFTScored" placeholder="2,1,3,0,2,1,4,2,1,2" />
-      </div>
-      <div id="aFTAllowedSection">
-        <label id="aFTAllowedLabel">Goals Conceded</label>
-        <input id="aFTAllowed" placeholder="1,1,0,2,1,2,1,0,1,1" />
-      </div>
+  <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
+    <label>Team B Name (Away)</label>
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      <input id="ssTeamBName" placeholder="Team B" style="margin-bottom:0;flex:1;" />
+      <input id="ssPasteB" placeholder="Paste JSON B" oninput="parseSofascoreIndividual('B')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
+      <button type="button" onclick="searchSofascorePlayer('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team">🔍</button>
+      <button type="button" onclick="clearPasteJSON('B')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
     </div>
-
-    <div id="aHomeAwaySection" style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:6px;">
-      <div>
-        <label>Home Goals Scored</label>
-        <input id="aFTScoredHome" placeholder="2,1,3,2,1" />
-      </div>
-      <div>
-        <label>Home Goals Conceded</label>
-        <input id="aFTAllowedHome" placeholder="1,0,1,1,0" />
-      </div>
-    </div>
-
-    <div id="a1HSection" style="margin-top:6px;">
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-        <div>
-          <label id="a1HScoredLabel">1st Half Goals Scored</label>
-          <input id="a1HScored" placeholder="1,0,1,0,1,1,2,0,1,1" />
-        </div>
-        <div>
-          <label>1st Half Goals Conceded</label>
-          <input id="a1HAllowed" placeholder="0,1,0,1,0,1,0,0,1,0" />
-        </div>
-      </div>
-    </div>
-
-    <div id="aExtraStatsSection" style="margin-top:6px;">
-      <label style="color:var(--muted); text-transform:uppercase; font-size:10px; margin-bottom:8px; display:block;">Additional Form Data</label>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-        <div><label>Shots on Target</label><input id="aShotsOnTarget" placeholder="5,4,6,3,5,4,7,5,4,5" /></div>
-        <div><label>Corners Won</label><input id="aCorners" placeholder="6,5,7,4,6,5,8,6,5,6" /></div>
-        <div><label>Cards (Y+R)</label><input id="aCards" placeholder="2,1,3,2,1,2,1,3,2,1" /></div>
-        <div><label>Possession %</label><input id="aPossession" placeholder="55,58,52,60,54" /></div>
-      </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input id="ssTeamBId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('B')" style="margin-bottom:0;font-size:11px;padding:4px 6px;" />
+      <a id="ssTeamBLink" href="#" target="_blank" style="color:#4ea9ff;font-size:10px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p0</a>
+      <a id="ssTeamBLink1" href="#" target="_blank" style="color:#4ea9ff;font-size:10px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p1</a>
     </div>
   </div>
 
-  <!-- ============================================================
-       TEAM B STATS
-       ============================================================ -->
-  <div class="section" id="teamBSection">
-    <h3>Team B - Last 10 Overall <span class="autofill-indicator" id="bAutoTag">✅ Auto-filled</span></h3>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-      <div>
-        <label id="bFTScoredLabel">Goals Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-        <input id="bFTScored" placeholder="1,2,1,1,2,0,1,3,1,2" />
-      </div>
-      <div id="bFTAllowedSection">
-        <label id="bFTAllowedLabel">Goals Conceded</label>
-        <input id="bFTAllowed" placeholder="1,0,2,1,1,1,2,1,0,1" />
-      </div>
+  <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--panel-border);">
+    <label style="font-size:11px;font-weight:800;">Tournament ID <span style="color:var(--muted);font-weight:600;">(auto-detected from paste · enter manually to override)</span></label>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <input id="ssTournamentId" placeholder="e.g. 17" style="margin-bottom:0;font-size:11px;padding:4px 6px;width:180px;flex-shrink:0;" oninput="onTournamentIdInput()" />
+      <span id="ssTournamentName" style="font-size:10px;font-weight:800;color:var(--muted);"></span>
     </div>
+  </div>
+  <div id="ssFetchStatus" style="font-size:10px;min-height:16px;margin-top:6px;"></div>
+</div>
+<div class="section" id="marketSection">
+  <h3>Market Lines</h3>
 
-    <div id="bHomeAwaySection" style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:6px;">
+  <div id="ftH1MarketRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+    <div><label id="ftMarketLabel">FT Total Goals</label><input id="ftMarket" placeholder="2.5 - 3.5" /></div>
+    <div id="h1MarketSection"><label>1H Total Goals</label><input id="h1Market" placeholder="0.5 - 1.5" /></div>
+  </div>
+
+  <div id="teamMarketSection" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+    <div><label id="teamAMarketLabel">Team A Total Goals</label><input id="teamAMarket" placeholder="1.5 - 2.5" /></div>
+    <div><label id="teamBMarketLabel">Team B Total Goals</label><input id="teamBMarket" placeholder="0.5 - 1.5" /></div>
+  </div>
+
+  <div id="h2MarketSection" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+    <div><label>2H Total Goals</label><input id="h2Market" placeholder="1.5 - 2.5" /></div>
+    <div></div>
+  </div>
+
+</div>
+
+<div class="section" id="teamASection">
+  <h3>Team A - Last 10 Overall <span class="autofill-indicator" id="aAutoTag">✅ Auto-filled</span></h3>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+    <div>
+      <label id="aFTScoredLabel">FT Goals Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
+      <input id="aFTScored" placeholder="2,1,3,0,2,1,2,3,1,2" />
+    </div>
+    <div id="aFTAllowedSection">
+      <label id="aFTAllowedLabel">FT Goals Allowed</label>
+      <input id="aFTAllowed" placeholder="1,1,0,2,1,2,0,1,1,0" />
+    </div>
+  </div>
+
+    <div id="a1HSection" style="display:none;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
       <div>
-        <label>Away Goals Scored</label>
-        <input id="bFTScoredAway" placeholder="1,1,2,0,1" />
+        <label id="a1HScoredLabel">1H Goals Scored</label>
+        <input id="a1HScored" placeholder="1,0,1,0,1,0,1,1,0,1" />
       </div>
       <div>
-        <label>Away Goals Conceded</label>
-        <input id="bFTAllowedAway" placeholder="1,2,1,1,2" />
-      </div>
-    </div>
-
-    <div id="b1HSection" style="margin-top:6px;">
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-        <div>
-          <label id="b1HScoredLabel">1st Half Goals Scored</label>
-          <input id="b1HScored" placeholder="0,1,1,0,1,0,1,1,0,1" />
-        </div>
-        <div>
-          <label>1st Half Goals Conceded</label>
-          <input id="b1HAllowed" placeholder="1,0,1,1,0,1,1,0,0,1" />
-        </div>
-      </div>
-    </div>
-
-    <div id="bExtraStatsSection" style="margin-top:6px;">
-      <label style="color:var(--muted); text-transform:uppercase; font-size:10px; margin-bottom:8px; display:block;">Additional Form Data</label>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-        <div><label>Shots on Target</label><input id="bShotsOnTarget" placeholder="4,5,3,6,4,3,5,4,6,4" /></div>
-        <div><label>Corners Won</label><input id="bCorners" placeholder="5,6,4,7,5,4,6,5,7,5" /></div>
-        <div><label>Cards (Y+R)</label><input id="bCards" placeholder="1,2,1,2,3,1,2,1,2,1" /></div>
-        <div><label>Possession %</label><input id="bPossession" placeholder="45,42,48,40,46" /></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       HEAD TO HEAD
-       ============================================================ -->
-  <div class="section" id="h2hSection">
-    <h3>H2H <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled (decay-weighted)</span></h3>
-
-    <label id="useFTH2HLabel"><input type="checkbox" id="useFTH2H" /> Use FT H2H (min 2 games)</label>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-      <input id="aFTH2H" placeholder="2,1,3,0,2" />
-      <input id="bFTH2H" placeholder="1,1,0,2,1" />
-    </div>
-
-    <div id="h2h1HSection" style="margin-top:6px;">
-      <label id="use1HH2HLabel"><input type="checkbox" id="use1HH2H" /> Use 1H H2H (min 2 games)</label>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-        <input id="a1HH2H" placeholder="1,0,1,0,1" />
-        <input id="b1HH2H" placeholder="0,1,0,1,0" />
-      </div>
-    </div>
-
-    <div id="h2hExtraSection" style="margin-top:10px; border-top:1px solid var(--panel-border); padding-top:10px;">
-      <label style="color:var(--muted); text-transform:uppercase; font-size:10px; margin-bottom:8px; display:block;">H2H Extra Markets</label>
-      <div style="margin-top:4px;">
-        <label><input type="checkbox" id="useBTTSH2H" /> Use BTTS H2H</label>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-          <input id="aBTTSH2H" placeholder="1,0,1,1,0" />
-          <input id="bBTTSH2H" placeholder="1,0,1,1,0" />
-        </div>
-      </div>
-      <div style="margin-top:6px;">
-        <label><input type="checkbox" id="useCornersH2H" /> Use Corners H2H</label>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-          <input id="aCornersH2H" placeholder="6,5,7,4,6" />
-          <input id="bCornersH2H" placeholder="5,6,4,7,5" />
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- hidden intel fields kept for structural parity -->
-  <div style="display:none;" aria-hidden="true">
-    <input id="aFormIntel" /><input id="bFormIntel" />
-    <input id="aSpreadIntel" /><input id="bSpreadIntel" />
-    <input id="aHitIntel" /><input id="bHitIntel" />
-  </div>
-
-  <div class="actions">
-    <button id="runBtn" type="button">Run</button>
-    <button id="clearBtn" type="button">Clear</button>
-    <button id="auditCopyBtn" type="button" title="Copy Audit" style="background:#1c8a4c !important; color:#fff !important; box-shadow:0 2px 8px rgba(28,138,76,0.35) !important; font-weight:700 !important; border:none !important; padding:5px 14px !important; font-size:12px !important; cursor:pointer !important; width:auto !important; min-width:0 !important;">📋</button>
-    <button id="inputsCopyBtn" type="button" title="Copy Inputs &amp; Market Lines" style="background:#1c8a4c !important; color:#fff !important; box-shadow:0 2px 8px rgba(28,138,76,0.35) !important; font-weight:700 !important; border:none !important; padding:5px 14px !important; font-size:12px !important; cursor:pointer !important; width:auto !important; min-width:0 !important;">🗒️</button>
-  </div>
-
-  <!-- ============================================================
-       RESULTS TABLE (populated by runEngine() placeholder)
-       ============================================================ -->
-  <div class="table-wrap">
-    <table id="results" style="display:none;">
-      <tr>
-        <th>Pick</th>
-        <th>Projection</th>
-        <th>Edge</th>
-        <th>Model Grade</th>
-        <th>Prediction</th>
-      </tr>
-    </table>
-  </div>
-
-  <!-- ============================================================
-       TRACKER MODAL
-       ============================================================ -->
-  <div id="trackerModal" class="tracker-modal" aria-hidden="true">
-    <div class="tracker-panel">
-      <div class="tracker-head">
-        <span id="trackerHeadTitle">Tracked Picks</span>
-        <span id="trackerStatusLabel" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;pointer-events:none;white-space:nowrap;"></span>
-        <div class="tracker-head-actions">
-          <button type="button" id="trackerCopyDataBtn" class="tracker-insights-btn" title="Copy tracker data to clipboard">📑</button>
-          <button type="button" id="trackerCopyDataJsonBtn" class="tracker-insights-btn" title="Copy tracker data as JSON">🧾</button>
-          <button type="button" id="trackerCloseBtn" class="tracker-close">✕</button>
-        </div>
-      </div>
-      <div class="tracker-summary" id="trackerSummary">0 saved • 0 settled • 0 wins</div>
-      <div class="tracker-market-summary" id="trackerMarketSummary"></div>
-
-      <div class="tracker-body-scroll" id="trackedPicksWrap">
-        <div id="trackerAnalyticsPanel" class="tracker-analytics-panel"></div>
-
-        <div id="trackerEmpty" class="tracker-empty">
-          No tracked picks saved yet.
-        </div>
-
-        <div class="table-wrap tracker-table-wrap">
-          <table id="trackedPicksTable">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>League</th>
-                <th>Match</th>
-                <th>Market</th>
-                <th>Line</th>
-                <th>Pick</th>
-                <th>Grade</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="trackedPicksBody"></tbody>
-          </table>
-        </div>
+        <label>1H Goals Allowed</label>
+        <input id="a1HAllowed" placeholder="0,1,0,1,0,1,0,0,1,0" />
       </div>
     </div>
   </div>
 
 </div>
 
-<div id="uiToast"></div>
+<div class="section" id="teamBSection">
+  <h3>Team B - Last 10 Overall <span class="autofill-indicator" id="bAutoTag">✅ Auto-filled</span></h3>
 
-<script>
-/* ================================================================
-   FOOTBALL ENGINE — UI SHELL ONLY
-   ----------------------------------------------------------------
-   This file intentionally contains NO prediction math and NO live
-   auto-fetch networking. It reproduces the UI, section wiring,
-   local save/load, and tracker (add / settle / delete / persist)
-   behavior from the basketball engine, restyled for football.
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+    <div>
+      <label id="bFTScoredLabel">FT Goals Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
+      <input id="bFTScored" placeholder="1,2,1,1,0,2,1,0,2,1" />
+    </div>
+    <div id="bFTAllowedSection">
+      <label id="bFTAllowedLabel">FT Goals Allowed</label>
+      <input id="bFTAllowed" placeholder="1,0,2,1,1,1,0,2,1,1" />
+    </div>
+  </div>
 
-   Where the basketball engine called into its stats/projection/
-   calibration pipeline, this file has clearly marked placeholder
-   stubs (see "PLACEHOLDER — WIRE UP YOUR ENGINE HERE") so you can
-   drop your football calculation logic in without touching any
-   of the surrounding UI code.
-   ================================================================ */
+    <div id="b1HSection" style="display:none;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
+      <div>
+        <label id="b1HScoredLabel">1H Goals Scored</label>
+        <input id="b1HScored" placeholder="0,1,0,0,0,1,1,0,1,0" />
+      </div>
+      <div>
+        <label>1H Goals Allowed</label>
+        <input id="b1HAllowed" placeholder="1,0,1,1,0,0,0,1,0,1" />
+      </div>
+    </div>
+  </div>
 
-/* ---------------- Toast helper ---------------- */
-function showToast(msg, ms) {
-  const t = document.getElementById("uiToast");
-  if (!t) return;
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => t.classList.remove("show"), ms || 1800);
-}
-
-/* ---------------- Theme toggle ---------------- */
-(function () {
-  const btn = document.getElementById("themeToggleBtn");
-  function applyStored() {
-    if (localStorage.getItem("fb_theme") === "dark") document.body.classList.add("dark-mode");
-  }
-  applyStored();
-  if (btn) {
-    btn.addEventListener("click", () => {
-      const isDark = document.body.classList.toggle("dark-mode");
-      localStorage.setItem("fb_theme", isDark ? "dark" : "light");
-    });
-  }
-})();
-
-/* ---------------- Fixture day toggle (UI only) ---------------- */
-(function () {
-  const todayBtn = document.getElementById("fixturesTodayBtn");
-  const tomBtn = document.getElementById("fixturesTomorrowBtn");
-  if (todayBtn && tomBtn) {
-    todayBtn.addEventListener("click", () => {
-      todayBtn.classList.add("active");
-      tomBtn.classList.remove("active");
-    });
-    tomBtn.addEventListener("click", () => {
-      tomBtn.classList.add("active");
-      todayBtn.classList.remove("active");
-    });
-  }
-})();
-
-/* ---------------- League select → section visibility (structural only) ---------------- */
-(function () {
-  const leagueSelect = document.getElementById("leagueSelect");
-  if (!leagueSelect) return;
-  leagueSelect.addEventListener("change", () => {
-    // PLACEHOLDER — WIRE UP YOUR ENGINE HERE
-    // In the basketball engine this drove which market/stat sections
-    // were shown for a given league (e.g. showing quarter breakdowns
-    // only for leagues that support them). For football you might
-    // toggle things like corners/cards availability per competition.
-  });
-})();
-
-/* ---------------- Clear All ---------------- */
-function clearAll() {
-  const ids = [
-    "teamAName", "teamBName",
-    "ftMarket", "h1Market", "teamAMarket", "teamBMarket",
-    "bttsMarket", "moneylineMarket", "ahMarket", "cornersMarket",
-    "cardsMarket", "h1TeamAMarket", "h1TeamBMarket", "h2Market",
-    "aFTScored", "aFTAllowed", "aFTScoredHome", "aFTAllowedHome",
-    "a1HScored", "a1HAllowed",
-    "aShotsOnTarget", "aCorners", "aCards", "aPossession",
-    "bFTScored", "bFTAllowed", "bFTScoredAway", "bFTAllowedAway",
-    "b1HScored", "b1HAllowed",
-    "bShotsOnTarget", "bCorners", "bCards", "bPossession",
-    "aFTH2H", "bFTH2H", "a1HH2H", "b1HH2H",
-    "aBTTSH2H", "bBTTSH2H", "aCornersH2H", "bCornersH2H",
-    "ssTeamAName", "ssTeamBName", "ssTeamAId", "ssTeamBId",
-    "ssTournamentId", "ssPasteA", "ssPasteB"
-  ];
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = "";
-  });
-  ["useFTH2H", "use1HH2H", "useBTTSH2H", "useCornersH2H"].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.checked = false;
-  });
-  const resultsTable = document.getElementById("results");
-  if (resultsTable) {
-    resultsTable.style.display = "none";
-    resultsTable.querySelectorAll("tr:not(:first-child)").forEach(r => r.remove());
-  }
-  const injA = document.getElementById("injuryBoxA");
-  const injB = document.getElementById("injuryBoxB");
-  if (injA) { injA.classList.remove("show"); document.getElementById("injuryContentA").innerHTML = ""; }
-  if (injB) { injB.classList.remove("show"); document.getElementById("injuryContentB").innerHTML = ""; }
-  const fetchStatus = document.getElementById("fetchStatus");
-  if (fetchStatus) fetchStatus.textContent = "";
-  showToast("Cleared");
-}
-document.getElementById("clearBtn")?.addEventListener("click", clearAll);
-
-/* ---------------- Fetch Stats (placeholder — no networking) ---------------- */
-document.getElementById("fetchBtn")?.addEventListener("click", () => {
-  // PLACEHOLDER — WIRE UP YOUR ENGINE HERE
-  // The basketball engine hit ESPN's API here, matched team names/IDs,
-  // and auto-populated the Team A/B + H2H fields. This button is left
-  // as a visible no-op so the UI layout/flow stays identical; wire your
-  // own football data source into this handler.
-  const status = document.getElementById("fetchStatus");
-  if (status) status.textContent = "Auto-fetch not wired in this shell.";
-  showToast("Fetch Stats: not wired (placeholder)");
-});
-
-/* ---------------- Run Engine (placeholder — no math) ---------------- */
-async function runEngine() {
-  // PLACEHOLDER — WIRE UP YOUR ENGINE HERE
-  // The basketball engine ran its full projection/edge/confidence
-  // pipeline here and rendered rows into #results. This stub just
-  // demonstrates the row format so your calculation layer has a
-  // drop-in target — replace the body of this function.
-  const table = document.getElementById("results");
-  if (!table) return;
-
-  table.querySelectorAll("tr:not(:first-child)").forEach(r => r.remove());
-
-  const demoRow = document.createElement("tr");
-  demoRow.innerHTML = `
-    <td>FT Over/Under</td>
-    <td>—</td>
-    <td>—</td>
-    <td>—</td>
-    <td class="pred-noplay">Wire up runEngine() to populate this table</td>
-  `;
-  table.appendChild(demoRow);
-  table.style.display = "";
-
-  showToast("Run: engine math not wired (placeholder)");
-}
-document.getElementById("runBtn")?.addEventListener("click", () => { runEngine(); });
-
-/* ---------------- Copy Audit / Copy Inputs (placeholders) ---------------- */
-document.getElementById("auditCopyBtn")?.addEventListener("click", () => {
-  // PLACEHOLDER — WIRE UP YOUR ENGINE HERE
-  // Originally serialized window.__LAST_AUDIT_STATE (the full internal
-  // calculation trace) to the clipboard. No audit state exists yet
-  // in this shell since no engine runs here.
-  showToast("Copy Audit: no audit state yet (placeholder)");
-});
-
-document.getElementById("inputsCopyBtn")?.addEventListener("click", () => {
-  const ids = [
-    "leagueSelect","teamAName","teamBName",
-    "ftMarket","h1Market","teamAMarket","teamBMarket",
-    "bttsMarket","moneylineMarket","ahMarket","cornersMarket","cardsMarket",
-    "aFTScored","aFTAllowed","bFTScored","bFTAllowed",
-    "a1HScored","a1HAllowed","b1HScored","b1HAllowed",
-    "aFTH2H","bFTH2H"
-  ];
-  const lines = ids.map(id => {
-    const el = document.getElementById(id);
-    return el ? `${id}: ${el.value || "(empty)"}` : null;
-  }).filter(Boolean);
-  const text = lines.join("\n");
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => showToast("Inputs copied"));
-  } else {
-    showToast("Clipboard unavailable");
-  }
-});
-
-/* ================================================================
-   TRACKER — fully functional local save/load, same shape as the
-   basketball engine (localStorage-backed, active/archived picks,
-   win/loss/push settlement, JSON export).
-   ================================================================ */
-
-const TRACKER_STORAGE_KEY = "FB_TRACKER_STATE_V1";
-
-let g_trackerState = {
-  vId: 1,
-  activePicks: [],
-  archivedPicks: [],
-  stats: { total: 0, settled: 0, wins: 0, losses: 0, pushes: 0 },
-  updatedAt: new Date().toISOString()
-};
-
-function createEmptyTrackerState() {
-  return {
-    vId: 1,
-    activePicks: [],
-    archivedPicks: [],
-    stats: { total: 0, settled: 0, wins: 0, losses: 0, pushes: 0 },
-    updatedAt: new Date().toISOString()
-  };
-}
-
-function loadTrackerStateFromLocal() {
-  try {
-    const raw = localStorage.getItem(TRACKER_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed;
-  } catch (err) {
-    console.error("[FB Engine] loadTrackerStateFromLocal failed", err);
-    return null;
-  }
-}
-
-function saveTrackerStateToLocal() {
-  try {
-    rebuildTrackerStats();
-    g_trackerState.updatedAt = new Date().toISOString();
-    localStorage.setItem(TRACKER_STORAGE_KEY, JSON.stringify(g_trackerState));
-    return true;
-  } catch (err) {
-    console.error("[FB Engine] saveTrackerStateToLocal failed", err);
-    showToast("Storage failed — could not save tracker data");
-    return false;
-  }
-}
-
-function rebuildTrackerStats() {
-  const active = Array.isArray(g_trackerState.activePicks) ? g_trackerState.activePicks : [];
-  const archived = Array.isArray(g_trackerState.archivedPicks) ? g_trackerState.archivedPicks : [];
-  const all = [...active, ...archived];
-  const settled = all.filter(p => ["win", "loss", "push"].includes(String(p.resultStatus || "").toLowerCase()));
-  g_trackerState.stats = {
-    total: all.length,
-    settled: settled.length,
-    wins: settled.filter(p => p.resultStatus === "win").length,
-    losses: settled.filter(p => p.resultStatus === "loss").length,
-    pushes: settled.filter(p => p.resultStatus === "push").length
-  };
-}
-
-function makePickId() {
-  return "pick_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-}
-
-/* Build a tracked pick payload from current form state.
-   PLACEHOLDER — WIRE UP YOUR ENGINE HERE: in the basketball engine
-   this pulled the projection/edge/grade produced by runEngine().
-   Here it just captures raw inputs since no engine runs yet. */
-function buildTrackedPickPayload({ marketKey, line, pick, projection, edgePct, grade }) {
-  const league = document.getElementById("leagueSelect")?.value || "";
-  const teamA = document.getElementById("teamAName")?.value || "Team A";
-  const teamB = document.getElementById("teamBName")?.value || "Team B";
-  return {
-    id: makePickId(),
-    createdAt: new Date().toISOString(),
-    eventDate: new Date().toISOString(),
-    league,
-    homeTeam: teamA,
-    awayTeam: teamB,
-    marketKey: marketKey || "ft",
-    line: line || "",
-    pick: pick || "",
-    projection: projection ?? null,
-    edgePct: edgePct ?? null,
-    confidenceGrade: grade || "—",
-    resultStatus: "pending"
-  };
-}
-
-function addPickToTracker(payload) {
-  if (!payload) return;
-  g_trackerState.activePicks.push(payload);
-  saveTrackerStateToLocal();
-  renderTrackedPicks();
-  showToast("Pick saved to tracker");
-}
-
-function settlePick(id, status) {
-  const idx = g_trackerState.activePicks.findIndex(p => p.id === id);
-  if (idx === -1) return;
-  const pick = g_trackerState.activePicks[idx];
-  pick.resultStatus = status;
-  pick.settledAt = new Date().toISOString();
-  g_trackerState.activePicks.splice(idx, 1);
-  g_trackerState.archivedPicks.push(pick);
-  saveTrackerStateToLocal();
-  renderTrackedPicks();
-  showToast("Pick marked " + status.toUpperCase());
-}
-
-function deletePick(id) {
-  g_trackerState.activePicks = g_trackerState.activePicks.filter(p => p.id !== id);
-  g_trackerState.archivedPicks = g_trackerState.archivedPicks.filter(p => p.id !== id);
-  saveTrackerStateToLocal();
-  renderTrackedPicks();
-  showToast("Pick deleted");
-}
-
-function renderTrackedPicks() {
-  const summaryEl = document.getElementById("trackerSummary");
-  const marketSummaryEl = document.getElementById("trackerMarketSummary");
-  const emptyEl = document.getElementById("trackerEmpty");
-  const wrapEl = document.getElementById("trackedPicksWrap");
-  const bodyEl = document.getElementById("trackedPicksBody");
-  if (!summaryEl || !emptyEl || !wrapEl || !bodyEl) return;
-
-  rebuildTrackerStats();
-  const stats = g_trackerState.stats;
-  const active = g_trackerState.activePicks || [];
-  const pendingCount = active.filter(p => (p.resultStatus || "pending") === "pending").length;
-
-  summaryEl.textContent = `${stats.total} saved • ${stats.settled} settled • ${stats.wins} wins • ${pendingCount} pending`;
-
-  const marketLabels = { ft: "FT", h1: "1H", team_a: "Team A", team_b: "Team B", btts: "BTTS", corners: "Corners", cards: "Cards", ah: "AH" };
-  const chips = Object.keys(marketLabels).map(key => {
-    const pending = active.filter(p => p.marketKey === key && (p.resultStatus || "pending") === "pending").length;
-    return pending ? `<div class="tracker-market-chip">${marketLabels[key]} ${pending}</div>` : "";
-  }).filter(Boolean);
-  marketSummaryEl.innerHTML = chips.join("");
-  marketSummaryEl.style.display = chips.length ? "flex" : "none";
-
-  const allSorted = [...active].sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
-
-  if (!allSorted.length) {
-    emptyEl.style.display = "block";
-    wrapEl.querySelector(".tracker-table-wrap").style.display = "none";
-    bodyEl.innerHTML = "";
-    return;
-  }
-
-  emptyEl.style.display = "none";
-  wrapEl.querySelector(".tracker-table-wrap").style.display = "block";
-
-  bodyEl.innerHTML = allSorted.map(p => {
-    const status = String(p.resultStatus || "pending").toLowerCase();
-    const statusClass = status === "win" ? "track-win" : status === "loss" ? "track-loss" : status === "push" ? "track-push" : "track-pending";
-    const dateStr = (p.eventDate || p.createdAt || "").slice(0, 10);
-    const matchStr = `${p.homeTeam || "Team A"} vs ${p.awayTeam || "Team B"}`;
-
-    let statusHtml;
-    if (status === "pending") {
-      statusHtml = `
-        <div class="pick-row-actions">
-          <button type="button" class="btn-win" onclick="settlePick('${p.id}','win')">W</button>
-          <button type="button" class="btn-loss" onclick="settlePick('${p.id}','loss')">L</button>
-          <button type="button" class="btn-push" onclick="settlePick('${p.id}','push')">P</button>
-          <button type="button" class="btn-del" onclick="deletePick('${p.id}')">✕</button>
-        </div>`;
-    } else {
-      statusHtml = `<span class="${statusClass}">${status.toUpperCase()}</span> <button type="button" class="btn-del" onclick="deletePick('${p.id}')">✕</button>`;
-    }
-
-    return `
-      <tr>
-        <td>${dateStr}</td>
-        <td>${(p.league || "").toUpperCase()}</td>
-        <td>${matchStr}</td>
-        <td>${(p.marketKey || "").toUpperCase()}</td>
-        <td>${p.line || "—"}</td>
-        <td>${p.pick || "—"}</td>
-        <td>${p.confidenceGrade || "—"}</td>
-        <td class="${statusClass}">${statusHtml}</td>
-      </tr>`;
-  }).join("");
-}
-
-/* ---------------- Tracker modal open/close ---------------- */
-function openTrackerModal() {
-  const modal = document.getElementById("trackerModal");
-  if (!modal) return;
-  document.body.classList.add("tracker-open");
-  modal.classList.add("open");
-  modal.setAttribute("aria-hidden", "false");
-  const loaded = loadTrackerStateFromLocal();
-  if (loaded) g_trackerState = loaded;
-  renderTrackedPicks();
-}
-function closeTrackerModal() {
-  const modal = document.getElementById("trackerModal");
-  if (!modal) return;
-  modal.classList.remove("open");
-  modal.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("tracker-open");
-}
-document.getElementById("trackerToggleBtn")?.addEventListener("click", openTrackerModal);
-document.getElementById("trackerCloseBtn")?.addEventListener("click", closeTrackerModal);
-
-/* ---------------- Copy tracker data ---------------- */
-document.getElementById("trackerCopyDataBtn")?.addEventListener("click", () => {
-  const all = [...(g_trackerState.activePicks || []), ...(g_trackerState.archivedPicks || [])];
-  const lines = all.map(p => `${(p.eventDate || "").slice(0,10)} | ${p.league} | ${p.homeTeam} vs ${p.awayTeam} | ${p.marketKey} | ${p.line} | ${p.pick} | ${p.confidenceGrade} | ${p.resultStatus}`);
-  const text = lines.join("\n") || "(no tracked picks)";
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => showToast("Tracker data copied"));
-  }
-});
-document.getElementById("trackerCopyDataJsonBtn")?.addEventListener("click", () => {
-  const text = JSON.stringify(g_trackerState, null, 2);
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => showToast("Tracker JSON copied"));
-  }
-});
-
-/* ---------------- Boot ---------------- */
-(function boot() {
-  const loaded = loadTrackerStateFromLocal();
-  if (loaded) g_trackerState = loaded;
-  else g_trackerState = createEmptyTrackerState();
-})();
-
-/* ================================================================
-   EXAMPLE: how to send a pick to the tracker once your engine
-   produces a real result. Call this from your runEngine() logic,
-   once per market row, e.g.:
-
-     addPickToTracker(buildTrackedPickPayload({
-       marketKey: "ft",
-       line: "2.5",
-       pick: "Over 2.5",
-       projection: 2.8,
-       edgePct: 4.3,
-       grade: "B+"
-     }));
-
-   This is not called automatically anywhere in this shell.
-   ================================================================ */
-</script>
-</body>
-</html>
+</div>
