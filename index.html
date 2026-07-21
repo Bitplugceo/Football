@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11584,14 +11585,13 @@ function isTrackerSupportedLeague(league) {
 }
 
 async function settleTrackedPick(signature, status) {
-  
   let pick = AppState.tracker.state.activePicks.find(p => p.signature === signature);
   if (!pick) pick = AppState.tracker.state.archivedPicks.find(p => p.signature === signature);
   if (!pick) return;
   const _sA = (pick.homeTeam && pick.homeTeam !== "—") ? pick.homeTeam : "A";
   const _sB = (pick.awayTeam && pick.awayTeam !== "—") ? pick.awayTeam : "B";
   const score = prompt(
-    `${status.toUpperCase()} — Enter final score:\n${_sA} vs ${_sB}\n(e.g. 110-105 — or leave blank)`,
+    `${status.toUpperCase()} — Enter final score:\n${_sA} vs ${_sB}\n(e.g. 2-1 or 0-0 — or leave blank)`,
     pick.actualScore || ""
   );
   if (score === null) return;
@@ -12024,79 +12024,16 @@ function isPickPeriodComplete(marketKey, currentPeriod, isHalfTime, isGameFinal,
   if (market === "ft") {
      actual = sHome + sAway;
   } else if (market === "h1") {
-     if (!h1Home && !h1Away) return "pending";
-     actual = h1Home + h1Away;
+     actual = (home.linescores?.[0]?.value ?? 0) + (away.linescores?.[0]?.value ?? 0);
   } else if (market === "team_a") {
      actual = isTeamAHome ? sHome : sAway;
   } else if (market === "team_b") {
      actual = isTeamAHome ? sAway : sHome;
-  } else if (market === "q1") {
-     if (!q1Home && !q1Away) return "pending";
-     actual = q1Home + q1Away;
-  } else if (market === "q2") {
-     if (!q2Home && !q2Away) return "pending";
-     actual = q2Home + q2Away;
-  } else if (market === "q3") {
-     if (!q3Home && !q3Away) return "pending";
-     actual = q3Home + q3Away;
-  } else if (market === "q4") {
-     if (!q4Home && !q4Away) return "pending";
-     actual = q4Home + q4Away;
-  } else if (market === "high_q_ou") {
-     if (!q4Home && !q4Away) return "pending";
-     const qs = [q1Home+q1Away, q2Home+q2Away, q3Home+q3Away, q4Home+q4Away];
-     actual = Math.max(...qs);
-  } else if (market === "low_q_ou") {
-     if (!q4Home && !q4Away) return "pending";
-     const qs = [q1Home+q1Away, q2Home+q2Away, q3Home+q3Away, q4Home+q4Away];
-     actual = Math.min(...qs);
-  } else if (market === "q1_team_a") {
-     if (!q1Home && !q1Away) return "pending";
-     actual = isTeamAHome ? q1Home : q1Away;
-  } else if (market === "q1_team_b") {
-     if (!q1Home && !q1Away) return "pending";
-     actual = isTeamAHome ? q1Away : q1Home;
-  } else if (market === "h1_team_a") {
-     if (!h1Home && !h1Away) return "pending";
-     actual = isTeamAHome ? h1Home : h1Away;
-  } else if (market === "h1_team_b") {
-     if (!h1Home && !h1Away) return "pending";
-     actual = isTeamAHome ? h1Away : h1Home;
-  } else if (market === "htft") {
-     if (h1Home === 0 && h1Away === 0) return "pending";
-     const h1Lead = h1Home > h1Away ? "Home" : h1Home < h1Away ? "Away" : "Tie";
-     const ftLead = sHome > sAway ? "Home" : sHome < sAway ? "Away" : "Tie";
-     const actualStr = (h1Lead + "/" + ftLead).toUpperCase();
-     pick.actualScore = actualStr;
-     const isWin = actualStr === String(pick.predictionText).toUpperCase();
-     pick.engineResultStatus = isWin ? "win" : "loss";
-     return isWin ? "win" : "loss";
-  } else if (market === "margin_any" || market === "margin_team") {
-     const diff = Math.abs(sHome - sAway);
-     const winner = sHome > sAway ? "Home" : sHome < sAway ? "Away" : "Tie";
-     pick.actualScore = winner + " by " + diff;
-     const pt = String(pick.predictionText).toUpperCase();
-     if (market === "margin_team" && !pt.startsWith(winner.toUpperCase())) {
-       pick.engineResultStatus = "loss"; 
-       return "loss";
-     }
-     let isWin = false;
-     const match = pt.match(/(\d+)-(\d+)/);
-     if (match) {
-       isWin = diff >= parseInt(match[1]) && diff <= parseInt(match[2]);
-     } else if (pt.includes("31+")) {
-       isWin = diff >= 31;
-     }
-     pick.engineResultStatus = isWin ? "win" : "loss";
-     return isWin ? "win" : "loss";
-  } else if (market === "high_q" || market === "low_q") {
-     if (!q4Home && !q4Away) return "pending";
-     const qs = [q1Home+q1Away, q2Home+q2Away, q3Home+q3Away, q4Home+q4Away];
-     const target = market === "high_q" ? Math.max(...qs) : Math.min(...qs);
-     const count = qs.filter(q => q === target).length;
-     const actualStr = count > 1 ? "Equal" : `Quarter ${qs.indexOf(target) + 1}`;
-     pick.actualScore = qs.join(", ");
-     const isWin = actualStr === String(pick.predictionText);
+  } else if (market === "btts") {
+     const bothScored = sHome > 0 && sAway > 0;
+     const actualStr = bothScored ? "BTTS YES" : "BTTS NO";
+     pick.actualScore = `${sHome}-${sAway}`;
+     const isWin = String(pick.predictionText).toUpperCase() === actualStr;
      pick.engineResultStatus = isWin ? "win" : "loss";
      return isWin ? "win" : "loss";
   } else {
@@ -13889,539 +13826,6 @@ btn.addEventListener("click", () => { section.classList.toggle("collapsed"); });
       }
       return [sA, sB];
     }
-
-async function fetchNbaSummerGameRefsViaScoreboard(base, teamId) {
-  const tId = String(teamId);
-  const year = new Date().getFullYear();
-  const startDate = new Date(year, 6, 1);
-  const endDate = new Date(year, 6, 31);
-  const dateKeys = [];
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    dateKeys.push(getDateKeyLocal(d));
-  }
-
-  const _summerBatchSize = 5;
-  const payloads = [];
-  for (let _sbi = 0; _sbi < dateKeys.length; _sbi += _summerBatchSize) {
-    const _summerBatchKeys = dateKeys.slice(_sbi, _sbi + _summerBatchSize);
-    const _summerBatchJobs = _summerBatchKeys.map(dateKey => {
-      const key = `${base}:sbscan:${dateKey}`;
-      return _schedCache.has(key)
-        ? _schedCache.get(key)
-        : (() => {
-            const p = proxyFetch(`${base}/scoreboard?dates=${dateKey}&limit=200`).catch(err => {
-              _schedCache.delete(key);
-              return null;
-            });
-            cacheSet(_schedCache, key, p);
-            return p;
-          })();
-    });
-    const _summerBatchPayloads = await Promise.allSettled(_summerBatchJobs);
-    payloads.push(..._summerBatchPayloads);
-  }
-  const refs = [];
-  payloads.forEach(result => {
-    if (result.status !== "fulfilled" || !result.value) return;
-    const events = result.value?.events || [];
-    for (const ev of events) {
-      if (!ev?.id) continue;
-      const comp = ev?.competitions?.[0];
-      if (!comp) continue;
-      const done =
-        comp?.status?.type?.completed ||
-        comp?.status?.type?.name === "STATUS_FINAL" ||
-        comp?.status?.type?.state === "post";
-      if (!done || (comp?.competitors || []).length < 2) continue;
-      const competitors = comp.competitors;
-      const mine = competitors.find(x => matchesTeam(x, tId));
-      const opp = mine ? competitors.find(x => x !== mine) : null;
-      if (!mine || !opp) continue;
-      const ps = s => typeof s === "object" ? parseFloat(s.value ?? s.displayValue ?? 0) : parseFloat(s);
-      refs.push({
-        id: String(ev.id),
-        date: ev.date || "",
-        rawS: ps(mine?.score),
-        rawA: ps(opp?.score),
-        venue: mine?.homeAway || "",
-        oppId: String(opp?.team?.id || "")
-      });
-    }
-  });
-  return refs;
-}
-
-async function fetchScheduleCore(base, teamId, leagueKey, requiredVenue, allowFallback = true) {
-  const rules = LEAGUE_FETCH_RULES[leagueKey];
-  if (!rules) return null;
-
-  const tId = String(teamId);
-  const gameRefs = [];
-  const currentSeason = getCurrentSeasonYear(leagueKey);
-
-  if (leagueKey === "nba_summer") {
-    const summerRefs = await fetchNbaSummerGameRefsViaScoreboard(base, teamId);
-    summerRefs.forEach(r => gameRefs.push(r));
-  } else {
-  const _schedJobList = [];
-  const _schedMeta = [];
-  for (let i = 0; i < rules.recentSeasons; i++) {
-    const season = String(currentSeason - i);
-    for (const stype of rules.scheduleTypes) {
-      const key = `${base}:sched:${teamId}:${season}:${stype}`;
-      const req = _schedCache.has(key)
-        ? _schedCache.get(key)
-        : (() => {
-            const p = proxyFetch(`${base}/teams/${teamId}/schedule?season=${season}&seasontype=${stype}`).catch(err => {
-              _schedCache.delete(key);
-              throw err;
-            });
-            cacheSet(_schedCache, key, p);
-            return p;
-          })();
-      _schedJobList.push(req);
-      _schedMeta.push({ season, stype });
-    }
-  }
-  const _schedPayloads = await Promise.allSettled(_schedJobList);
-  _schedPayloads.forEach((result, _schedIdx) => {
-    if (result.status !== 'fulfilled') {
-      const _schedFailMeta = _schedMeta[_schedIdx] || {};
-      engineDebug("fetchScheduleCore schedule fetch failed for teamId=" + teamId, { season: _schedFailMeta.season, seasontype: _schedFailMeta.stype, reason: result.reason?.message || String(result.reason) });
-      return;
-    }
-    const r = result.value;
-    const events = r?.events || r?.team?.schedule?.events || [];
-    for (const ev of events) {
-      if (!ev?.id) continue;
-
-      const comp = ev?.competitions?.[0];
-      if (!comp) continue;
-
-      const done =
-        comp?.status?.type?.completed ||
-        comp?.status?.type?.name === "STATUS_FINAL" ||
-        comp?.status?.type?.state === "post";
-
-      if (!done || (comp?.competitors || []).length < 2) continue;
-
-      const competitors = comp.competitors;
-
-      const mine = competitors.find(x => matchesTeam(x, tId));
-
-      const opp = mine ? competitors.find(x => x !== mine) : null;
-      if (!mine || !opp) continue;
-      const ps = s => typeof s === "object" ? parseFloat(s.value ?? s.displayValue ?? 0) : parseFloat(s);
-
-      gameRefs.push({
-        id: String(ev.id),
-        date: ev.date || "",
-        rawS: ps(mine?.score),
-        rawA: ps(opp?.score),
-        venue: mine?.homeAway || "",
-        oppId: String(opp?.team?.id || "")
-      });
-    }
-  });
-  }
-
-  if (!gameRefs.length) return null;
-
-  const seen = new Set();
-  const unique = gameRefs
-    .filter(g => {
-      if (seen.has(g.id)) return false;
-      seen.add(g.id);
-      return true;
-    })
-    .sort((a, b) => {
-      const da = a.date ? new Date(a.date).getTime() : 0;
-      const db = b.date ? new Date(b.date).getTime() : 0;
-      return db - da;
-    });
-
-  const strictFiltered = requiredVenue ? unique.filter(g => g.venue === requiredVenue) : unique;
-  const venueReliable = strictFiltered.length >= 2;
-  const usedVenueFallback = !!requiredVenue && !venueReliable && unique.length >= 2 && allowFallback;
-  const chosen = venueReliable ? strictFiltered : (allowFallback ? unique : strictFiltered);
-
-  if (chosen.length < 2) return null;
-
-  const scored10 = [];
-  const allowed10 = [];
-  const h1Scored10 = [];
-  const h1Allowed10 = [];
-
-  const qS = { q1:[], q2:[], q3:[], q4:[] };
-  const qA = { q1:[], q2:[], q3:[], q4:[] };
-
-    const _chosenForSummary = chosen.slice(0, Math.min(chosen.length, 10));
-    const summaries = await Promise.all(_chosenForSummary.map(async ref => {
-      let ms = ref.rawS;
-      let os = ref.rawA;
-      let h1m = 0, h1o = 0;
-      let gotLS = false;
-      let advanced = null;
-
-      try {
-    const key = `${base}:sum:${ref.id}`;
-    const data = await (_summaryCache.has(key)
-      ? _summaryCache.get(key)
-      : (() => {
-          const p = proxyFetch(`${base}/summary?event=${ref.id}`).catch(err => {
-            _summaryCache.delete(key);
-            throw err;
-          });
-          cacheSet(_summaryCache, key, p);
-          return p;
-        })());
-
-    const hc = data?.header?.competitions?.[0];
-    const boxscore = data?.boxscore;
-    const venueAddr = hc?.venue?.address || data?.gameInfo?.venue?.address || null;
-    ref.venueCity = venueAddr?.city || null;
-    ref.venueState = venueAddr?.state || null;
-
-    if (hc) {
-      const competitors = hc?.competitors || [];
-      const mine = competitors.find(c => matchesTeam(c, tId));
-      const opp = competitors.find(c => !matchesTeam(c, tId));
-
-      if (mine && opp) {
-        gotLS = true;
-        ms = parseFloat(mine.score) || ms;
-        os = parseFloat(opp.score) || os;
-
-        const lm = mine?.linescores || [];
-        const lo = opp?.linescores || [];
-
-        const _wentToOT = lm.length > rules.regulationPeriods && lo.length > rules.regulationPeriods;
-
-        if (lm.length >= 1 && lo.length >= 1) {
-          if (rules.regulationPeriods >= 4) {
-            h1m = (readVal(lm[0]) || 0) + (readVal(lm[1]) || 0);
-            h1o = (readVal(lo[0]) || 0) + (readVal(lo[1]) || 0);
-            if (lm.length >= 4 && lo.length >= 4) {
-              const _qm = [readVal(lm[0]), readVal(lm[1]), readVal(lm[2]), readVal(lm[3])];
-              const _qo = [readVal(lo[0]), readVal(lo[1]), readVal(lo[2]), readVal(lo[3])];
-              if (_qm.every(v => v > 0) && _qo.every(v => v > 0)) {
-                ref.qs = { m: _qm, o: _qo };
-              }
-            }
-          } else {
-            [h1m, h1o] = extractFirstHalf(lm, lo);
-          }
-          [ms, os] = stripOTFromScores(ms, os, lm, lo, rules.regulationPeriods);
-        }
-
-        if (boxscore && typeof boxscore === 'object') {
-          let sMap = {};
-          const safeTeams = Array.isArray(boxscore.teams) ? boxscore.teams : [];
-          const myBox = safeTeams.find(t => matchesTeam(t, tId));
-          
-          if (myBox && Array.isArray(myBox.statistics) && myBox.statistics.length > 0) {
-            myBox.statistics.forEach(s => { sMap[s.name] = s.displayValue; });
-          } else if (Array.isArray(boxscore.players)) {
-            const safePlayers = boxscore.players || [];
-            const myPlayers = safePlayers.find(p => matchesTeam(p, tId));
-            if (myPlayers && Array.isArray(myPlayers.statistics) && myPlayers.statistics[0] && Array.isArray(myPlayers.statistics[0].athletes)) {
-              let fga = 0, fta = 0, orb = 0, tov = 0;
-              const keys = myPlayers.statistics[0].names || [];
-              const iFga = keys.indexOf("FGA");
-              const iFta = keys.indexOf("FTA");
-              const iOrb = keys.indexOf("OREB");
-              const iTov = keys.indexOf("TO");
-              
-              myPlayers.statistics[0].athletes.forEach(ath => {
-                const st = ath.stats || [];
-                if (iFga >= 0) fga += parseFloat(st[iFga]) || 0;
-                if (iFta >= 0) fta += parseFloat(st[iFta]) || 0;
-                if (iOrb >= 0) orb += parseFloat(st[iOrb]) || 0;
-                if (iTov >= 0) tov += parseFloat(st[iTov]) || 0;
-              });
-              sMap = { fieldGoals: fga, freeThrows: fta, offensiveRebounds: orb, turnovers: tov };
-            }
-          }
-
-          
-          
-          if (Object.keys(sMap).length > 0 && !_wentToOT) {
-            const gameMinutes = leagueKey === "nba" ? 48 : 40;
-            const advResult = calculateAdvancedMetrics(sMap, ms, os, gameMinutes);
-            if (advResult) {
-              advanced = advResult;
-              trackerDebug(`Level 2 Stats Extracted: ${ref.id}`, advanced);
-            }
-          }
-        }
-      }
-    }
-  } catch (e) {
-    logDebug("fetchScheduleCore summary failed", e);
-  }
-
-  if (isNaN(ms) || isNaN(os) || ms <= 0 || os <= 0) return null;
-
-  return {
-    ms: Math.round(ms),
-    os: Math.round(os),
-    h1m: gotLS && h1m > 0 ? Math.round(h1m) : null,
-    h1o: gotLS && h1o > 0 ? Math.round(h1o) : null,
-    qs: ref.qs,
-    advanced: advanced,
-    
-    date: ref.date || null,
-    venueCity: ref.venueCity || null,
-    venueState: ref.venueState || null
-  };
-}));
-
-  const h1Scored10Dates = [];
-  const qDates = { q1:[], q2:[], q3:[], q4:[] };
-
-  summaries.filter(Boolean).forEach(game => {
-    scored10.push(game.ms);
-    allowed10.push(game.os);
-
-    if (game.h1m !== null && game.h1o !== null) {
-      h1Scored10.push(game.h1m);
-      h1Allowed10.push(game.h1o);
-      h1Scored10Dates.push(game.date || null);
-    }
-
-    if (game.qs) {
-      qS.q1.push(game.qs.m[0]); qS.q2.push(game.qs.m[1]); qS.q3.push(game.qs.m[2]); qS.q4.push(game.qs.m[3]);
-      qA.q1.push(game.qs.o[0]); qA.q2.push(game.qs.o[1]); qA.q3.push(game.qs.o[2]); qA.q4.push(game.qs.o[3]);
-      qDates.q1.push(game.date || null); qDates.q2.push(game.date || null);
-      qDates.q3.push(game.date || null); qDates.q4.push(game.date || null);
-    }
-  });
-
-    return scored10.length >= 2 
-? { 
-scored: scored10.slice(0, 10), 
-allowed: allowed10.slice(0, 10), 
-        h1Scored: h1Scored10.slice(0, 10), 
-h1Allowed: h1Allowed10.slice(0, 10), 
-q1Scored: qS.q1.slice(0, 10), q2Scored: qS.q2.slice(0, 10), q3Scored: qS.q3.slice(0, 10), q4Scored: qS.q4.slice(0, 10), 
-q1Allowed: qA.q1.slice(0, 10), q2Allowed: qA.q2.slice(0, 10), q3Allowed: qA.q3.slice(0, 10), q4Allowed: qA.q4.slice(0, 10), 
-        ortg10: summaries.filter(s => s && s.advanced).map(s => s.advanced.ortg),
-        drtg10: summaries.filter(s => s && s.advanced).map(s => s.advanced.drtg),
-        pace10: summaries.filter(s => s && s.advanced).map(s => s.advanced.pace),
-        scored10,
-        allowed10,
-        h1Scored10,
-        h1Allowed10,
-
-        h1ScoredDates: h1Scored10Dates,
-        q1ScoredDates: qDates.q1, q2ScoredDates: qDates.q2,
-        q3ScoredDates: qDates.q3, q4ScoredDates: qDates.q4,
-        lastGameDate: unique[0]?.date || null,
-        lastGameCity: (summaries.find(Boolean))?.venueCity || null,
-        lastGameState: (summaries.find(Boolean))?.venueState || null,
-        venueReliable,
-        usedVenueFallback,
-
-        sos: (() => {
-          const cache = window._espnStandingsCache?.[leagueKey]?.data;
-          if (!cache) return null;
-          const oppPcts = unique.slice(0, 10).map(g => cache[g.oppId]?.pct).filter(v => isFinite(v) && v > 0);
-          if (oppPcts.length < 3) return null;
-          return parseFloat((oppPcts.reduce((a, b) => a + b, 0) / oppPcts.length).toFixed(3));
-        })()
-      }
-    : null;
-
-}
-
-async function fetchH2HCore(base, teamAId, teamBId, leagueKey) {
-  const rules = LEAGUE_FETCH_RULES[leagueKey];
-  if (!rules) return [];
-
-  const tA = String(teamAId);
-  const tB = String(teamBId);
-  const currentSeason = getCurrentSeasonYear(leagueKey);
-
-  const lookbackYears = getParam("h2hLookbackSeasons", leagueKey) ?? 4;
-  const minSeason = currentSeason - lookbackYears;
-  const minDateTs = new Date(minSeason, 0, 1).getTime();
-
-  const scheduleJobs = [];
-
-  for (let season = currentSeason; season >= minSeason; season--) {
-    for (const stype of rules.h2hScheduleTypes) {
-
-      const key = `${base}:sched:${tA}:${season}:${stype}`;
-      const req = _schedCache.has(key)
-        ? _schedCache.get(key)
-        : (() => {
-            const p = proxyFetch(`${base}/teams/${teamAId}/schedule?season=${season}&seasontype=${stype}`).catch(err => {
-              _schedCache.delete(key);
-              throw err;
-            });
-            cacheSet(_schedCache, key, p);
-            return p;
-          })();
-
-      scheduleJobs.push(
-        req.catch(err => {
-          logDebug("fetchH2HCore schedule scan failed", err);
-          return null;
-        })
-      );
-    }
-  }
-
-  const schedulePayloads = await Promise.all(scheduleJobs);
-  const candidateMap = new Map();
-
-  schedulePayloads
-    .filter(Boolean)
-    .forEach(r => {
-      const events = [
-        ...(r?.events || []),
-        ...(r?.team?.schedule?.events || [])
-      ];
-
-      events.forEach(ev => {
-        const comp = ev?.competitions?.[0];
-        if (!ev?.id || !comp) return;
-
-        const done =
-          comp?.status?.type?.completed ||
-          comp?.status?.type?.name === "STATUS_FINAL" ||
-          comp?.status?.type?.state === "post";
-
-        if (!done) return;
-
-        const competitors = comp?.competitors || [];
-        if (competitors.length < 2) return;
-
-        const hasA = competitors.some(c => matchesTeam(c, tA));
-        const hasB = competitors.some(c => matchesTeam(c, tB));
-        if (!hasA || !hasB) return;
-
-        const rawDate = ev?.date || comp?.date || "";
-        const gameTs = rawDate ? Date.parse(rawDate) : NaN;
-        if (isFinite(gameTs) && gameTs < minDateTs) return;
-
-        candidateMap.set(String(ev.id), {
-          id: String(ev.id),
-          date: rawDate
-        });
-      });
-    });
-
-  if (!candidateMap.size) return [];
-
-  const refs = [...candidateMap.values()]
-    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-    .slice(0, 10);
-
-  const summaries = await Promise.all(
-    refs.map(async ref => {
-      try {
-        const key = `${base}:sum:${ref.id}`;
-        const data = await (_summaryCache.has(key)
-          ? _summaryCache.get(key)
-          : (() => {
-              const p = proxyFetch(`${base}/summary?event=${ref.id}`).catch(err => {
-                _summaryCache.delete(key);
-                throw err;
-              });
-              cacheSet(_summaryCache, key, p);
-              return p;
-            })());
-
-        const hc = data?.header?.competitions?.[0];
-        if (!hc) return null;
-
-        const done =
-          hc?.status?.type?.completed ||
-          hc?.status?.type?.name === "STATUS_FINAL" ||
-          hc?.status?.type?.state === "post";
-
-        if (!done) return null;
-
-        const gameDate = hc?.date || ref.date || "";
-        const gameTs = gameDate ? Date.parse(gameDate) : NaN;
-        if (isFinite(gameTs) && gameTs < minDateTs) return null;
-
-        const competitors = hc?.competitors || [];
-        const cA = competitors.find(c => matchesTeam(c, tA));
-        const cB = competitors.find(c => matchesTeam(c, tB));
-        if (!cA || !cB) return null;
-
-        const lA = cA?.linescores || [];
-        const lB = cB?.linescores || [];
-
-        let sA = readVal(cA?.score);
-        let sB = readVal(cB?.score);
-
-        if ((!isFinite(sA) || sA <= 0) && lA.length) {
-          sA = lA.reduce((t, p) => t + readVal(p), 0);
-        }
-        if ((!isFinite(sB) || sB <= 0) && lB.length) {
-          sB = lB.reduce((t, p) => t + readVal(p), 0);
-        }
-
-        if (!isFinite(sA) || !isFinite(sB) || sA <= 0 || sB <= 0) return null;
-
-        let h1A = 0;
-        let h1B = 0;
-        let h2A = 0;
-        let h2B = 0;
-
-        if (lA.length && lB.length) {
-          if (rules.regulationPeriods >= 4) {
-            h1A = lA.length >= 2 ? readVal(lA[0]) + readVal(lA[1]) : 0;
-            h1B = lB.length >= 2 ? readVal(lB[0]) + readVal(lB[1]) : 0;
-            h2A = lA.length >= 4 ? readVal(lA[2]) + readVal(lA[3]) : 0;
-            h2B = lB.length >= 4 ? readVal(lB[2]) + readVal(lB[3]) : 0;
-          } else {
-            [h1A, h1B] = extractFirstHalf(lA, lB);
-            [h2A, h2B] = extractSecondHalf(lA, lB);
-          }
-
-                    [sA, sB] = stripOTFromScores(sA, sB, lA, lB, rules.regulationPeriods);
-        }
-
-        return {
-          eventId: ref.id,
-          teamAId: tA,
-          teamBId: tB,
-          scoreA: Math.round(sA),
-          scoreB: Math.round(sB),
-          h1A: Math.round(h1A),
-          h1B: Math.round(h1B),
-          h2A: Math.round(h2A),
-          h2B: Math.round(h2B),
-          q1A: readVal(lA[0]), q1B: readVal(lB[0]),
-          q2A: readVal(lA[1]), q2B: readVal(lB[1]),
-          q3A: readVal(lA[2]), q3B: readVal(lB[2]),
-          q4A: readVal(lA[3]), q4B: readVal(lB[3]),
-          date: gameDate
-        };
-      } catch (e) {
-        logDebug("fetchH2HCore summary failed", e);
-        return null;
-      }
-    })
-  );
-
-  return summaries
-    .filter(Boolean)
-    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-    .slice(0, 10);
-}
-
-async function fetchNcaaSchedule(base, teamId, requiredVenue, allowFallback = true, leagueKey = "ncaa") {
-  return fetchScheduleCore(base, teamId, leagueKey, requiredVenue, allowFallback);
-}
-
-async function fetchNcaaH2H(base, teamAId, teamBId, leagueKey = "ncaa") {
-  return fetchH2HCore(base, teamAId, teamBId, leagueKey);
-}
 
 function renderInjuryBox(boxId, contentId, inj) {
       const box = document.getElementById(boxId);
@@ -16906,7 +16310,6 @@ function withErrorBoundary(fn, context) {
 }
 
 function extractInputs(league) {
-  const isNbaOrNcaa = league === "nba" || league === "wnba" || league === "wnba_pre" || league === "ncaa";
   function readLine(id) {
     const v = parseMarketLine((document.getElementById(id)?.value || "").trim());
     return isFinite(v) ? v : null;
@@ -16921,36 +16324,17 @@ function extractInputs(league) {
     bFTScored:  readSeries("bFTScored"),  bFTAllowed: readSeries("bFTAllowed"),
     a1HScored:  readSeries("a1HScored"),  a1HAllowed: readSeries("a1HAllowed"),
     b1HScored:  readSeries("b1HScored"),  b1HAllowed: readSeries("b1HAllowed"),
-    aQ1Scored:  readSeries("aQ1Scored"),  aQ1Allowed: readSeries("aQ1Allowed"),
-    aQ2Scored:  readSeries("aQ2Scored"),  aQ2Allowed: readSeries("aQ2Allowed"),
-    aQ3Scored:  readSeries("aQ3Scored"),  aQ3Allowed: readSeries("aQ3Allowed"),
-    aQ4Scored:  readSeries("aQ4Scored"),  aQ4Allowed: readSeries("aQ4Allowed"),
-    bQ1Scored:  readSeries("bQ1Scored"),  bQ1Allowed: readSeries("bQ1Allowed"),
-    bQ2Scored:  readSeries("bQ2Scored"),  bQ2Allowed: readSeries("bQ2Allowed"),
-    bQ3Scored:  readSeries("bQ3Scored"),  bQ3Allowed: readSeries("bQ3Allowed"),
-    bQ4Scored:  readSeries("bQ4Scored"),  bQ4Allowed: readSeries("bQ4Allowed"),
-    aFTH2H: readSeries("aFTH2H"),  bFTH2H: readSeries("bFTH2H"),
-    a1HH2H: readSeries("a1HH2H"),  b1HH2H: readSeries("b1HH2H"),
-    aQ1H2H: readSeries("aQ1H2H"),  bQ1H2H: readSeries("bQ1H2H"),
-    aQ2H2H: readSeries("aQ2H2H"),  bQ2H2H: readSeries("bQ2H2H"),
-    aQ3H2H: readSeries("aQ3H2H"),  bQ3H2H: readSeries("bQ3H2H"),
-    aQ4H2H: readSeries("aQ4H2H"),  bQ4H2H: readSeries("bQ4H2H"),
+    aFTH2H:     readSeries("aFTH2H"),     bFTH2H:     readSeries("bFTH2H"),
+    a1HH2H:     readSeries("a1HH2H"),     b1HH2H:     readSeries("b1HH2H"),
     aFTScoredHome: readSeries("aFTScoredHome"), aFTAllowedHome: readSeries("aFTAllowedHome"),
     aFTScoredAway: readSeries("aFTScoredAway"), aFTAllowedAway: readSeries("aFTAllowedAway"),
     bFTScoredHome: readSeries("bFTScoredHome"), bFTAllowedHome: readSeries("bFTAllowedHome"),
-    bFTScoredAway: readSeries("bFTScoredAway"), bFTAllowedAway: readSeries("bFTAllowedAway"),
+    bFTScoredAway: readSeries("bFTScoredAway"), bFTAllowedAway: readSeries("bFTAllowedAway")
   };
   const lines = {
     ftLine, h1Line,
-
-    aLine:     readLine("teamAMarket"),
-    bLine:     readLine("teamBMarket"),
-    q1aLine:   readLine("q1TeamAMarket"),
-    q1bLine:   readLine("q1TeamBMarket"),
-    h1aLine:   readLine("h1TeamAMarket"),
-    h1bLine:   readLine("h1TeamBMarket"),
-    highQLine: readLine("highQTotalMarket"),
-    lowQLine:  readLine("lowQTotalMarket"),
+    aLine: readLine("teamAMarket"),
+    bLine: readLine("teamBMarket")
   };
   return { parsed, lines };
 }
@@ -18944,7 +18328,7 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
 
       setFieldValues(FIELD_GROUPS.periodInputs);
 
-            const teamMarketSection = document.getElementById("teamMarketSection");
+      const teamMarketSection = document.getElementById("teamMarketSection");
       if (teamMarketSection) {
         teamMarketSection.style.gridTemplateColumns = "1fr 1fr";
       }
@@ -18953,43 +18337,9 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
         ftH1MarketRow.style.gridTemplateColumns = "1fr 1fr";
       }
 
-      const _espnEl = document.getElementById("espnSection");
-      if (_espnEl) _espnEl.style.display = _isBig5 ? "block" : "none";
-      const _sofaEl = document.getElementById("sofascoreManualSection");
-      if (_sofaEl) _sofaEl.style.display = (!league || _isBig5) ? "none" : "block";
-
-      document.getElementById("aQSection").style.display = isQs || !isNbaOrNcaa ? "block" : "none";
-      document.getElementById("bQSection").style.display = isQs || !isNbaOrNcaa ? "block" : "none";
-
-      ["a1HSection", "b1HSection", "h2h1HSection"].forEach(id => {
+      ["a1HSection", "b1HSection", "h2h1HSection", "h1MarketSection"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = leagueVal ? "block" : "none";
-      });
-      ["a2HSection", "b2HSection", "h2h2HSection"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = "none";
-      });
-      const h2hQ = document.getElementById("h2hQSection");
-      if (h2hQ) h2hQ.style.display = (isQs && isNbaOrNcaa) || !isNbaOrNcaa ? "block" : "none";
-      
-      const h1MarketEl = document.getElementById("h1MarketSection");
-      if (h1MarketEl) h1MarketEl.style.display = leagueVal ? "block" : "none";
-      const h1TeamEl = document.getElementById("h1TeamMarketSection");
-      if (h1TeamEl) h1TeamEl.style.display = (isNbaOrNcaa && !isWnba) ? "grid" : "none";
-
-      const h1MarketElManual = document.getElementById("h1MarketSection");
-      if (h1MarketElManual) h1MarketElManual.style.display = leagueVal ? "block" : "none";
-
-      ["q1q2MarketSection", "q3q4MarketSection"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = leagueVal ? "grid" : "none";
-      });
-      const highLowQEl = document.getElementById("highLowQMarketSection");
-      if (highLowQEl) highLowQEl.style.display = "none";
-
-      ["q1TeamMarketSection", "exoticMarketSection"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = "none";
       });
 
               if (!isNbaOrNcaa) {
@@ -20674,21 +20024,19 @@ window.INTEGRATION_TEST_SUITE = (() => {
     try {
 
       const ls = document.getElementById("leagueSelect");
-      if (ls) ls.value = "nba";
+      if (ls) ls.value = "epl";
       selectedTeamIds = { A: null, B: null };
       setVal("teamAName", TEAM_A);
       setVal("teamBName", TEAM_B);
-      setVal("aFTScored", "115,118,120,117,119");
-      setVal("aFTAllowed", "100,98,102,101,99");
-      setVal("bFTScored", "112,110,115,111,113");
-      setVal("bFTAllowed", "105,103,107,104,106");
+      setVal("aFTScored", "2,1,3,2,1");
+      setVal("aFTAllowed", "0,1,1,0,1");
+      setVal("bFTScored", "1,2,0,1,3");
+      setVal("bFTAllowed", "1,0,2,1,1");
 
-      setVal("ftMarket", "150.5-152.5");
-      setVal("h1Market", "");
-      setVal("teamAMarket", "");
-      setVal("teamBMarket", "");
-      setVal("q1Market", ""); setVal("q2Market", "");
-      setVal("q3Market", ""); setVal("q4Market", "");
+      setVal("ftMarket", "2.5");
+      setVal("h1Market", "1.0");
+      setVal("teamAMarket", "1.5");
+      setVal("teamBMarket", "1.5");
       g_injA = defaultInjuryMeta();
       g_injB = defaultInjuryMeta();
 
@@ -20696,14 +20044,13 @@ window.INTEGRATION_TEST_SUITE = (() => {
 
       const savedPick = (g_trackerState.activePicks || []).find(p => isTestPick(p) && p.marketKey === "ft");
       check("FT pick was saved to tracker after runEngine", !!savedPick);
-      check("Saved pick side is OVER (large positive edge expected)", getPickSideFromText(savedPick?.predictionText || "") === "over");
       check("Saved pick starts pending", savedPick?.resultStatus === "pending");
 
       if (!savedPick) {
         throw new Error("No tracked pick was produced — cannot continue to settle step.");
       }
 
-      savedPick.actualScore = "235-210"; 
+      savedPick.actualScore = "3-1"; 
       const settleOk = await applyManualSettlementToTrackedPick(savedPick.signature, "win");
       check("applyManualSettlementToTrackedPick returned true", settleOk === true);
 
