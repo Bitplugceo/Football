@@ -1,3 +1,4 @@
+A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2886,17 +2887,16 @@ const APP_BUILD_VERSION = "tracker_cleanup_v22_measurement_lab";
 const STANDALONE_BUILD_MARKER = "bb_engine_standalone_build";
 const WORKER_URL = "https://thebetceo-engine.ridwantunde636.workers.dev/";
 
-const SS_BASKETBALL_SPORT_IDS = new Set([2, 128, 129, 155, 156, 157, 158]);
+const SS_FOOTBALL_SPORT_IDS = new Set([1]);
 
-function ssIsBasketballEvent(ev) {
-  
+function ssIsFootballEvent(ev) {
   const sportSlug = String(
     ev?.tournament?.category?.sport?.slug ||
     ev?.sport?.slug ||
     ev?.category?.sport?.slug ||
     ""
   ).toLowerCase();
-  if (sportSlug && sportSlug !== "basketball") return false;
+  if (sportSlug && sportSlug !== "football" && sportSlug !== "soccer") return false;
 
   let sportId = Number(
     ev?.tournament?.category?.sport?.id ??
@@ -2908,16 +2908,7 @@ function ssIsBasketballEvent(ev) {
   if (sportId === -1 && ev?.tournament?.category?.parent?.sport?.id) {
     sportId = Number(ev.tournament.category.parent.sport.id);
   }
-  if (sportId !== -1 && !SS_BASKETBALL_SPORT_IDS.has(sportId)) return false;
-
-  if (sportSlug === "" && sportId === -1) {
-
-    const hScore = Number(ev?.homeScore?.normaltime ?? ev?.homeScore?.current ?? -1);
-    const aScore = Number(ev?.awayScore?.normaltime ?? ev?.awayScore?.current ?? -1);
-    if (isFinite(hScore) && isFinite(aScore) && hScore >= 0 && aScore >= 0) {
-      if (hScore <= 9 && aScore <= 9) return false; 
-    }
-  }
+  if (sportId !== -1 && !SS_FOOTBALL_SPORT_IDS.has(sportId)) return false;
 
   return true;
 }
@@ -2936,30 +2927,27 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
   const homeScoredList = [], homeAllowedList = [];
   const awayScoredList = [], awayAllowedList = [];
 
-  
   const h1HomeScoredList = [], h1HomeAllowedList = [];
   const h1AwayScoredList = [], h1AwayAllowedList = [];
   const h1ScoredList = [], h1AllowedList = [];
-  const h1ScoredDates = []; 
-  const q1ScoredList = [], q2ScoredList = [], q3ScoredList = [], q4ScoredList = [];
-  const q1AllowedList = [], q2AllowedList = [], q3AllowedList = [], q4AllowedList = [];
-  
-  const q1ScoredDates = [], q2ScoredDates = [], q3ScoredDates = [], q4ScoredDates = [];
+  const h1ScoredDates = [];
+  const bttsList = [];
+  const cleanSheetList = [];
 
-  const basketballEvents = events.filter(ev => ssIsBasketballEvent(ev));
-  const blockedCount = events.length - basketballEvents.length;
+  const footballEvents = events.filter(ev => ssIsFootballEvent(ev));
+  const blockedCount = events.length - footballEvents.length;
   if (blockedCount > 0) {
-    engineDebug("ssProcessTeamEvents: blocked " + blockedCount + " non-basketball events", { label, total: events.length, kept: basketballEvents.length });
+    engineDebug("ssProcessTeamEvents: blocked " + blockedCount + " non-football events", { label, total: events.length, kept: footballEvents.length });
   }
 
-  let competitionEvents = basketballEvents;
+  let competitionEvents = footballEvents;
   if (fixtureTournamentId != null) {
     const tidStr = String(fixtureTournamentId);
-    competitionEvents = basketballEvents.filter(ev => {
+    competitionEvents = footballEvents.filter(ev => {
       const evTid = ev?.tournament?.uniqueTournament?.id;
       return evTid != null && String(evTid) === tidStr;
     });
-    const crossBlocked = basketballEvents.length - competitionEvents.length;
+    const crossBlocked = footballEvents.length - competitionEvents.length;
     if (crossBlocked > 0) {
       engineDebug("ssProcessTeamEvents: blocked " + crossBlocked + " cross-competition events", { label, fixtureTournamentId, kept: competitionEvents.length });
     }
@@ -2982,34 +2970,23 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
     const myScore = isHome ? ev.homeScore : ev.awayScore;
     const oppScore = isHome ? ev.awayScore : ev.homeScore;
     if (myScore && oppScore) {
-        const myFT = Number(myScore.normaltime ?? myScore.current ?? myScore.display ?? 0);
-        const oppFT = Number(oppScore.normaltime ?? oppScore.current ?? oppScore.display ?? 0);
-      if (myFT > 0) {
+      const myFT = Number(myScore.normaltime ?? myScore.current ?? myScore.display ?? 0);
+      const oppFT = Number(oppScore.normaltime ?? oppScore.current ?? oppScore.display ?? 0);
+      if (isFinite(myFT) && isFinite(oppFT) && myFT >= 0 && oppFT >= 0) {
         scoredList.push(myFT);
         allowedList.push(oppFT);
-        const myQ1 = Number(myScore.period1 ?? 0);
-        const myQ2 = Number(myScore.period2 ?? 0);
-        const myQ3 = Number(myScore.period3 ?? 0);
-        const myQ4 = Number(myScore.period4 ?? 0);
-        const oppQ1 = Number(oppScore.period1 ?? 0);
-        const oppQ2 = Number(oppScore.period2 ?? 0);
-        const oppQ3 = Number(oppScore.period3 ?? 0);
-        const oppQ4 = Number(oppScore.period4 ?? 0);
-        
-        const _evDate = ev.startTimestamp ? new Date(ev.startTimestamp * 1000).toISOString() : null;
-            if (myQ1 + myQ2 + myQ3 + myQ4 > 0) {
-      q1ScoredList.push(myQ1); q2ScoredList.push(myQ2);
-      q3ScoredList.push(myQ3); q4ScoredList.push(myQ4);
-      q1AllowedList.push(oppQ1); q2AllowedList.push(oppQ2);
-      q3AllowedList.push(oppQ3); q4AllowedList.push(oppQ4);
-      q1ScoredDates.push(_evDate); q2ScoredDates.push(_evDate);
-      q3ScoredDates.push(_evDate); q4ScoredDates.push(_evDate);
-      if (myQ1 + myQ2 > 0) {
-        h1ScoredList.push(myQ1 + myQ2);
-        h1AllowedList.push(oppQ1 + oppQ2);
-        h1ScoredDates.push(_evDate);
-      }
-    }
+
+        const my1H = Number(myScore.period1 ?? 0);
+        const opp1H = Number(oppScore.period1 ?? 0);
+        if (isFinite(my1H) && isFinite(opp1H) && my1H >= 0 && opp1H >= 0) {
+          h1ScoredList.push(my1H);
+          h1AllowedList.push(opp1H);
+          const _evDate = ev.startTimestamp ? new Date(ev.startTimestamp * 1000).toISOString() : null;
+          h1ScoredDates.push(_evDate);
+        }
+
+        bttsList.push(myFT > 0 && oppFT > 0 ? 1 : 0);
+        cleanSheetList.push(oppFT === 0 ? 1 : 0);
       }
       engineDebug("ssProcessTeamEvents overall match #" + (idx + 1), { myFT, oppFT, isHome });
     }
@@ -3022,7 +2999,7 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
     if (myScore && oppScore) {
       const myFT = Number(myScore.normaltime ?? myScore.current ?? myScore.display ?? 0);
       const oppFT = Number(oppScore.normaltime ?? oppScore.current ?? oppScore.display ?? 0);
-      if (myFT > 0) {
+      if (isFinite(myFT) && isFinite(oppFT) && myFT >= 0 && oppFT >= 0) {
         if (isHome) {
           if (homeScoredList.length < 10) {
             homeScoredList.push(myFT);
@@ -3035,19 +3012,17 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
           }
         }
 
-        const myQ1h = Number(myScore.period1 ?? 0), myQ2h = Number(myScore.period2 ?? 0);
-        const oppQ1h = Number(oppScore.period1 ?? 0), oppQ2h = Number(oppScore.period2 ?? 0);
-        if (myQ1h + myQ2h > 0) {
-          if (isHome) {
-            if (h1HomeScoredList.length < 10) {
-              h1HomeScoredList.push(myQ1h + myQ2h);
-              h1HomeAllowedList.push(oppQ1h + oppQ2h);
-            }
-          } else {
-            if (h1AwayScoredList.length < 10) {
-              h1AwayScoredList.push(myQ1h + myQ2h);
-              h1AwayAllowedList.push(oppQ1h + oppQ2h);
-            }
+        const my1H = Number(myScore.period1 ?? 0);
+        const opp1H = Number(oppScore.period1 ?? 0);
+        if (isHome) {
+          if (h1HomeScoredList.length < 10) {
+            h1HomeScoredList.push(my1H);
+            h1HomeAllowedList.push(opp1H);
+          }
+        } else {
+          if (h1AwayScoredList.length < 10) {
+            h1AwayScoredList.push(my1H);
+            h1AwayAllowedList.push(opp1H);
           }
         }
       }
@@ -3056,15 +3031,11 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
 
   updateLeagueVolCache(document.getElementById("leagueSelect")?.value || "", scoredList);
 
-  return { scoredList, allowedList, homeScoredList, homeAllowedList, awayScoredList, awayAllowedList,
-
-           h1HomeScoredList, h1HomeAllowedList, h1AwayScoredList, h1AwayAllowedList,
-           h1ScoredList, h1AllowedList,
-
-           h1ScoredDates,
-           q1ScoredList, q2ScoredList, q3ScoredList, q4ScoredList,
-           q1AllowedList, q2AllowedList, q3AllowedList, q4AllowedList,
-           q1ScoredDates, q2ScoredDates, q3ScoredDates, q4ScoredDates };
+  return {
+    scoredList, allowedList, homeScoredList, homeAllowedList, awayScoredList, awayAllowedList,
+    h1ScoredList, h1AllowedList, h1HomeScoredList, h1HomeAllowedList, h1AwayScoredList, h1AwayAllowedList,
+    h1ScoredDates, bttsList, cleanSheetList
+  };
 }
 
 function clearPasteJSON(side) {
@@ -3099,15 +3070,15 @@ if (side === "B") { const _link1 = document.getElementById("ssTeamBLink1"); if (
 function searchSofascorePlayer(side) {
 const nameEl = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName");
 const rawName = (nameEl?.value || "").trim();
-if (!rawName) { alert("Enter a player/team name first."); return; }
+if (!rawName) { alert("Enter a team name first."); return; }
 const searchName = rawName.split(",")[0].trim();
 
-const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=basketball";
+const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=football";
 window.open(searchUrl, "_blank");
 const st = document.getElementById("ssFetchStatus");
 if (st) {
 st.style.color = "#d98a00";
-st.textContent = "🔍 Basketball-only search opened for " + side + " — find the team ID in the JSON and paste it above.";
+st.textContent = "🔍 Football-only search opened for " + side + " — find the team ID in the JSON and paste it above.";
 }
 }
 
@@ -3566,23 +3537,15 @@ function extractH2HFromPastedEvents() {
       const oppScoreObj = isAHome ? m.awayScore : m.homeScore;
       const myFT = Number(myScoreObj?.normaltime ?? myScoreObj?.current ?? myScoreObj?.display ?? 0);
       const oppFT = Number(oppScoreObj?.normaltime ?? oppScoreObj?.current ?? oppScoreObj?.display ?? 0);
-      if (myFT > 0) {
-        const mQ1 = Number(myScoreObj?.period1 ?? 0);
-        const mQ2 = Number(myScoreObj?.period2 ?? 0);
-        const mQ3 = Number(myScoreObj?.period3 ?? 0);
-        const mQ4 = Number(myScoreObj?.period4 ?? 0);
-        const oQ1 = Number(oppScoreObj?.period1 ?? 0);
-        const oQ2 = Number(oppScoreObj?.period2 ?? 0);
-        const oQ3 = Number(oppScoreObj?.period3 ?? 0);
-        const oQ4 = Number(oppScoreObj?.period4 ?? 0);
+      if (isFinite(myFT) && isFinite(oppFT) && myFT >= 0 && oppFT >= 0) {
+        const m1H = Number(myScoreObj?.period1 ?? 0);
+        const o1H = Number(oppScoreObj?.period1 ?? 0);
         newEntries.push({
           id: m.id,
           ts: m.startTimestamp || 0,
           aFT: myFT, bFT: oppFT,
-          aH1: mQ1 + mQ2, bH1: oQ1 + oQ2,
-          aQ1: mQ1, bQ1: oQ1, aQ2: mQ2, bQ2: oQ2,
-          aQ3: mQ3, bQ3: oQ3, aQ4: mQ4, bQ4: oQ4,
-          hasQ: mQ1 > 0 || mQ2 > 0
+          aH1: m1H, bH1: o1H,
+          hasH1: isFinite(m1H) && isFinite(o1H) && m1H >= 0 && o1H >= 0
         });
       }
     });
@@ -3598,16 +3561,8 @@ function extractH2HFromPastedEvents() {
     const merged = window.__h2hEntryCache;
     const h2hA = merged.map(e => e.aFT);
     const h2hB = merged.map(e => e.bFT);
-    const h2hA1H = merged.filter(e => e.hasQ).map(e => e.aH1);
-    const h2hB1H = merged.filter(e => e.hasQ).map(e => e.bH1);
-    const h2hAQ1 = merged.filter(e => e.hasQ).map(e => e.aQ1);
-    const h2hBQ1 = merged.filter(e => e.hasQ).map(e => e.bQ1);
-    const h2hAQ2 = merged.filter(e => e.hasQ).map(e => e.aQ2);
-    const h2hBQ2 = merged.filter(e => e.hasQ).map(e => e.bQ2);
-    const h2hAQ3 = merged.filter(e => e.hasQ).map(e => e.aQ3);
-    const h2hBQ3 = merged.filter(e => e.hasQ).map(e => e.bQ3);
-    const h2hAQ4 = merged.filter(e => e.hasQ).map(e => e.aQ4);
-    const h2hBQ4 = merged.filter(e => e.hasQ).map(e => e.bQ4);
+    const h2hA1H = merged.filter(e => e.hasH1).map(e => e.aH1);
+    const h2hB1H = merged.filter(e => e.hasH1).map(e => e.bH1);
 
     if (h2hA.length >= 2) {
       document.getElementById("aFTH2H").value = h2hA.join(",");
@@ -3619,19 +3574,6 @@ function extractH2HFromPastedEvents() {
         document.getElementById("b1HH2H").value = h2hB1H.join(",");
         const h1Cb = document.getElementById("use1HH2H");
         if (h1Cb) h1Cb.checked = true;
-      }
-      if (h2hAQ1.length >= 2) {
-        document.getElementById("aQ1H2H").value = h2hAQ1.join(",");
-        document.getElementById("bQ1H2H").value = h2hBQ1.join(",");
-        document.getElementById("aQ2H2H").value = h2hAQ2.join(",");
-        document.getElementById("bQ2H2H").value = h2hBQ2.join(",");
-        document.getElementById("aQ3H2H").value = h2hAQ3.join(",");
-        document.getElementById("bQ3H2H").value = h2hBQ3.join(",");
-        document.getElementById("aQ4H2H").value = h2hAQ4.join(",");
-        document.getElementById("bQ4H2H").value = h2hBQ4.join(",");
-        ["useQ1H2H","useQ2H2H","useQ3H2H","useQ4H2H"].forEach(id => {
-          const cb = document.getElementById(id); if (cb) cb.checked = true;
-        });
       }
       syncAllH2HCheckboxes(false);
 
