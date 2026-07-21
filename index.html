@@ -23,18 +23,22 @@
       window.addEventListener("load", function () {
         navigator.serviceWorker.register("sw.js?v=tracker_cleanup_v22_measurement_lab")
           .then(function (reg) {
-            console.log("[ServiceWorker] Registered successfully", reg.scope);
+            if (typeof engineDebug === "function") {
+              engineDebug("Service worker registered", { scope: reg.scope });
+            }
           })
           .catch(function (err) {
-            console.warn("[ServiceWorker] Registration skipped (non-fatal):", err?.message || String(err));
+            if (typeof engineDebug === "function") {
+              engineDebug("Service worker registration failed (non-fatal)", { error: err?.message || String(err) });
+            }
           });
       });
     }
   </script>
 
-  <title>Football Prediction Engine</title>
+  <title>Basketball Prediction Engine</title>
 
-<style>
+  <style>
 :root {
   --bg: #efefef;
   --text: #1f2430;
@@ -2488,7 +2492,7 @@ body.dark-mode .tracker-analytics-section-head {
 
   <span class="brand-right">
 
-    <button class="theme-toggle" type="button" id="themeToggleBtn" title="Toggle dark/light mode">⚽</button>
+    <button class="theme-toggle" type="button" id="themeToggleBtn" title="Toggle dark/light mode">🏀</button>
     <button class="theme-toggle" type="button" id="trackerToggleBtn" title="Open tracked picks">📊</button>
     <button class="theme-toggle" type="button" id="afdbBtn" title="Auto-Fetch Debugger" onclick="if(typeof AFDB!=='undefined'&&AFDB.open)AFDB.open()">🔬</button>
     
@@ -2503,52 +2507,215 @@ body.dark-mode .tracker-analytics-section-head {
   <label>Select League</label>
   <select id="leagueSelect" class="league-box">
     <option value="">- Select League -</option>
-    <optgroup label="── TOP EUROPEAN LEAGUES ──">
-      <option value="epl">England - Premier League</option>
-      <option value="championship">England - Championship</option>
-      <option value="la_liga">Spain - La Liga</option>
-      <option value="la_liga2">Spain - Segunda División</option>
-      <option value="serie_a">Italy - Serie A</option>
-      <option value="serie_b">Italy - Serie B</option>
-      <option value="bundesliga">Germany - Bundesliga</option>
-      <option value="bundesliga2">Germany - 2. Bundesliga</option>
-      <option value="ligue1">France - Ligue 1</option>
-      <option value="ligue2">France - Ligue 2</option>
-      <option value="eredivisie">Netherlands - Eredivisie</option>
-      <option value="primeira_liga">Portugal - Primeira Liga</option>
-      <option value="pro_league">Belgium - Pro League</option>
-      <option value="super_lig">Turkiye - Süper Lig</option>
-      <option value="scottish_prem">Scotland - Premiership</option>
+    <optgroup label="── A ──────────────────">
+      <option value="aba">ABA - Liga ABA (International)</option>
+      <option value="acb">ACB - Spain (Liga ACB)</option>
+      <option value="argentina_lnb">Argentina - LNB</option>
+      <option value="ausnbl">Australia - NBL</option>
+      <option value="aus_nbl1_east">Australia - NBL1, East</option>
+      <option value="aus_nbl1_north">Australia - NBL1, North</option>
+      <option value="aus_nbl1_south">Australia - NBL1, South</option>
+      <option value="aus_nbl1_west">Australia - NBL1, West</option>
+      <option value="aus_nbl1_central">Australia - NBL1, Central</option>
+      <option value="aus_nbl1_east_w">Australia - NBL1 East, Women</option>
+      <option value="aus_nbl1_north_w">Australia - NBL1 North, Women</option>
+      <option value="aus_nbl1_south_w">Australia - NBL1 South, Women</option>
+      <option value="aus_nbl1_west_w">Australia - NBL1 West, Women</option>
+      <option value="aus_nbl1_central_w">Australia - NBL1 Central, Women</option>
+      <option value="aus_big_v">Australia - Big V</option>
+      <option value="aus_big_v_w">Australia - Big V, Women</option>
+      <option value="austria_superliga">Austria - Superliga</option>
+      <option value="austria_zweite">Austria - Zweite Liga</option>
     </optgroup>
-    <optgroup label="── INTERNATIONAL & CLUB CUPS ──">
-      <option value="ucl">UEFA - Champions League</option>
-      <option value="uel">UEFA - Europa League</option>
-      <option value="uecl">UEFA - Conference League</option>
-      <option value="fifa_wc">FIFA - World Cup / Qualifiers</option>
-      <option value="euro_comp">UEFA - European Championship</option>
+    <optgroup label="── B ──────────────────">
+      <option value="bal">BAL - Basketball Africa League</option>
+      <option value="bbl">BBL - Germany</option>
+      <option value="belgium_top">Belgium - Top Division 1</option>
+      <option value="bih_1st">Bosnia &amp; Herzegovina - 1st Division</option>
+      <option value="bnxt">BNXT League (Intl)</option>
+      <option value="brazil_nbb">Brazil - NBB</option>
+      <option value="brazil_lbf_w">Brazil - LBF Women</option>
+      <option value="bulgaria_nbl">Bulgaria - NBL</option>
     </optgroup>
-    <optgroup label="── AMERICAS & AFRICA & ASIA ──">
-      <option value="npfl">Nigeria - NPFL</option>
-      <option value="mls">USA - MLS</option>
-      <option value="brasileirao">Brazil - Série A</option>
-      <option value="argentina_lp">Argentina - Liga Profesional</option>
-      <option value="saudi_pro">Saudi Arabia - Pro League</option>
+    <optgroup label="── C ──────────────────">
+      <option value="cba">CBA - China</option>
+      <option value="cebl">CEBL - Canada</option>
+      <option value="chile_lnb">Chile - Liga Nacional</option>
+      <option value="chile_lnb2">Chile - LNB 2</option>
+      <option value="china_nbl">China - NBL</option>
+
+      <option value="croatia_premier">Croatia - Premijer Liga</option>
+      <option value="cyprus_div_a">Cyprus - Division A</option>
+      <option value="nbl_cz">Czech Republic - NBL</option>
     </optgroup>
-    <optgroup label="── OTHER ──">
-      <option value="other_football">Other Football League</option>
+    <optgroup label="── D ──────────────────">
+      <option value="denmark_bliga">Denmark - Basketligaen</option>
+    </optgroup>
+    <optgroup label="── E ──────────────────">
+      <option value="el_salvador_lmb">El Salvador - Liga Mayor</option>
+      <option value="england_slb">England - SLB</option>
+      <option value="england_slb_w">England - SLB Women</option>
+      <option value="estonia_kml">Estonia - KML</option>
+      <option value="eurocup">EuroCup (Intl)</option>
+      <option value="euroleague">EuroLeague (Intl)</option>
+      <option value="champions_league">Champions League (Intl)</option>
+    </optgroup>
+    <optgroup label="── F ──────────────────">
+      <option value="fiba_ac">FIBA - AmeriCup</option>
+      <option value="fiba_eb">FIBA - EuroBasket</option>
+      
+      <option value="fiba_u20eb_a">FIBA - U20 EuroBasket, Div. A</option>
+      <option value="fiba_u20eb_b">FIBA - U20 EuroBasket, Div. B</option>
+      <option value="fiba_wc">FIBA - World Cup</option>
+      <option value="finland_koris">Finland - Korisliiga</option>
+      <option value="proa">France - Pro A</option>
+      <option value="prob">France - Pro B</option>
+      <option value="france_lfb_w">France - LFB Women</option>
+    </optgroup>
+    <optgroup label="── G ──────────────────">
+      <option value="georgia_super">Georgia - Superleague</option>
+      <option value="germany_proa">Germany - Pro A</option>
+      <option value="gb_super_league_w">Great Britain - Super League Women</option>
+      <option value="bcl">Greece - Basketball League</option>
+    </optgroup>
+    <optgroup label="── H ──────────────────">
+      <option value="hungary_nb1">Hungary - NB I. A</option>
+    </optgroup>
+    <optgroup label="── I ──────────────────">
+      <option value="iceland_urvalsdeild">Iceland - Urvalsdeild</option>
+      <option value="iceland_urvalsdeild_w">Iceland - Urvalsdeild Women</option>
+      <option value="iceland_1st">Iceland - First Division</option>
+      <option value="indonesia_ibl">Indonesia - IBL</option>
+      <option value="isl">Israel - Super League</option>
+      <option value="lba">Italy - Serie A</option>
+      <option value="italy_a2">Italy - Serie A2</option>
+      <option value="italy_serb">Italy - Serie B</option>
+      <option value="italy_a1_w">Italy - A1 Women</option>
+      <option value="italy_a2_w">Italy - Serie A2 Women</option>
+    </optgroup>
+    <optgroup label="── J ──────────────────">
+      <option value="bleague">Japan - B1 League</option>
+    </optgroup>
+    <optgroup label="── K ──────────────────">
+      <option value="korea_kbl">Korea - KBL</option>
+    </optgroup>
+    <optgroup label="── L ──────────────────">
+      <option value="latvia_lbl">Latvia - LBL</option>
+      <option value="lebanon_1st">Lebanon - First Division</option>
+      <option value="lkl">Lithuania - LKL</option>
+    </optgroup>
+    <optgroup label="── M ──────────────────">
+      <option value="mexico_cibacopa">Mexico - CIBACOPA</option>
+      <option value="mexico_lnbp">Mexico - LNBP</option>
+    </optgroup>
+    <optgroup label="── N ──────────────────">
+
+      <option value="nba">NBA - USA</option>
+      <option value="nznbl">New Zealand - NBL</option>
+    </optgroup>
+    <optgroup label="── P ──────────────────">
+      <option value="pba">Philippines - PBA (Philippine Cup)</option>
+      <option value="phil_mpbl">Philippines - MPBL</option>
+      <option value="plk">Poland - PLK</option>
+      <option value="poland_1liga">Poland - 1. Liga</option>
+      <option value="portugal_lpb">Portugal - LPB</option>
+      <option value="portugal_proliga">Portugal - Proliga</option>
+      <option value="portugal_taca">Portugal - Taca da Liga</option>
+      <option value="portugal_lfb_w">Portugal - Liga Feminina</option>
+      <option value="puerto_rico_bsn">Puerto Rico - BSN</option>
+    </optgroup>
+    <optgroup label="── R ──────────────────">
+      <option value="romania_ln">Romania - Liga Nationala</option>
+      <option value="rwanda">Rwanda - Basketball League</option>
+    </optgroup>
+    <optgroup label="── S ──────────────────">
+      <option value="serbia_kls">Serbia - KLS</option>
+      <option value="slovenia_1a">Slovenia - 1. A SKL</option>
+      <option value="spain_primera">Spain - Primera FEB</option>
+      <option value="spain_segunda">Spain - Segunda FEB</option>
+      <option value="sweden_sbl">Sweden - SBL</option>
+      <option value="swiss_sbl">Switzerland - SB League</option>
+    </optgroup>
+    <optgroup label="── T ──────────────────">
+      <option value="taipei_tpbl">Taiwan - TPBL / P. League+</option>
+      <option value="turkey_bsl">Turkiye - Super Lig</option>
+      <option value="turkey_tbl">Turkiye - TBL</option>
+      <option value="turkey_tb2l">Turkiye - TB2L</option>
+    </optgroup>
+    <optgroup label="── U ──────────────────">
+      <option value="united_league">United League (Intl)</option>
+      <option value="uruguay_lub">Uruguay - LUB</option>
+      <option value="uruguay_lfb_w">Uruguay - LFB Women</option>
+
+      <option value="nba">USA - NBA</option>
+      
+      <option value="nba_summer">USA - NBA Summer League</option>
+      <option value="nba_gl">USA - NBA G League</option>
+      <option value="ncaa">USA - NCAA Men's</option>
+      <option value="ncaaw">USA - NCAA Women's</option>
+      <option value="wnba">USA - WNBA</option>
+      <option value="wnba_pre">USA - WNBA Preseason</option>
+    </optgroup>
+    <optgroup label="── V ──────────────────">
+      <option value="venezuela_sl">Venezuela - SuperLiga</option>
+    </optgroup>
+    <optgroup label="── Z ──────────────────">
+      <option value="unknown">Other / Mixed League</option>
     </optgroup>
   </select>
 </div>
 
-<div class="section" id="sofascoreManualSection">
-  <h3>⚽ SofaScore Data Paste <span style="font-size:11px;color:#aaa;">(Manual Football JSON Paste)</span></h3>
+<div class="section" id="espnSection">
+  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(NBA · WNBA · NCAA Men's · NCAA Women's · NBA G League)</span></h3>
+
+  <div id="fixtureToolbar" class="fixture-toolbar">
+    <button type="button" class="fixture-day active" id="fixturesTodayBtn">Today</button>
+    <button type="button" class="fixture-day" id="fixturesTomorrowBtn">Tomorrow</button>
+  </div>
+
+<label id="fixtureSelectLabel" style="font-size:12px;">Select match</label>
+<select id="fixtureSelect" class="league-box">
+
+<option value="">- Select match -</option>
+</select>
+
+<label id="teamALabel" style="font-size:12px;">Team A Name (Home)</label>
+
+  <div class="autocomplete-wrap">
+    <input id="teamAName" placeholder="e.g. Lakers" autocomplete="off" />
+    <div class="autocomplete-list" id="dropA"></div>
+  </div>
+
+<label id="teamBLabel" style="font-size:12px;margin-top:6px;">Team B Name (Away)</label>
+
+  <div class="autocomplete-wrap">
+    <input id="teamBName" placeholder="e.g. Celtics" autocomplete="off" />
+    <div class="autocomplete-list" id="dropB"></div>
+  </div>
+
+<button class="fetch-btn" id="fetchBtn" type="button">📡 Fetch Stats</button>
+
+  <div id="fetchStatus"></div>
+
+  <div class="injury-box" id="injuryBoxA">
+    <div class="inj-title">Team A - Injury Report</div>
+    <div id="injuryContentA"></div>
+  </div>
+
+  <div class="injury-box" id="injuryBoxB">
+    <div class="inj-title">Team B - Injury Report</div>
+    <div id="injuryContentB"></div>
+  </div>
+</div>
+<div class="section" id="sofascoreManualSection" style="display:none;">
+  <h3>🔍 Player Lookup <span style="font-size:11px;color:#aaa;">(Manual leagues — SofaScore)</span></h3>
 
   <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
-    <label>Team A Name (Home)</label>
+    <label>Player A Name (Home)</label>
     <div style="display:flex;gap:6px;margin-bottom:4px;">
-      <input id="ssTeamAName" placeholder="Team A (e.g. Arsenal)" style="margin-bottom:0;flex:1;" />
+      <input id="ssTeamAName" placeholder="Player / Team A" style="margin-bottom:0;flex:1;" />
       <input id="ssPasteA" placeholder="Paste JSON A" oninput="parseSofascoreIndividual('A')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-      <button type="button" onclick="searchSofascorePlayer('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team">🔍</button>
+      <button type="button" onclick="searchSofascorePlayer('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search basketball team">🔍</button>
       <button type="button" onclick="clearPasteJSON('A')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -2558,11 +2725,11 @@ body.dark-mode .tracker-analytics-section-head {
   </div>
 
   <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
-    <label>Team B Name (Away)</label>
+    <label>Player B Name (Away)</label>
     <div style="display:flex;gap:6px;margin-bottom:4px;">
-      <input id="ssTeamBName" placeholder="Team B (e.g. Chelsea)" style="margin-bottom:0;flex:1;" />
+      <input id="ssTeamBName" placeholder="Player / Team B" style="margin-bottom:0;flex:1;" />
       <input id="ssPasteB" placeholder="Paste JSON B" oninput="parseSofascoreIndividual('B')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-      <button type="button" onclick="searchSofascorePlayer('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team">🔍</button>
+      <button type="button" onclick="searchSofascorePlayer('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search basketball team">🔍</button>
       <button type="button" onclick="clearPasteJSON('B')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -2575,7 +2742,7 @@ body.dark-mode .tracker-analytics-section-head {
   <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--panel-border);">
     <label style="font-size:11px;font-weight:800;">Tournament ID <span style="color:var(--muted);font-weight:600;">(auto-detected from paste · enter manually to override)</span></label>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-      <input id="ssTournamentId" placeholder="e.g. 17" style="margin-bottom:0;font-size:11px;padding:4px 6px;width:180px;flex-shrink:0;" oninput="onTournamentIdInput()" />
+      <input id="ssTournamentId" placeholder="e.g. 12345" style="margin-bottom:0;font-size:11px;padding:4px 6px;width:180px;flex-shrink:0;" oninput="onTournamentIdInput()" />
       <span id="ssTournamentName" style="font-size:10px;font-weight:800;color:var(--muted);"></span>
     </div>
   </div>
@@ -2585,14 +2752,40 @@ body.dark-mode .tracker-analytics-section-head {
   <h3>Market Lines</h3>
 
   <div id="ftH1MarketRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-    <div><label id="ftMarketLabel">FT Total Goals</label><input id="ftMarket" placeholder="2.5 (e.g. 2.25 - 2.75)" /></div>
-    <div id="h1MarketSection"><label>1H Total Goals</label><input id="h1Market" placeholder="0.75 - 1.25" /></div>
+    <div><label id="ftMarketLabel">FT Total</label><input id="ftMarket" placeholder="150.5 - 160.5" /></div>
+    <div id="h1MarketSection"><label>1H Total</label><input id="h1Market" placeholder="75.5 - 85.5" /></div>
   </div>
 
   <div id="teamMarketSection" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
-    <div><label id="teamAMarketLabel">Team A Total Goals</label><input id="teamAMarket" placeholder="1.25 - 1.75" /></div>
-    <div><label id="teamBMarketLabel">Team B Total Goals</label><input id="teamBMarket" placeholder="0.75 - 1.25" /></div>
+    <div><label id="teamAMarketLabel">Team A Total</label><input id="teamAMarket" placeholder="75.5 - 79.5" /></div>
+    <div><label id="teamBMarketLabel">Team B Total</label><input id="teamBMarket" placeholder="75.5 - 79.5" /></div>
   </div>
+
+      <div id="q1q2MarketSection" style="display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+      <div><label>Q1 Total</label><input id="q1Market" placeholder="45.5 - 55.5" /></div>
+      <div><label>Q2 Total</label><input id="q2Market" placeholder="45.5 - 55.5" /></div>
+    </div>
+    
+    <div id="q3q4MarketSection" style="display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+      <div><label>Q3 Total</label><input id="q3Market" placeholder="45.5 - 55.5" /></div>
+      <div><label>Q4 Total</label><input id="q4Market" placeholder="45.5 - 55.5" /></div>
+    </div>
+
+  <div id="h1TeamMarketSection" style="display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+    <div><label>1H Team A</label><input id="h1TeamAMarket" placeholder="52.5" /></div>
+    <div><label>1H Team B</label><input id="h1TeamBMarket" placeholder="53.5" /></div>
+  </div>
+
+  <div id="highLowQMarketSection" style="display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+    <div><label>Highest Q Total</label><input id="highQTotalMarket" placeholder="62.5 - 65.5" /></div>
+    <div><label>Lowest Q Total</label><input id="lowQTotalMarket" placeholder="32.5 - 35.5" /></div>
+  </div>
+
+  <div id="q1TeamMarketSection" style="display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+    <div><label>Q1 Team A</label><input id="q1TeamAMarket" placeholder="25.5 - 29.5" /></div>
+    <div><label>Q1 Team B</label><input id="q1TeamBMarket" placeholder="26.5 - 30.5" /></div>
+  </div>
+
 </div>
 
 <div class="section" id="teamASection">
@@ -2600,27 +2793,42 @@ body.dark-mode .tracker-analytics-section-head {
 
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
     <div>
-      <label id="aFTScoredLabel">FT Goals Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-      <input id="aFTScored" placeholder="2,1,3,0,2,1,4,1,2,0" />
+      <label id="aFTScoredLabel">FT Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
+      <input id="aFTScored" placeholder="85,79,88,74,82,92,76,80,86,90" />
     </div>
     <div id="aFTAllowedSection">
-      <label id="aFTAllowedLabel">FT Goals Conceded</label>
-      <input id="aFTAllowed" placeholder="1,0,2,1,1,2,0,1,1,2" />
+      <label id="aFTAllowedLabel">FT Allowed</label>
+      <input id="aFTAllowed" placeholder="80,76,84,72,79,88,70,83,85,75" />
     </div>
   </div>
 
-  <div id="a1HSection" style="margin-top: 6px;">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+    <div id="a1HSection" style="display:none;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
       <div>
-        <label id="a1HScoredLabel">1H Goals Scored</label>
-        <input id="a1HScored" placeholder="1,0,1,0,1,0,2,0,1,0" />
+        <label id="a1HScoredLabel">1H Scored</label>
+        <input id="a1HScored" placeholder="42,38,45,40,41,43,39,44,37,42" />
       </div>
       <div>
-        <label>1H Goals Conceded</label>
-        <input id="a1HAllowed" placeholder="0,0,1,0,0,1,0,1,0,1" />
+        <label>1H Allowed</label>
+        <input id="a1HAllowed" placeholder="39,36,41,35,38,40,37,42,36,39" />
       </div>
     </div>
   </div>
+
+  <div id="aQSection" style="display:none; margin-top: 6px;">
+    <label style="color:var(--muted); text-transform:uppercase; font-size:10px; margin-bottom:8px; display:block;">Quarter-by-Quarter Form</label>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+      <div><label>Q1 Scored</label><input id="aQ1Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q1 Allowed</label><input id="aQ1Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+      <div><label>Q2 Scored</label><input id="aQ2Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q2 Allowed</label><input id="aQ2Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+      <div><label>Q3 Scored</label><input id="aQ3Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q3 Allowed</label><input id="aQ3Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+      <div><label>Q4 Scored</label><input id="aQ4Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q4 Allowed</label><input id="aQ4Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+    </div>
+  </div>
+
 </div>
 
 <div class="section" id="teamBSection">
@@ -2628,45 +2836,97 @@ body.dark-mode .tracker-analytics-section-head {
 
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
     <div>
-      <label id="bFTScoredLabel">FT Goals Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-      <input id="bFTScored" placeholder="1,2,0,1,3,1,0,2,1,1" />
+      <label id="bFTScoredLabel">FT Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
+      <input id="bFTScored" placeholder="83,77,81,79,80,85,82,78,90,86" />
     </div>
     <div id="bFTAllowedSection">
-      <label id="bFTAllowedLabel">FT Goals Conceded</label>
-      <input id="bFTAllowed" placeholder="0,1,1,2,0,1,2,0,1,1" />
+      <label id="bFTAllowedLabel">FT Allowed</label>
+      <input id="bFTAllowed" placeholder="78,80,77,76,81,84,79,85,75,82" />
     </div>
   </div>
 
-  <div id="b1HSection" style="margin-top: 6px;">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+    <div id="b1HSection" style="display:none;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
       <div>
-        <label id="b1HScoredLabel">1H Goals Scored</label>
-        <input id="b1HScored" placeholder="0,1,0,0,1,1,0,1,0,0" />
+        <label id="b1HScoredLabel">1H Scored</label>
+        <input id="b1HScored" placeholder="40,39,42,38,41,43,40,44,37,42" />
       </div>
       <div>
-        <label>1H Goals Conceded</label>
-        <input id="b1HAllowed" placeholder="0,0,1,1,0,0,1,0,0,1" />
+        <label>1H Allowed</label>
+        <input id="b1HAllowed" placeholder="38,39,37,36,40,41,38,42,35,39" />
       </div>
     </div>
   </div>
+
+  <div id="bQSection" style="display:none; margin-top: 6px;">
+    <label style="color:var(--muted); text-transform:uppercase; font-size:10px; margin-bottom:8px; display:block;">Quarter-by-Quarter Form</label>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+      <div><label>Q1 Scored</label><input id="bQ1Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q1 Allowed</label><input id="bQ1Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+      <div><label>Q2 Scored</label><input id="bQ2Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q2 Allowed</label><input id="bQ2Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+      <div><label>Q3 Scored</label><input id="bQ3Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q3 Allowed</label><input id="bQ3Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+      <div><label>Q4 Scored</label><input id="bQ4Scored" placeholder="22,19,25,18,20,21,17,24,19,22" /></div>
+      <div><label>Q4 Allowed</label><input id="bQ4Allowed" placeholder="20,18,22,17,21,19,16,23,18,20" /></div>
+    </div>
+  </div>
+
 </div>
 
 <div class="section" id="h2hSection">
-  <h3>H2H TEST <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled (decay-weighted)</span></h3>
+  <h3>H2H TEST <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled (2022+, decay-weighted, OT stripped)</span></h3>
 
-  <label id="useFTH2HLabel"><input type="checkbox" id="useFTH2H" /> Use FT Goals H2H (min 2 games)</label>
+  <label id="useFTH2HLabel"><input type="checkbox" id="useFTH2H" /> Use FT H2H (min 2 games)</label>
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-    <input id="aFTH2H" placeholder="2,1,3,0,1" />
-    <input id="bFTH2H" placeholder="1,1,0,2,0" />
+    <input id="aFTH2H" placeholder="82,78,84,76,82" />
+    <input id="bFTH2H" placeholder="79,81,77,80,78" />
   </div>
 
-  <div id="h2h1HSection" style="margin-top: 6px;">
-    <label id="use1HH2HLabel"><input type="checkbox" id="use1HH2H" /> Use 1H Goals H2H (min 2 games)</label>
+  <div id="h2h1HSection" style="display:none; margin-top: 6px;">
+    <label id="use1HH2HLabel"><input type="checkbox" id="use1HH2H" /> Use 1H H2H (min 2 games)</label>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-      <input id="a1HH2H" placeholder="1,0,1,0,0" />
-      <input id="b1HH2H" placeholder="0,1,0,1,0" />
+      <input id="a1HH2H" placeholder="41,39,43,38,41" />
+      <input id="b1HH2H" placeholder="39,41,38,42,39" />
     </div>
   </div>
+
+  <div id="h2hQSection" style="display:none; margin-top: 10px; border-top: 1px solid var(--panel-border); padding-top: 10px;">
+    <label style="color:var(--muted); text-transform:uppercase; font-size:10px; margin-bottom:8px; display:block;">H2H Quarter Breakdown</label>
+    
+    <div style="margin-top:4px;">
+      <label><input type="checkbox" id="useQ1H2H" /> Use Q1 H2H</label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+        <input id="aQ1H2H" placeholder="22,19,25,18,20" />
+        <input id="bQ1H2H" placeholder="20,18,22,17,21" />
+      </div>
+    </div>
+
+    <div style="margin-top:6px;">
+      <label><input type="checkbox" id="useQ2H2H" /> Use Q2 H2H</label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+        <input id="aQ2H2H" placeholder="22,19,25,18,20" />
+        <input id="bQ2H2H" placeholder="20,18,22,17,21" />
+      </div>
+    </div>
+
+    <div style="margin-top:6px;">
+      <label><input type="checkbox" id="useQ3H2H" /> Use Q3 H2H</label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+        <input id="aQ3H2H" placeholder="22,19,25,18,20" />
+        <input id="bQ3H2H" placeholder="20,18,22,17,21" />
+      </div>
+    </div>
+
+    <div style="margin-top:6px;">
+      <label><input type="checkbox" id="useQ4H2H" /> Use Q4 H2H</label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+        <input id="aQ4H2H" placeholder="22,19,25,18,20" />
+        <input id="bQ4H2H" placeholder="20,18,22,17,21" />
+      </div>
+    </div>
+  </div>
+
 </div>
 
   </div>
@@ -2882,16 +3142,17 @@ const APP_BUILD_VERSION = "tracker_cleanup_v22_measurement_lab";
 const STANDALONE_BUILD_MARKER = "bb_engine_standalone_build";
 const WORKER_URL = "https://thebetceo-engine.ridwantunde636.workers.dev/";
 
-const SS_FOOTBALL_SPORT_IDS = new Set([1]);
+const SS_BASKETBALL_SPORT_IDS = new Set([2, 128, 129, 155, 156, 157, 158]);
 
-function ssIsFootballEvent(ev) {
+function ssIsBasketballEvent(ev) {
+  
   const sportSlug = String(
     ev?.tournament?.category?.sport?.slug ||
     ev?.sport?.slug ||
     ev?.category?.sport?.slug ||
     ""
   ).toLowerCase();
-  if (sportSlug && sportSlug !== "football" && sportSlug !== "soccer") return false;
+  if (sportSlug && sportSlug !== "basketball") return false;
 
   let sportId = Number(
     ev?.tournament?.category?.sport?.id ??
@@ -2903,7 +3164,16 @@ function ssIsFootballEvent(ev) {
   if (sportId === -1 && ev?.tournament?.category?.parent?.sport?.id) {
     sportId = Number(ev.tournament.category.parent.sport.id);
   }
-  if (sportId !== -1 && !SS_FOOTBALL_SPORT_IDS.has(sportId)) return false;
+  if (sportId !== -1 && !SS_BASKETBALL_SPORT_IDS.has(sportId)) return false;
+
+  if (sportSlug === "" && sportId === -1) {
+
+    const hScore = Number(ev?.homeScore?.normaltime ?? ev?.homeScore?.current ?? -1);
+    const aScore = Number(ev?.awayScore?.normaltime ?? ev?.awayScore?.current ?? -1);
+    if (isFinite(hScore) && isFinite(aScore) && hScore >= 0 && aScore >= 0) {
+      if (hScore <= 9 && aScore <= 9) return false; 
+    }
+  }
 
   return true;
 }
@@ -2922,27 +3192,30 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
   const homeScoredList = [], homeAllowedList = [];
   const awayScoredList = [], awayAllowedList = [];
 
+  
   const h1HomeScoredList = [], h1HomeAllowedList = [];
   const h1AwayScoredList = [], h1AwayAllowedList = [];
   const h1ScoredList = [], h1AllowedList = [];
-  const h1ScoredDates = [];
-  const bttsList = [];
-  const cleanSheetList = [];
+  const h1ScoredDates = []; 
+  const q1ScoredList = [], q2ScoredList = [], q3ScoredList = [], q4ScoredList = [];
+  const q1AllowedList = [], q2AllowedList = [], q3AllowedList = [], q4AllowedList = [];
+  
+  const q1ScoredDates = [], q2ScoredDates = [], q3ScoredDates = [], q4ScoredDates = [];
 
-  const footballEvents = events.filter(ev => ssIsFootballEvent(ev));
-  const blockedCount = events.length - footballEvents.length;
+  const basketballEvents = events.filter(ev => ssIsBasketballEvent(ev));
+  const blockedCount = events.length - basketballEvents.length;
   if (blockedCount > 0) {
-    engineDebug("ssProcessTeamEvents: blocked " + blockedCount + " non-football events", { label, total: events.length, kept: footballEvents.length });
+    engineDebug("ssProcessTeamEvents: blocked " + blockedCount + " non-basketball events", { label, total: events.length, kept: basketballEvents.length });
   }
 
-  let competitionEvents = footballEvents;
+  let competitionEvents = basketballEvents;
   if (fixtureTournamentId != null) {
     const tidStr = String(fixtureTournamentId);
-    competitionEvents = footballEvents.filter(ev => {
+    competitionEvents = basketballEvents.filter(ev => {
       const evTid = ev?.tournament?.uniqueTournament?.id;
       return evTid != null && String(evTid) === tidStr;
     });
-    const crossBlocked = footballEvents.length - competitionEvents.length;
+    const crossBlocked = basketballEvents.length - competitionEvents.length;
     if (crossBlocked > 0) {
       engineDebug("ssProcessTeamEvents: blocked " + crossBlocked + " cross-competition events", { label, fixtureTournamentId, kept: competitionEvents.length });
     }
@@ -2965,23 +3238,34 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
     const myScore = isHome ? ev.homeScore : ev.awayScore;
     const oppScore = isHome ? ev.awayScore : ev.homeScore;
     if (myScore && oppScore) {
-      const myFT = Number(myScore.normaltime ?? myScore.current ?? myScore.display ?? 0);
-      const oppFT = Number(oppScore.normaltime ?? oppScore.current ?? oppScore.display ?? 0);
-      if (isFinite(myFT) && isFinite(oppFT) && myFT >= 0 && oppFT >= 0) {
+        const myFT = Number(myScore.normaltime ?? myScore.current ?? myScore.display ?? 0);
+        const oppFT = Number(oppScore.normaltime ?? oppScore.current ?? oppScore.display ?? 0);
+      if (myFT > 0) {
         scoredList.push(myFT);
         allowedList.push(oppFT);
-
-        const my1H = Number(myScore.period1 ?? 0);
-        const opp1H = Number(oppScore.period1 ?? 0);
-        if (isFinite(my1H) && isFinite(opp1H) && my1H >= 0 && opp1H >= 0) {
-          h1ScoredList.push(my1H);
-          h1AllowedList.push(opp1H);
-          const _evDate = ev.startTimestamp ? new Date(ev.startTimestamp * 1000).toISOString() : null;
-          h1ScoredDates.push(_evDate);
-        }
-
-        bttsList.push(myFT > 0 && oppFT > 0 ? 1 : 0);
-        cleanSheetList.push(oppFT === 0 ? 1 : 0);
+        const myQ1 = Number(myScore.period1 ?? 0);
+        const myQ2 = Number(myScore.period2 ?? 0);
+        const myQ3 = Number(myScore.period3 ?? 0);
+        const myQ4 = Number(myScore.period4 ?? 0);
+        const oppQ1 = Number(oppScore.period1 ?? 0);
+        const oppQ2 = Number(oppScore.period2 ?? 0);
+        const oppQ3 = Number(oppScore.period3 ?? 0);
+        const oppQ4 = Number(oppScore.period4 ?? 0);
+        
+        const _evDate = ev.startTimestamp ? new Date(ev.startTimestamp * 1000).toISOString() : null;
+            if (myQ1 + myQ2 + myQ3 + myQ4 > 0) {
+      q1ScoredList.push(myQ1); q2ScoredList.push(myQ2);
+      q3ScoredList.push(myQ3); q4ScoredList.push(myQ4);
+      q1AllowedList.push(oppQ1); q2AllowedList.push(oppQ2);
+      q3AllowedList.push(oppQ3); q4AllowedList.push(oppQ4);
+      q1ScoredDates.push(_evDate); q2ScoredDates.push(_evDate);
+      q3ScoredDates.push(_evDate); q4ScoredDates.push(_evDate);
+      if (myQ1 + myQ2 > 0) {
+        h1ScoredList.push(myQ1 + myQ2);
+        h1AllowedList.push(oppQ1 + oppQ2);
+        h1ScoredDates.push(_evDate);
+      }
+    }
       }
       engineDebug("ssProcessTeamEvents overall match #" + (idx + 1), { myFT, oppFT, isHome });
     }
@@ -2994,7 +3278,7 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
     if (myScore && oppScore) {
       const myFT = Number(myScore.normaltime ?? myScore.current ?? myScore.display ?? 0);
       const oppFT = Number(oppScore.normaltime ?? oppScore.current ?? oppScore.display ?? 0);
-      if (isFinite(myFT) && isFinite(oppFT) && myFT >= 0 && oppFT >= 0) {
+      if (myFT > 0) {
         if (isHome) {
           if (homeScoredList.length < 10) {
             homeScoredList.push(myFT);
@@ -3007,17 +3291,19 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
           }
         }
 
-        const my1H = Number(myScore.period1 ?? 0);
-        const opp1H = Number(oppScore.period1 ?? 0);
-        if (isHome) {
-          if (h1HomeScoredList.length < 10) {
-            h1HomeScoredList.push(my1H);
-            h1HomeAllowedList.push(opp1H);
-          }
-        } else {
-          if (h1AwayScoredList.length < 10) {
-            h1AwayScoredList.push(my1H);
-            h1AwayAllowedList.push(opp1H);
+        const myQ1h = Number(myScore.period1 ?? 0), myQ2h = Number(myScore.period2 ?? 0);
+        const oppQ1h = Number(oppScore.period1 ?? 0), oppQ2h = Number(oppScore.period2 ?? 0);
+        if (myQ1h + myQ2h > 0) {
+          if (isHome) {
+            if (h1HomeScoredList.length < 10) {
+              h1HomeScoredList.push(myQ1h + myQ2h);
+              h1HomeAllowedList.push(oppQ1h + oppQ2h);
+            }
+          } else {
+            if (h1AwayScoredList.length < 10) {
+              h1AwayScoredList.push(myQ1h + myQ2h);
+              h1AwayAllowedList.push(oppQ1h + oppQ2h);
+            }
           }
         }
       }
@@ -3026,11 +3312,15 @@ function ssProcessTeamEvents(events, teamId, label, fixtureTournamentId) {
 
   updateLeagueVolCache(document.getElementById("leagueSelect")?.value || "", scoredList);
 
-  return {
-    scoredList, allowedList, homeScoredList, homeAllowedList, awayScoredList, awayAllowedList,
-    h1ScoredList, h1AllowedList, h1HomeScoredList, h1HomeAllowedList, h1AwayScoredList, h1AwayAllowedList,
-    h1ScoredDates, bttsList, cleanSheetList
-  };
+  return { scoredList, allowedList, homeScoredList, homeAllowedList, awayScoredList, awayAllowedList,
+
+           h1HomeScoredList, h1HomeAllowedList, h1AwayScoredList, h1AwayAllowedList,
+           h1ScoredList, h1AllowedList,
+
+           h1ScoredDates,
+           q1ScoredList, q2ScoredList, q3ScoredList, q4ScoredList,
+           q1AllowedList, q2AllowedList, q3AllowedList, q4AllowedList,
+           q1ScoredDates, q2ScoredDates, q3ScoredDates, q4ScoredDates };
 }
 
 function clearPasteJSON(side) {
@@ -3065,15 +3355,15 @@ if (side === "B") { const _link1 = document.getElementById("ssTeamBLink1"); if (
 function searchSofascorePlayer(side) {
 const nameEl = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName");
 const rawName = (nameEl?.value || "").trim();
-if (!rawName) { alert("Enter a team name first."); return; }
+if (!rawName) { alert("Enter a player/team name first."); return; }
 const searchName = rawName.split(",")[0].trim();
 
-const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=football";
+const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=basketball";
 window.open(searchUrl, "_blank");
 const st = document.getElementById("ssFetchStatus");
 if (st) {
 st.style.color = "#d98a00";
-st.textContent = "🔍 Football-only search opened for " + side + " — find the team ID in the JSON and paste it above.";
+st.textContent = "🔍 Basketball-only search opened for " + side + " — find the team ID in the JSON and paste it above.";
 }
 }
 
@@ -3092,7 +3382,7 @@ function detectTournamentIdIntersection(eventsA, eventsB) {
   function countByTournament(events) {
     const counts = {};
     events.forEach(ev => {
-      if (!ssIsFootballEvent(ev)) return;
+      if (!ssIsBasketballEvent(ev)) return;
       const sType = ev.status?.type ?? "";
       const done = sType === "finished" || sType === "afterExtraTime" || sType === "afterPenalties" || ev.status?.finished === true;
       if (!done) return;
@@ -3126,7 +3416,7 @@ function detectPrimaryTournamentForEvents(events) {
   
   const counts = {};
   events.forEach(ev => {
-    if (!ssIsFootballEvent(ev)) return;
+    if (!ssIsBasketballEvent(ev)) return;
     const sType = ev.status?.type ?? "";
     const done = sType === "finished" || sType === "afterExtraTime" || sType === "afterPenalties" || ev.status?.finished === true;
     if (!done) return;
@@ -3147,7 +3437,7 @@ function detectPrimaryTournamentForEvents(events) {
 
   const fallbackCounts = {};
   events.forEach(ev => {
-    if (!ssIsFootballEvent(ev)) return;
+    if (!ssIsBasketballEvent(ev)) return;
     const tid = ev?.tournament?.uniqueTournament?.id;
     if (tid != null) {
       const key = String(tid);
@@ -3224,6 +3514,26 @@ function updateTeamUIFromStats(side, stats) {
     if (!AppState.context.data[side].venue) AppState.context.data[side].venue = {};
     AppState.context.data[side].venue.h1Scored10 = _venueH1Scored;
     AppState.context.data[side].venue.h1Allowed10 = _venueH1Allowed;
+  }
+
+  if (stats.q1ScoredList?.length >= 2) {
+    AppState.context.data[side].q1Scored = stats.q1ScoredList.slice(0, 10);
+    AppState.context.data[side].q2Scored = stats.q2ScoredList.slice(0, 10);
+    AppState.context.data[side].q3Scored = stats.q3ScoredList.slice(0, 10);
+    AppState.context.data[side].q4Scored = stats.q4ScoredList.slice(0, 10);
+    AppState.context.data[side].q1Allowed = stats.q1AllowedList.slice(0, 10);
+    AppState.context.data[side].q2Allowed = stats.q2AllowedList.slice(0, 10);
+    AppState.context.data[side].q3Allowed = stats.q3AllowedList.slice(0, 10);
+    AppState.context.data[side].q4Allowed = stats.q4AllowedList.slice(0, 10);
+
+    const teamName = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName")?.value?.trim() ||
+                     document.getElementById(side === "A" ? "teamAName" : "teamBName")?.value?.trim() || "";
+    updateTeamQuarterShapeProfile(
+      document.getElementById("leagueSelect")?.value || "",
+      teamName,
+      stats.q1ScoredList.slice(0, 10), stats.q2ScoredList.slice(0, 10),
+      stats.q3ScoredList.slice(0, 10), stats.q4ScoredList.slice(0, 10)
+    );
   }
 
   const tagEl = document.getElementById(prefix + "AutoTag");
@@ -3440,7 +3750,7 @@ function extractH2HFromPastedEvents() {
       window.__h2hEntryCache = [];
       const h2hTag = document.getElementById("h2hAutoTag");
       if (h2hTag) h2hTag.style.display = "none";
-      ["aFTH2H","bFTH2H","a1HH2H","b1HH2H"].forEach(id => {
+      ["aFTH2H","bFTH2H","a1HH2H","b1HH2H","aQ1H2H","bQ1H2H","aQ2H2H","bQ2H2H","aQ3H2H","bQ3H2H","aQ4H2H","bQ4H2H"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = "";
       });
@@ -3448,6 +3758,10 @@ function extractH2HFromPastedEvents() {
       if (ftCb) ftCb.checked = false;
       const h1Cb = document.getElementById("use1HH2H");
       if (h1Cb) h1Cb.checked = false;
+      ["useQ1H2H","useQ2H2H","useQ3H2H","useQ4H2H"].forEach(id => {
+        const cb = document.getElementById(id);
+        if (cb) cb.checked = false;
+      });
     }
     return;
   }
@@ -3508,15 +3822,23 @@ function extractH2HFromPastedEvents() {
       const oppScoreObj = isAHome ? m.awayScore : m.homeScore;
       const myFT = Number(myScoreObj?.normaltime ?? myScoreObj?.current ?? myScoreObj?.display ?? 0);
       const oppFT = Number(oppScoreObj?.normaltime ?? oppScoreObj?.current ?? oppScoreObj?.display ?? 0);
-      if (isFinite(myFT) && isFinite(oppFT) && myFT >= 0 && oppFT >= 0) {
-        const m1H = Number(myScoreObj?.period1 ?? 0);
-        const o1H = Number(oppScoreObj?.period1 ?? 0);
+      if (myFT > 0) {
+        const mQ1 = Number(myScoreObj?.period1 ?? 0);
+        const mQ2 = Number(myScoreObj?.period2 ?? 0);
+        const mQ3 = Number(myScoreObj?.period3 ?? 0);
+        const mQ4 = Number(myScoreObj?.period4 ?? 0);
+        const oQ1 = Number(oppScoreObj?.period1 ?? 0);
+        const oQ2 = Number(oppScoreObj?.period2 ?? 0);
+        const oQ3 = Number(oppScoreObj?.period3 ?? 0);
+        const oQ4 = Number(oppScoreObj?.period4 ?? 0);
         newEntries.push({
           id: m.id,
           ts: m.startTimestamp || 0,
           aFT: myFT, bFT: oppFT,
-          aH1: m1H, bH1: o1H,
-          hasH1: isFinite(m1H) && isFinite(o1H) && m1H >= 0 && o1H >= 0
+          aH1: mQ1 + mQ2, bH1: oQ1 + oQ2,
+          aQ1: mQ1, bQ1: oQ1, aQ2: mQ2, bQ2: oQ2,
+          aQ3: mQ3, bQ3: oQ3, aQ4: mQ4, bQ4: oQ4,
+          hasQ: mQ1 > 0 || mQ2 > 0
         });
       }
     });
@@ -3532,8 +3854,16 @@ function extractH2HFromPastedEvents() {
     const merged = window.__h2hEntryCache;
     const h2hA = merged.map(e => e.aFT);
     const h2hB = merged.map(e => e.bFT);
-    const h2hA1H = merged.filter(e => e.hasH1).map(e => e.aH1);
-    const h2hB1H = merged.filter(e => e.hasH1).map(e => e.bH1);
+    const h2hA1H = merged.filter(e => e.hasQ).map(e => e.aH1);
+    const h2hB1H = merged.filter(e => e.hasQ).map(e => e.bH1);
+    const h2hAQ1 = merged.filter(e => e.hasQ).map(e => e.aQ1);
+    const h2hBQ1 = merged.filter(e => e.hasQ).map(e => e.bQ1);
+    const h2hAQ2 = merged.filter(e => e.hasQ).map(e => e.aQ2);
+    const h2hBQ2 = merged.filter(e => e.hasQ).map(e => e.bQ2);
+    const h2hAQ3 = merged.filter(e => e.hasQ).map(e => e.aQ3);
+    const h2hBQ3 = merged.filter(e => e.hasQ).map(e => e.bQ3);
+    const h2hAQ4 = merged.filter(e => e.hasQ).map(e => e.aQ4);
+    const h2hBQ4 = merged.filter(e => e.hasQ).map(e => e.bQ4);
 
     if (h2hA.length >= 2) {
       document.getElementById("aFTH2H").value = h2hA.join(",");
@@ -3545,6 +3875,19 @@ function extractH2HFromPastedEvents() {
         document.getElementById("b1HH2H").value = h2hB1H.join(",");
         const h1Cb = document.getElementById("use1HH2H");
         if (h1Cb) h1Cb.checked = true;
+      }
+      if (h2hAQ1.length >= 2) {
+        document.getElementById("aQ1H2H").value = h2hAQ1.join(",");
+        document.getElementById("bQ1H2H").value = h2hBQ1.join(",");
+        document.getElementById("aQ2H2H").value = h2hAQ2.join(",");
+        document.getElementById("bQ2H2H").value = h2hBQ2.join(",");
+        document.getElementById("aQ3H2H").value = h2hAQ3.join(",");
+        document.getElementById("bQ3H2H").value = h2hBQ3.join(",");
+        document.getElementById("aQ4H2H").value = h2hAQ4.join(",");
+        document.getElementById("bQ4H2H").value = h2hBQ4.join(",");
+        ["useQ1H2H","useQ2H2H","useQ3H2H","useQ4H2H"].forEach(id => {
+          const cb = document.getElementById(id); if (cb) cb.checked = true;
+        });
       }
       syncAllH2HCheckboxes(false);
 
@@ -5096,34 +5439,114 @@ function getLeagueUnderBlockRatio(league) {
 }
 
 const LEAGUE_EDGE_POINT_THRESHOLDS = {
-  epl:           { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  championship:  { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  la_liga:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  la_liga2:      { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
-  serie_a:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  serie_b:       { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
-  bundesliga:    { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
-  bundesliga2:   { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
-  ligue1:        { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  ligue2:        { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
-  eredivisie:    { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
-  primeira_liga: { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  pro_league:    { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  super_lig:     { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  scottish_prem: { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  ucl:           { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
-  uel:           { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  uecl:          { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  fifa_wc:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  euro_comp:     { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
-  npfl:          { ft: 0.25, h1: 0.18, team: 0.20, btts: 0.18 },
-  mls:           { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
-  brasileirao:   { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
-  argentina_lp:  { ft: 0.25, h1: 0.18, team: 0.20, btts: 0.18 },
-  saudi_pro:     { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
-  other_football:{ ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  unknown:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
-  default:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 }
+  nba:                { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  wnba:               { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  wnba_pre:           { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  ncaa:               { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  ncaaw:              { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  euroleague:         { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  eurocup:            { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  acb:                { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  lba:                { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  turkey_bsl:         { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
+  aba:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  ausnbl:             { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  bcl:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  champions_league:   { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  bnxt:               { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  bbl:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  bleague:            { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  cba:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  korea_kbl:          { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  pba:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  lkl:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  nba_gl:             { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+
+  nba_summer:         { ft: 6.5, h1: 6.0, team: 6.5, q: 4.0 },
+  bal:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  proa:               { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  brazil_nbb:         { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  plk:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  united_league:      { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  mexico_lnbp:        { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  puerto_rico_bsn:    { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
+  argentina_lnb:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  austria_superliga:  { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  belgium_top:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  cebl:               { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  croatia_premier:    { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  denmark_bliga:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  fiba_ac:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  fiba_eb:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  fiba_u20eb_a:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  fiba_u20eb_b:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  fiba_wc:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  finland_koris:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  france_lfb_w:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  germany_proa:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  hungary_nb1:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  isl:                { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  italy_a2:           { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  italy_a2_w:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  latvia_lbl:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  lebanon_1st:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  mexico_cibacopa:    { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  nbl_cz:             { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  nznbl:              { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  poland_1liga:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  portugal_lpb:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  portugal_taca:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  prob:               { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  romania_ln:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  serbia_kls:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  slovenia_1a:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  spain_primera:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  spain_segunda:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  sweden_sbl:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  swiss_sbl:          { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  taipei_tpbl:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  turkey_tbl:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  venezuela_sl:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  uruguay_lub:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  austria_zweite:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  bih_1st:            { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  brazil_lbf_w:       { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  bulgaria_nbl:       { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  cyprus_div_a:       { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  chile_lnb:          { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  chile_lnb2:         { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  el_salvador_lmb:    { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  england_slb:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  england_slb_w:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  estonia_kml:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  gb_super_league_w:  { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  georgia_super:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  iceland_1st:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  iceland_urvalsdeild:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  iceland_urvalsdeild_w: { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  indonesia_ibl:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  italy_a1_w:         { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  italy_serb:         { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  phil_mpbl:          { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  portugal_lfb_w:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  portugal_proliga:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  rwanda:             { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  turkey_tb2l:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  uruguay_lfb_w:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_big_v:          { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_big_v_w:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_east:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_east_w:    { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_north:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_north_w:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_south:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_south_w:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_west:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_west_w:    { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_central:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  aus_nbl1_central_w: { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
+  unknown:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
+  default:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 }
 };
 
 function getLeagueEdgePointThreshold(league, marketKey) {
@@ -5162,41 +5585,108 @@ function getLeagueEdgePointThreshold(league, marketKey) {
 
     
 
-const FOOTBALL_LEAGUE_GOAL_BASES = {
-  epl: 2.85,
-  championship: 2.65,
-  la_liga: 2.55,
-  la_liga2: 2.25,
-  serie_a: 2.60,
-  serie_b: 2.35,
-  bundesliga: 3.10,
-  bundesliga2: 2.95,
-  ligue1: 2.60,
-  ligue2: 2.30,
-  eredivisie: 3.05,
-  primeira_liga: 2.65,
-  pro_league: 2.85,
-  super_lig: 2.75,
-  scottish_prem: 2.70,
-  ucl: 3.00,
-  uel: 2.80,
-  uecl: 2.75,
-  fifa_wc: 2.60,
-  euro_comp: 2.45,
-  npfl: 2.10,
-  mls: 2.90,
-  brasileirao: 2.40,
-  argentina_lp: 2.15,
-  saudi_pro: 2.95,
-  other_football: 2.65,
-  default: 2.65
+let LEAGUE_BASES = {
+  nba: 230, ncaa: 148, nba_gl: 228, ncaaw: 144, wnba: 168, wnba_pre: 164, nba_summer: 158, cebl: 176,
+  pba: 196, phil_mpbl: 156, cba: 202, china_nbl: 188, taipei_tpbl: 176,
+  bleague: 162, korea_kbl: 164, indonesia_ibl: 154,
+  ausnbl: 176, aus_nbl1_east: 178, aus_nbl1_north: 178, aus_nbl1_south: 178, aus_nbl1_west: 178, aus_nbl1_central: 178, aus_nbl1_east_w: 152, aus_nbl1_north_w: 152, aus_nbl1_south_w: 152, aus_nbl1_west_w: 152, aus_nbl1_central_w: 152, aus_big_v: 154, aus_big_v_w: 148, nznbl: 176,
+  puerto_rico_bsn: 182, mexico_cibacopa: 180, mexico_lnbp: 172,
+  argentina_lnb: 160, brazil_nbb: 160, brazil_lbf_w: 142, chile_lnb: 158, chile_lnb2: 152,
+  uruguay_lub: 164, uruguay_lfb_w: 138, venezuela_sl: 156, el_salvador_lmb: 154,
+  euroleague: 162, eurocup: 160, champions_league: 160, acb: 166, lba: 162, bbl: 168, turkey_bsl: 168, proa: 162, bcl: 158, isl: 166,
+  aba: 158, bnxt: 156, united_league: 162, spain_primera: 158, spain_segunda: 152,
+  italy_a2: 156, italy_serb: 150, italy_a1_w: 144, italy_a2_w: 140,
+  germany_proa: 160, prob: 156, france_lfb_w: 144,
+  turkey_tbl: 160, turkey_tb2l: 154, lkl: 162, plk: 160, poland_1liga: 152,
+  england_slb: 164, england_slb_w: 146, gb_super_league_w: 146,
+  serbia_kls: 160, croatia_premier: 158, slovenia_1a: 156, bih_1st: 154,
+  austria_superliga: 156, austria_zweite: 150, belgium_top: 158, bulgaria_nbl: 158,
+  cyprus_div_a: 154, nbl_cz: 160, denmark_bliga: 164, estonia_kml: 156, finland_koris: 162,
+  georgia_super: 158, hungary_nb1: 158, iceland_urvalsdeild: 178, iceland_urvalsdeild_w: 154, iceland_1st: 172,
+  latvia_lbl: 158, lebanon_1st: 168, portugal_lpb: 160, portugal_proliga: 154, portugal_taca: 158, portugal_lfb_w: 142,
+  romania_ln: 156, sweden_sbl: 162, swiss_sbl: 156,
+  bal: 154, nigeria: 148, rwanda: 144,
+
+  fiba_wc: 156, fiba_eb: 156, fiba_u20eb_a: 156, fiba_u20eb_b: 156, fiba_ac: 154, unknown: 160
 };
 
-let LEAGUE_BASES = new Proxy(FOOTBALL_LEAGUE_GOAL_BASES, {
-  get: (target, prop) => target[prop] ?? target.default
-});
+const NBA_2026_TEAM_BASELINES = {
+  ATL: { ortg: 116.1, drtg: 113.7, pace: 101.7, total: 234.5 },
+  BOS: { ortg: 120.8, drtg: 112.7, pace: 94.8,  total: 222.1 },
+  BRK: { ortg: 108.7, drtg: 119.0, pace: 97.1,  total: 221.8 },
+  CHO: { ortg: 119.4, drtg: 114.4, pace: 96.8,  total: 227.2 },
+  CHI: { ortg: 113.0, drtg: 118.1, pace: 102.5, total: 237.8 },
+  CLE: { ortg: 119.2, drtg: 115.1, pace: 99.9,  total: 234.9 },
+  DAL: { ortg: 111.2, drtg: 116.5, pace: 101.7, total: 233.7 },
+  DEN: { ortg: 122.6, drtg: 117.4, pace: 98.4,  total: 239.0 },
+  DET: { ortg: 112.3, drtg: 120.1, pace: 101.8, total: 234.9 },
+  GSW: { ortg: 115.0, drtg: 115.6, pace: 99.0,  total: 229.8 },
+  HOU: { ortg: 118.6, drtg: 113.2, pace: 96.1,  total: 225.2 },
+  IND: { ortg: 110.9, drtg: 118.8, pace: 101.0, total: 232.8 },
+  LAC: { ortg: 117.3, drtg: 116.1, pace: 96.5,  total: 226.4 },
+  LAL: { ortg: 118.2, drtg: 116.4, pace: 98.3,  total: 230.9 },
+  MEM: { ortg: 112.9, drtg: 118.8, pace: 101.3, total: 235.4 },
+  MIA: { ortg: 116.7, drtg: 114.5, pace: 103.4, total: 239.4 },
+  MIL: { ortg: 112.9, drtg: 119.3, pace: 97.6,  total: 227.4 },
+  MIN: { ortg: 116.8, drtg: 113.5, pace: 100.5, total: 232.6 },
+  NOP: { ortg: 114.4, drtg: 118.9, pace: 100.3, total: 235.5 },
+  NYK: { ortg: 119.8, drtg: 113.3, pace: 96.8,  total: 226.6 },
+  OKC: { ortg: 119.2, drtg: 111.8, pace: 99.6,  total: 231.0 },
+  ORL: { ortg: 114.9, drtg: 114.3, pace: 100.0, total: 230.8 },
+  PHI: { ortg: 115.4, drtg: 115.5, pace: 99.4,  total: 232.0 },
+  PHO: { ortg: 115.4, drtg: 113.9, pace: 97.2,  total: 223.7 },
+  POR: { ortg: 114.4, drtg: 114.7, pace: 100.5, total: 231.3 },
+  SAC: { ortg: 111.4, drtg: 121.5, pace: 99.2,  total: 232.0 },
+  SAS: { ortg: 114.5, drtg: 117.6, pace: 98.3,  total: 228.8 },
+  TOR: { ortg: 115.9, drtg: 113.0, pace: 98.4,  total: 226.4 },
+  UTA: { ortg: 114.1, drtg: 122.3, pace: 102.3, total: 243.6 },
+  WAS: { ortg: 111.0, drtg: 122.7, pace: 101.4, total: 237.8 }
+};
 
-function getNBASeasonBaseline() { return null; }
+const _NBA_NAME_TO_ABV = {
+  "atlanta hawks": "ATL", "boston celtics": "BOS", "brooklyn nets": "BRK",
+  "charlotte hornets": "CHO", "chicago bulls": "CHI", "cleveland cavaliers": "CLE",
+  "dallas mavericks": "DAL", "denver nuggets": "DEN", "detroit pistons": "DET",
+  "golden state warriors": "GSW", "houston rockets": "HOU", "indiana pacers": "IND",
+  "los angeles clippers": "LAC", "los angeles lakers": "LAL", "memphis grizzlies": "MEM",
+  "miami heat": "MIA", "milwaukee bucks": "MIL", "minnesota timberwolves": "MIN",
+  "new orleans pelicans": "NOP", "new york knicks": "NYK",
+  "oklahoma city thunder": "OKC", "orlando magic": "ORL",
+  "philadelphia 76ers": "PHI", "phoenix suns": "PHO", "portland trail blazers": "POR",
+  "sacramento kings": "SAC", "san antonio spurs": "SAS",
+  "toronto raptors": "TOR", "utah jazz": "UTA", "washington wizards": "WAS",
+  "hawks": "ATL", "celtics": "BOS", "nets": "BRK", "hornets": "CHO", "bulls": "CHI",
+  "cavaliers": "CLE", "cavs": "CLE", "mavericks": "DAL", "mavs": "DAL",
+  "nuggets": "DEN", "pistons": "DET", "warriors": "GSW", "rockets": "HOU",
+  "pacers": "IND", "clippers": "LAC", "lakers": "LAL", "grizzlies": "MEM",
+  "heat": "MIA", "bucks": "MIL", "timberwolves": "MIN", "wolves": "MIN",
+  "pelicans": "NOP", "knicks": "NYK", "thunder": "OKC", "magic": "ORL",
+  "76ers": "PHI", "sixers": "PHI", "suns": "PHO", "trail blazers": "POR",
+  "blazers": "POR", "kings": "SAC", "spurs": "SAS", "raptors": "TOR",
+  "jazz": "UTA", "wizards": "WAS",
+  "atlanta": "ATL", "boston": "BOS", "brooklyn": "BRK", "charlotte": "CHO",
+  "chicago": "CHI", "cleveland": "CLE", "dallas": "DAL", "denver": "DEN",
+  "detroit": "DET", "golden state": "GSW", "houston": "HOU", "indiana": "IND",
+  "la clippers": "LAC", "la lakers": "LAL", "memphis": "MEM", "miami": "MIA",
+  "milwaukee": "MIL", "minnesota": "MIN", "new orleans": "NOP", "new york": "NYK",
+  "oklahoma city": "OKC", "orlando": "ORL", "philadelphia": "PHI",
+  "phoenix": "PHO", "portland": "POR", "sacramento": "SAC", "san antonio": "SAS",
+  "toronto": "TOR", "utah": "UTA", "washington": "WAS",
+  "atl": "ATL", "bos": "BOS", "brk": "BRK", "cho": "CHO", "chi": "CHI",
+  "cle": "CLE", "dal": "DAL", "den": "DEN", "det": "DET", "gsw": "GSW",
+  "hou": "HOU", "ind": "IND", "lac": "LAC", "lal": "LAL", "mem": "MEM",
+  "mia": "MIA", "mil": "MIL", "min": "MIN", "nop": "NOP", "nyk": "NYK",
+  "okc": "OKC", "orl": "ORL", "phi": "PHI", "pho": "PHO", "por": "POR",
+  "sac": "SAC", "sas": "SAS", "tor": "TOR", "uta": "UTA", "was": "WAS"
+};
+
+function getNBASeasonBaseline(teamName, league) {
+  if (league !== "nba" || !teamName) return null;
+  const key = String(teamName).toLowerCase().trim();
+  const abv = _NBA_NAME_TO_ABV[key] || null;
+  if (!abv) return null;
+  return NBA_2026_TEAM_BASELINES[abv] || null;
+}
 
 const LEAGUE_PACE_BASES = {
   nba: 99.0,
@@ -5251,11 +5741,12 @@ const LEAGUE_RATING_BASES = {
 };
 
 const LEAGUE_REGULATION_MINUTES = {
-  default: 90,
-  half: 45
+  nba: 48, nba_gl: 48, nba_summer: 48,
+  wnba: 40, wnba_pre: 40, ncaa: 40, ncaaw: 40,
+  default: 40
 };
 function getLeagueRegulationMinutes(league) {
-  return LEAGUE_REGULATION_MINUTES.default;
+  return LEAGUE_REGULATION_MINUTES[String(league || "").toLowerCase()] || LEAGUE_REGULATION_MINUTES.default;
 }
 
 function getLeagueRecencyDefaults(league) {
@@ -5323,27 +5814,138 @@ function updateLeagueVolCache(league, values) {
   saveVolCache(cache);
 }
 
-function updateTeamQuarterShapeProfile() {}
-function getTeamQuarterShapeSignal() { return null; }
+const QSHAPE_STORAGE_KEY = "BB_TEAM_QSHAPE_V1";
+const QSHAPE_MIN_GAMES = 6;
 
-const LEAGUE_CONFIG_MAP = {};
+function getTeamQuarterShapeKey(league, teamName) {
+  return String(league || "unknown").toLowerCase() + "|" + normalizeTeamName(teamName || "");
+}
+
+function loadQuarterShapeStore() {
+  try {
+    const raw = localStorage.getItem(QSHAPE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return (parsed && typeof parsed === "object") ? parsed : {};
+  } catch (e) {
+    engineDebug("loadQuarterShapeStore failed: " + (e?.message || String(e)), { error: e });
+    return {};
+  }
+}
+
+function saveQuarterShapeStore(store) {
+  try {
+    localStorage.setItem(QSHAPE_STORAGE_KEY, JSON.stringify(store));
+  } catch (e) {
+    engineDebug("saveQuarterShapeStore failed to persist", { error: e });
+  }
+}
+
+function updateTeamQuarterShapeProfile(league, teamName, q1s, q2s, q3s, q4s) {
+  const key = getTeamQuarterShapeKey(league, teamName);
+  if (!key) return;
+  const n = Math.min(
+    Array.isArray(q1s) ? q1s.length : 0,
+    Array.isArray(q2s) ? q2s.length : 0,
+    Array.isArray(q3s) ? q3s.length : 0,
+    Array.isArray(q4s) ? q4s.length : 0
+  );
+  if (n < 2) return;
+
+  const store = loadQuarterShapeStore();
+  const entry = store[key] || { n: 0, meanShare: [0.25, 0.25, 0.25, 0.25], m2: [0, 0, 0, 0] };
+
+  for (let i = 0; i < n; i++) {
+    const q1 = Number(q1s[i]), q2 = Number(q2s[i]), q3 = Number(q3s[i]), q4 = Number(q4s[i]);
+    const total = q1 + q2 + q3 + q4;
+    if (!isFinite(total) || total <= 0) continue;
+    const shares = [q1 / total, q2 / total, q3 / total, q4 / total];
+    entry.n += 1;
+    for (let qi = 0; qi < 4; qi++) {
+      const delta = shares[qi] - entry.meanShare[qi];
+      entry.meanShare[qi] += delta / entry.n;
+      const delta2 = shares[qi] - entry.meanShare[qi];
+      entry.m2[qi] += delta * delta2;
+    }
+  }
+
+  entry.updatedAt = new Date().toISOString();
+  store[key] = entry;
+  saveQuarterShapeStore(store);
+}
+
+function getTeamQuarterShapeSignal(league, teamName, qKey) {
+  const key = getTeamQuarterShapeKey(league, teamName);
+  const store = loadQuarterShapeStore();
+  const entry = store[key];
+  if (!entry || entry.n < QSHAPE_MIN_GAMES) return null;
+
+  const qIdx = { q1: 0, q2: 1, q3: 2, q4: 3 }[String(qKey || "").toLowerCase()];
+  if (qIdx === undefined) return null;
+
+  const share = entry.meanShare[qIdx];
+  const variance = entry.n > 1 ? entry.m2[qIdx] / (entry.n - 1) : 0;
+  const stdErr = Math.sqrt(Math.max(variance, 0.0001) / entry.n);
+  if (!isFinite(stdErr) || stdErr <= 0) return null;
+
+  const z = (share - 0.25) / stdErr;
+  return {
+    z: Number(z.toFixed(2)),
+    share: Number((share * 100).toFixed(1)),
+    sampleSize: entry.n,
+    direction: z >= 1.0 ? "fast" : z <= -1.0 ? "fade" : "neutral"
+  };
+}
+
+const LEAGUE_CONFIG_MAP = {
+  NBA: { volLimit:12, sanityMin:160, sanityMax:250 },
+  NCAA: { volLimit:15, sanityMin:120, sanityMax:200 },
+  NCAAW: { volLimit:15, sanityMin:100, sanityMax:175 },
+  WNBA: { volLimit:13, sanityMin:130, sanityMax:200 },
+  WNBA_PRE: { volLimit:14, sanityMin:125, sanityMax:200 },
+  NBA_GL: { volLimit:13, sanityMin:155, sanityMax:245 },
+  NBA_SUMMER: { volLimit:15, sanityMin:130, sanityMax:210 },
+  EUROLEAGUE: { volLimit:10, sanityMin:130, sanityMax:200 },
+  EUROCUP: { volLimit:11, sanityMin:125, sanityMax:195 },
+  CHAMPIONS_LEAGUE: { volLimit:11, sanityMin:120, sanityMax:195 },
+  ACB: { volLimit:11, sanityMin:130, sanityMax:200 },
+  LBA: { volLimit:11, sanityMin:125, sanityMax:195 },
+  BBL: { volLimit:12, sanityMin:130, sanityMax:205 },
+  TURKEY_BSL: { volLimit:12, sanityMin:130, sanityMax:205 },
+  AUSNBL: { volLimit:12, sanityMin:130, sanityMax:210 }
+};
 
 initLeagueOverridesFromDefaults();
 pruneUnverifiedLeagueOverrideDrift();
 
 const LEAGUE_TRUST_PROFILES = {
   trusted: [
-    "epl", "championship", "la_liga", "la_liga2", "serie_a", "serie_b", "bundesliga",
-    "bundesliga2", "ligue1", "ligue2", "eredivisie", "primeira_liga", "pro_league",
-    "super_lig", "scottish_prem", "ucl", "uel", "uecl", "fifa_wc", "euro_comp",
-    "mls", "brasileirao", "saudi_pro"
+    "nba", "ncaa", "nba_gl", "ncaaw", "wnba", "euroleague", "eurocup", "champions_league", 
+    "acb", "lba", "bbl", "bcl", "turkey_bsl", "isl", "cba", "pba", 
+    "ausnbl", "proa", "united_league", "bleague", "korea_kbl",
+    "aus_nbl1_east", "aus_nbl1_north", "aus_nbl1_south", "aus_nbl1_west", "aus_nbl1_central", "aus_big_v",
+    "nznbl"
   ],
   advisory: [
-    "npfl", "argentina_lp", "other_football"
+    "nba_summer", "wnba_pre", "aba", "lkl", "plk", "prob", "germany_proa", "serbia_kls", "croatia_premier", 
+    "romania_ln", "hungary_nb1", "nbl_cz", "denmark_bliga", "england_slb", "england_slb_w",
+    "finland_koris", "italy_a2", "italy_serb", "italy_a1_w", "poland_1liga",
+    "portugal_lpb", "portugal_proliga", "spain_primera", "spain_segunda", "sweden_sbl",
+    "swiss_sbl", "turkey_tbl", "turkey_tb2l", "china_nbl", "taipei_tpbl",
+    "austria_superliga", "belgium_top", "bih_1st", "bulgaria_nbl", "georgia_super", 
+    "argentina_lnb", "brazil_nbb", "chile_lnb", "mexico_lnbp", "mexico_cibacopa", 
+    "puerto_rico_bsn", "uruguay_lub", "cebl",
+    "aus_nbl1_east_w", "aus_nbl1_north_w", "aus_nbl1_south_w", "aus_nbl1_west_w", "aus_nbl1_central_w", "aus_big_v_w",
+    "bnxt", "cyprus_div_a", "estonia_kml", "iceland_urvalsdeild", "latvia_lbl", 
+    "lebanon_1st", "slovenia_1a", "gb_super_league_w", "france_lfb_w"
   ],
-  blocked: []
+  blocked: [
+    "brazil_lbf_w", "chile_lnb2", "uruguay_lfb_w", "venezuela_sl", "el_salvador_lmb",
+    "bal", "nigeria", "rwanda",
+    "phil_mpbl", "indonesia_ibl", "italy_a2_w", "austria_zweite", 
+    "iceland_urvalsdeild_w", "iceland_1st", "portugal_taca", "portugal_lfb_w",
+    "fiba_wc", "fiba_eb", "fiba_u20eb_a", "fiba_u20eb_b", "fiba_ac"
+  ]
 };
-
 function normalizeLeagueTrustKey(league) {
   return String(league || "unknown").trim().toLowerCase() || "unknown";
 }
@@ -5404,11 +6006,106 @@ function getLeagueTrustSortRank(level) {
 }
 
 const LEAGUE_FETCH_RULES = {
-  default: {
+    nba: {
     recentSeasons: 2,
+    scheduleTypes: ["1", "2", "3"],
+    h2hScheduleTypes: ["1", "2", "3"],
+    regulationPeriods: 4
+  },
+  wnba: {
+    recentSeasons: 2,
+    scheduleTypes: ["1", "2", "3"],
+    h2hScheduleTypes: ["1", "2", "3"],
+    regulationPeriods: 4
+  },
+  wnba_pre: {
+    recentSeasons: 2,
+    scheduleTypes: ["1", "2", "3"],
+    h2hScheduleTypes: ["1", "2", "3"],
+    regulationPeriods: 4
+  },
+  ncaa: {
+    recentSeasons: 3,
+    scheduleTypes: ["2", "3"],
+    h2hScheduleTypes: ["2", "3"],
     regulationPeriods: 2
-  }
+  },
+
+  ncaaw: {
+    recentSeasons: 3,
+    scheduleTypes: ["2", "3"],
+    h2hScheduleTypes: ["2", "3"],
+    regulationPeriods: 2
+  },
+  nba_gl: {
+    recentSeasons: 2,
+    scheduleTypes: ["1", "2", "3"],
+    h2hScheduleTypes: ["1", "2", "3"],
+    regulationPeriods: 4
+  },
+
+  nba_summer: {
+    recentSeasons: 1,
+    scheduleTypes: ["1", "2", "3"],
+    h2hScheduleTypes: ["1", "2", "3"],
+    regulationPeriods: 4
+  },
+  euroleague:      { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  eurocup:         { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  champions_league:{ recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  turkey_bsl:      { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  acb:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  bbl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  ausnbl:          { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  lba:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  bleague:         { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  united_league:   { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  proa:            { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  bcl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  aba:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  isl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
+  cebl:            { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 }
 };
+
+    const NBA_TEAM_MAP = {
+      "hawks":1,"atlanta":1,"celtics":2,"boston":2,"nets":17,"brooklyn":17,
+      "hornets":30,"charlotte":30,"bulls":4,"chicago":4,"cavaliers":5,"cavs":5,"cleveland":5,
+      "mavericks":6,"mavs":6,"dallas":6,"nuggets":7,"denver":7,"pistons":8,"detroit":8,
+      "warriors":9,"golden state":9,"gsw":9,"rockets":10,"houston":10,"pacers":11,"indiana":11,
+      "clippers":12,"la clippers":12,"lakers":13,"los angeles lakers":13,"la lakers":13,
+      "grizzlies":29,"memphis":29,"heat":14,"miami":14,"bucks":15,"milwaukee":15,
+      "timberwolves":16,"wolves":16,"minnesota":16,"pelicans":3,"new orleans":3,
+      "knicks":18,"new york":18,"thunder":25,"okc":25,"oklahoma city":25,"magic":19,"orlando":19,
+      "76ers":20,"sixers":20,"philadelphia":20,"suns":21,"phoenix":21,
+      "trail blazers":22,"trailblazers":22,"blazers":22,"portland":22,
+      "kings":23,"sacramento":23,"spurs":24,"san antonio":24,"raptors":28,"toronto":28,
+      "jazz":26,"utah":26,"wizards":27,"washington":27
+    };
+
+    const NCAA_TEAM_MAP = {
+      "duke":150,"kentucky":96,"kansas":2305,"unc":153,"north carolina":153,"uconn":41,"connecticut":41,
+      "arizona":12,"gonzaga":2250,"purdue":2509,"ucla":26,"houston":248,"baylor":239,"tennessee":2633,
+      "alabama":333,"auburn":2,"michigan state":127,"wisconsin":275,"illinois":356,"texas":251,
+      "arkansas":8,"memphis":235,"florida":57,"virginia":258,"villanova":222,"marquette":269,
+      "creighton":156,"xavier":2752,"saint marys":2608,"st marys":2608,"san diego state":21,
+      "new mexico":167,"dayton":2168,"byu":252,"iowa state":66,"texas tech":2641,"texas a&m":245,
+      "texas a and m":245,"missouri":142,"indiana":84,"ohio state":194,"michigan":130,"usc":30,"oregon":2483,
+      "nevada":4,"boise state":68,"colorado state":36,"utah state":328,"providence":2507,"seton hall":2550,
+      "st johns":2599,"saint johns":2599,"wake forest":154,"clemson":228,"florida atlantic":2226,
+      "fau":2226,"miami":2390,"texas christian":2628,"tcu":2628,"nc state":152,"north carolina state":152,
+      "louisville":97,"syracuse":183,"notre dame":87,"georgetown":46,"georgia":61,"ole miss":145,
+      "mississippi state":344,"lsu":99,"vanderbilt":238,"butler":2086,"belmont":2057,"drake":2181,
+      "oregon state":204,"washington":264,"washington state":265
+    };
+
+    const WNBA_TEAM_MAP = {
+      "aces":17,"las vegas":17,"liberty":9,"new york":9,"sun":18,"connecticut":18,
+      "lynx":8,"minnesota":8,"storm":14,"seattle":14,"mercury":11,"phoenix":11,
+      "fever":5,"indiana":5,"dream":20,"atlanta":20,"sky":19,"chicago":19,
+      "wings":3,"dallas":3,"mystics":16,"washington":16,"sparks":6,"los angeles":6,
+      "valkyries":129689,"golden state":129689,"fire":132052,"portland":132052,
+      "tempo":131935,"toronto":131935
+    };
 
     const _schedCache = new Map();
     const _summaryCache = new Map();
@@ -11157,53 +11854,19 @@ function getTrackedLeagueApiBase(league) {
   return "";
 }
 
-window._espnStandingsCache = window._espnStandingsCache || {};
-
-async function fetchLeagueStandings(league) {
-  const lk = String(league || "").toLowerCase();
-  const base = getTrackedLeagueApiBase(lk);
-  if (!base) return;
-  const existing = window._espnStandingsCache[lk];
-  if (existing && existing.data && (Date.now() - (existing.ts || 0)) < 6 * 60 * 60 * 1000) return;
-  try {
-    const data = await proxyFetch(base + "/standings?_=" + Date.now(), 12000);
-    const table = {};
-    const groupEntries = Array.isArray(data?.children)
-      ? data.children.flatMap(c => c?.standings?.entries || [])
-      : [];
-    const flatEntries = Array.isArray(data?.standings?.entries) ? data.standings.entries : [];
-    const entries = flatEntries.length ? flatEntries : groupEntries;
-    entries.forEach(e => {
-      const teamId = String(e?.team?.id || "");
-      if (!teamId) return;
-      const stats = e?.stats || [];
-      const pctStat = stats.find(s => s.name === "winPercent" || s.abbreviation === "PCT" || s.type === "winpercent");
-      const pct = pctStat ? parseFloat(pctStat.value ?? pctStat.displayValue ?? 0) : NaN;
-      if (isFinite(pct)) table[teamId] = { pct };
-    });
-    window._espnStandingsCache[lk] = { data: table, ts: Date.now() };
-    if (typeof engineDebug === "function") {
-      engineDebug("fetchLeagueStandings cached", { league: lk, teams: Object.keys(table).length });
-    }
-  } catch (err) {
-    if (typeof engineDebug === "function") {
-      engineDebug("fetchLeagueStandings failed", { league: lk, error: err?.message || String(err) });
-    }
-  }
-}
-
 function isTrackerSupportedLeague(league) {
   return !!getTrackedLeagueApiBase(String(league || "").toLowerCase());
 }
 
 async function settleTrackedPick(signature, status) {
+  
   let pick = AppState.tracker.state.activePicks.find(p => p.signature === signature);
   if (!pick) pick = AppState.tracker.state.archivedPicks.find(p => p.signature === signature);
   if (!pick) return;
   const _sA = (pick.homeTeam && pick.homeTeam !== "—") ? pick.homeTeam : "A";
   const _sB = (pick.awayTeam && pick.awayTeam !== "—") ? pick.awayTeam : "B";
   const score = prompt(
-    `${status.toUpperCase()} — Enter final score:\n${_sA} vs ${_sB}\n(e.g. 2-1 or 0-0 — or leave blank)`,
+    `${status.toUpperCase()} — Enter final score:\n${_sA} vs ${_sB}\n(e.g. 110-105 — or leave blank)`,
     pick.actualScore || ""
   );
   if (score === null) return;
@@ -11607,12 +12270,28 @@ function isPickPeriodComplete(marketKey, currentPeriod, isHalfTime, isGameFinal,
   const lsHome = home.linescores || [];
   const lsAway = away.linescores || [];
   
-  let h1Home = lsHome.length > 0 ? getVal(lsHome[0]) : 0;
-  let h1Away = lsAway.length > 0 ? getVal(lsAway[0]) : 0;
+  let h1Home = 0, h1Away = 0;
+  let q1Home = 0, q1Away = 0, q2Home = 0, q2Away = 0, q3Home = 0, q3Away = 0, q4Home = 0, q4Away = 0;
+  
+  if (lsHome.length >= 2 && lsAway.length >= 2) {
+     if (pick.league === "nba" || pick.league === "wnba" || pick.league === "wnba_pre" || pick.league === "nba_gl" || pick.league === "nba_summer") {
+                q1Home = getVal(lsHome[0]); q1Away = getVal(lsAway[0]);
+                q2Home = getVal(lsHome[1]); q2Away = getVal(lsAway[1]);
+                h1Home = q1Home + q2Home;
+                h1Away = q1Away + q2Away;
+                if (lsHome.length >= 4 && lsAway.length >= 4) {
+                  q3Home = getVal(lsHome[2]); q3Away = getVal(lsAway[2]);
+                  q4Home = getVal(lsHome[3]); q4Away = getVal(lsAway[3]);
+                }
+     } else {
+                h1Home = getVal(lsHome[0]);
+                h1Away = getVal(lsAway[0]);
+     }
+  }
 
   const market = pick.marketKey;
   const marketLine = parseFloat(pick.line);
-  if (isNaN(marketLine) && market !== "btts") return "pending";
+  if (isNaN(marketLine) && market !== "margin_team" && market !== "margin_any" && market !== "high_q" && market !== "low_q" && market !== "htft" && market !== "player") return "pending";
 
   let actual = 0;
   const isTeamAHome = String(pick.homeId) === String(home.id) || pick.homeTeam === home.team?.displayName;
@@ -11620,16 +12299,79 @@ function isPickPeriodComplete(marketKey, currentPeriod, isHalfTime, isGameFinal,
   if (market === "ft") {
      actual = sHome + sAway;
   } else if (market === "h1") {
+     if (!h1Home && !h1Away) return "pending";
      actual = h1Home + h1Away;
   } else if (market === "team_a") {
      actual = isTeamAHome ? sHome : sAway;
   } else if (market === "team_b") {
      actual = isTeamAHome ? sAway : sHome;
-  } else if (market === "btts") {
-     const bothScored = sHome > 0 && sAway > 0;
-     const actualStr = bothScored ? "BTTS YES" : "BTTS NO";
-     pick.actualScore = `${sHome}-${sAway}`;
-     const isWin = String(pick.predictionText).toUpperCase() === actualStr;
+  } else if (market === "q1") {
+     if (!q1Home && !q1Away) return "pending";
+     actual = q1Home + q1Away;
+  } else if (market === "q2") {
+     if (!q2Home && !q2Away) return "pending";
+     actual = q2Home + q2Away;
+  } else if (market === "q3") {
+     if (!q3Home && !q3Away) return "pending";
+     actual = q3Home + q3Away;
+  } else if (market === "q4") {
+     if (!q4Home && !q4Away) return "pending";
+     actual = q4Home + q4Away;
+  } else if (market === "high_q_ou") {
+     if (!q4Home && !q4Away) return "pending";
+     const qs = [q1Home+q1Away, q2Home+q2Away, q3Home+q3Away, q4Home+q4Away];
+     actual = Math.max(...qs);
+  } else if (market === "low_q_ou") {
+     if (!q4Home && !q4Away) return "pending";
+     const qs = [q1Home+q1Away, q2Home+q2Away, q3Home+q3Away, q4Home+q4Away];
+     actual = Math.min(...qs);
+  } else if (market === "q1_team_a") {
+     if (!q1Home && !q1Away) return "pending";
+     actual = isTeamAHome ? q1Home : q1Away;
+  } else if (market === "q1_team_b") {
+     if (!q1Home && !q1Away) return "pending";
+     actual = isTeamAHome ? q1Away : q1Home;
+  } else if (market === "h1_team_a") {
+     if (!h1Home && !h1Away) return "pending";
+     actual = isTeamAHome ? h1Home : h1Away;
+  } else if (market === "h1_team_b") {
+     if (!h1Home && !h1Away) return "pending";
+     actual = isTeamAHome ? h1Away : h1Home;
+  } else if (market === "htft") {
+     if (h1Home === 0 && h1Away === 0) return "pending";
+     const h1Lead = h1Home > h1Away ? "Home" : h1Home < h1Away ? "Away" : "Tie";
+     const ftLead = sHome > sAway ? "Home" : sHome < sAway ? "Away" : "Tie";
+     const actualStr = (h1Lead + "/" + ftLead).toUpperCase();
+     pick.actualScore = actualStr;
+     const isWin = actualStr === String(pick.predictionText).toUpperCase();
+     pick.engineResultStatus = isWin ? "win" : "loss";
+     return isWin ? "win" : "loss";
+  } else if (market === "margin_any" || market === "margin_team") {
+     const diff = Math.abs(sHome - sAway);
+     const winner = sHome > sAway ? "Home" : sHome < sAway ? "Away" : "Tie";
+     pick.actualScore = winner + " by " + diff;
+     const pt = String(pick.predictionText).toUpperCase();
+     if (market === "margin_team" && !pt.startsWith(winner.toUpperCase())) {
+       pick.engineResultStatus = "loss"; 
+       return "loss";
+     }
+     let isWin = false;
+     const match = pt.match(/(\d+)-(\d+)/);
+     if (match) {
+       isWin = diff >= parseInt(match[1]) && diff <= parseInt(match[2]);
+     } else if (pt.includes("31+")) {
+       isWin = diff >= 31;
+     }
+     pick.engineResultStatus = isWin ? "win" : "loss";
+     return isWin ? "win" : "loss";
+  } else if (market === "high_q" || market === "low_q") {
+     if (!q4Home && !q4Away) return "pending";
+     const qs = [q1Home+q1Away, q2Home+q2Away, q3Home+q3Away, q4Home+q4Away];
+     const target = market === "high_q" ? Math.max(...qs) : Math.min(...qs);
+     const count = qs.filter(q => q === target).length;
+     const actualStr = count > 1 ? "Equal" : `Quarter ${qs.indexOf(target) + 1}`;
+     pick.actualScore = qs.join(", ");
+     const isWin = actualStr === String(pick.predictionText);
      pick.engineResultStatus = isWin ? "win" : "loss";
      return isWin ? "win" : "loss";
   } else {
@@ -12180,7 +12922,17 @@ function getEffectivePaceClamp(league) {
 }
 
     function getLineSanityBands(league) {
-  return { ft: [1.0, 6.5], h1: [0.5, 3.5], team: [0.25, 4.5] };
+  const cfg = LEAGUE_CONFIG_MAP[String(league || "").toUpperCase()];
+  if (cfg && isFinite(cfg.sanityMin) && isFinite(cfg.sanityMax)) {
+    return { ft: [cfg.sanityMin, cfg.sanityMax], h1: [cfg.sanityMin * 0.46, cfg.sanityMax * 0.54], team: [cfg.sanityMin * 0.44, cfg.sanityMax * 0.56] };
+  }
+  const defaults = {
+    nba: { ft:[160,260], h1:[74,130], team:[70,130] },
+    ncaa: { ft:[120,200], h1:[56,100], team:[54,100] },
+    wnba: { ft:[130,200], h1:[60,100], team:[58,100] },
+    euroleague: { ft:[130,200], h1:[60,100], team:[56,100] }
+  };
+  return defaults[String(league || "").toLowerCase()] || { ft:[100,300], h1:[44,154], team:[40,155] };
 }
 
     function validateLines(league, ftLine, h1Line, aLine, bLine) {
@@ -13302,102 +14054,6 @@ btn.addEventListener("click", () => { section.classList.toggle("collapsed"); });
       }
     }
 
-    async function fetchInjuryMeta(base, teamId, teamAvgScored, league) {
-  const result = {
-    scoringMult: 1,
-    notes: [],
-    outCount: 0,
-    dtdCount: 0,
-    unknownImpactCount: 0,
-    hasUnknownImpact: false,
-    highUncertainty: false
-  };
-
-  try {
-    const data = await proxyFetch(`${base}/teams/${teamId}/injuries`).catch(() => null);
-    const items = data?.injuries || data?.items || [];
-    if (!items.length) return result;
-
-    const avgPPG = (isFinite(teamAvgScored) && teamAvgScored > 0) ? teamAvgScored : 80;
-    let totalReduction = 0;
-
-    for (const inj of items) {
-      const status = (inj?.status || inj?.type?.description || "").toLowerCase();
-      const isOut = status.includes("out") || status.includes("injured reserve") || status.includes("suspended");
-      const isDTD = status.includes("questionable") || status.includes("doubtful") || status.includes("day-to-day");
-      if (!isOut && !isDTD) continue;
-
-      const athlete = inj?.athlete || inj?.person || {};
-      const playerName = athlete?.displayName || athlete?.fullName || "Unknown";
-      const tag = isOut ? "OUT" : "DTD";
-
-      if (isOut) result.outCount++;
-      if (isDTD) result.dtdCount++;
-
-      let ppg = 0;
-
-      for (const cat of (athlete?.statistics?.splits?.categories || [])) {
-        for (const stat of (cat.stats || [])) {
-          if (stat.name === "avgPoints" || stat.abbreviation === "PPG") {
-            ppg = parseFloat(stat.value) || 0;
-          }
-        }
-      }
-
-      if (ppg <= 0) {
-        result.unknownImpactCount++;
-
-        const _posAbbr = String(athlete?.position?.abbreviation || "").toUpperCase();
-        const _posImpactMult =
-          (_posAbbr === "C")              ? 1.30 :
-          (_posAbbr === "PF" || _posAbbr === "F") ? 1.15 :
-          (_posAbbr === "SF")             ? 1.05 :
-          (_posAbbr === "SG" || _posAbbr === "G") ? 0.95 :
-          (_posAbbr === "PG")             ? 0.90 :
-          1.00; 
-        const unknownPenalty = (isOut ? 0.02 : 0.01) * _posImpactMult;
-        totalReduction += unknownPenalty;
-        result.notes.push({
-          type: isOut ? "out" : "dtd",
-          text: `${playerName} — ${tag} (impact unknown, ${_posAbbr || "pos?"}) → -${(unknownPenalty * 100).toFixed(1)}%`
-        });
-        continue;
-      }
-
-      const share = ppg / avgPPG;
-      const impact = Math.min(isOut ? share * 0.65 : share * 0.30, 0.22);
-      totalReduction += impact;
-
-      result.notes.push({
-        type: isOut ? "out" : "dtd",
-        text: `${playerName} (${ppg.toFixed(1)} ppg) — ${tag} → -${(impact * 100).toFixed(1)}% offense`
-      });
-    }
-
-    const maxInjCap = league === "nba" ? 0.25 : 0.20;
-    result.scoringMult = 1 - Math.min(totalReduction, maxInjCap);
-    result.hasUnknownImpact = result.unknownImpactCount > 0;
-
-    result.highUncertainty =
-      result.dtdCount >= 2 ||
-      result.unknownImpactCount >= 2 ||
-      (result.dtdCount >= 1 && result.hasUnknownImpact) ||
-      result.outCount >= 3;
-
-    if (result.hasUnknownImpact) {
-      result.notes.push({ type: "meta", text: "Injury caution: some player scoring data unavailable" });
-    }
-
-    if (result.highUncertainty) {
-      result.notes.push({ type: "meta", text: "High injury uncertainty" });
-    }
-  } catch (e) {
-    logDebug("fetchInjuryMeta failed", e);
-  }
-
-  return result;
-}
-
     function stripOTFromScores(scoreA, scoreB, linesA, linesB, regulationPeriods) {
       let sA = scoreA, sB = scoreB;
       if (linesA.length > regulationPeriods && linesB.length > regulationPeriods) {
@@ -13412,6 +14068,539 @@ btn.addEventListener("click", () => { section.classList.toggle("collapsed"); });
       }
       return [sA, sB];
     }
+
+async function fetchNbaSummerGameRefsViaScoreboard(base, teamId) {
+  const tId = String(teamId);
+  const year = new Date().getFullYear();
+  const startDate = new Date(year, 6, 1);
+  const endDate = new Date(year, 6, 31);
+  const dateKeys = [];
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    dateKeys.push(getDateKeyLocal(d));
+  }
+
+  const _summerBatchSize = 5;
+  const payloads = [];
+  for (let _sbi = 0; _sbi < dateKeys.length; _sbi += _summerBatchSize) {
+    const _summerBatchKeys = dateKeys.slice(_sbi, _sbi + _summerBatchSize);
+    const _summerBatchJobs = _summerBatchKeys.map(dateKey => {
+      const key = `${base}:sbscan:${dateKey}`;
+      return _schedCache.has(key)
+        ? _schedCache.get(key)
+        : (() => {
+            const p = proxyFetch(`${base}/scoreboard?dates=${dateKey}&limit=200`).catch(err => {
+              _schedCache.delete(key);
+              return null;
+            });
+            cacheSet(_schedCache, key, p);
+            return p;
+          })();
+    });
+    const _summerBatchPayloads = await Promise.allSettled(_summerBatchJobs);
+    payloads.push(..._summerBatchPayloads);
+  }
+  const refs = [];
+  payloads.forEach(result => {
+    if (result.status !== "fulfilled" || !result.value) return;
+    const events = result.value?.events || [];
+    for (const ev of events) {
+      if (!ev?.id) continue;
+      const comp = ev?.competitions?.[0];
+      if (!comp) continue;
+      const done =
+        comp?.status?.type?.completed ||
+        comp?.status?.type?.name === "STATUS_FINAL" ||
+        comp?.status?.type?.state === "post";
+      if (!done || (comp?.competitors || []).length < 2) continue;
+      const competitors = comp.competitors;
+      const mine = competitors.find(x => matchesTeam(x, tId));
+      const opp = mine ? competitors.find(x => x !== mine) : null;
+      if (!mine || !opp) continue;
+      const ps = s => typeof s === "object" ? parseFloat(s.value ?? s.displayValue ?? 0) : parseFloat(s);
+      refs.push({
+        id: String(ev.id),
+        date: ev.date || "",
+        rawS: ps(mine?.score),
+        rawA: ps(opp?.score),
+        venue: mine?.homeAway || "",
+        oppId: String(opp?.team?.id || "")
+      });
+    }
+  });
+  return refs;
+}
+
+async function fetchScheduleCore(base, teamId, leagueKey, requiredVenue, allowFallback = true) {
+  const rules = LEAGUE_FETCH_RULES[leagueKey];
+  if (!rules) return null;
+
+  const tId = String(teamId);
+  const gameRefs = [];
+  const currentSeason = getCurrentSeasonYear(leagueKey);
+
+  if (leagueKey === "nba_summer") {
+    const summerRefs = await fetchNbaSummerGameRefsViaScoreboard(base, teamId);
+    summerRefs.forEach(r => gameRefs.push(r));
+  } else {
+  const _schedJobList = [];
+  const _schedMeta = [];
+  for (let i = 0; i < rules.recentSeasons; i++) {
+    const season = String(currentSeason - i);
+    for (const stype of rules.scheduleTypes) {
+      const key = `${base}:sched:${teamId}:${season}:${stype}`;
+      const req = _schedCache.has(key)
+        ? _schedCache.get(key)
+        : (() => {
+            const p = proxyFetch(`${base}/teams/${teamId}/schedule?season=${season}&seasontype=${stype}`).catch(err => {
+              _schedCache.delete(key);
+              throw err;
+            });
+            cacheSet(_schedCache, key, p);
+            return p;
+          })();
+      _schedJobList.push(req);
+      _schedMeta.push({ season, stype });
+    }
+  }
+  const _schedPayloads = await Promise.allSettled(_schedJobList);
+  _schedPayloads.forEach((result, _schedIdx) => {
+    if (result.status !== 'fulfilled') {
+      const _schedFailMeta = _schedMeta[_schedIdx] || {};
+      engineDebug("fetchScheduleCore schedule fetch failed for teamId=" + teamId, { season: _schedFailMeta.season, seasontype: _schedFailMeta.stype, reason: result.reason?.message || String(result.reason) });
+      return;
+    }
+    const r = result.value;
+    const events = r?.events || r?.team?.schedule?.events || [];
+    for (const ev of events) {
+      if (!ev?.id) continue;
+
+      const comp = ev?.competitions?.[0];
+      if (!comp) continue;
+
+      const done =
+        comp?.status?.type?.completed ||
+        comp?.status?.type?.name === "STATUS_FINAL" ||
+        comp?.status?.type?.state === "post";
+
+      if (!done || (comp?.competitors || []).length < 2) continue;
+
+      const competitors = comp.competitors;
+
+      const mine = competitors.find(x => matchesTeam(x, tId));
+
+      const opp = mine ? competitors.find(x => x !== mine) : null;
+      if (!mine || !opp) continue;
+      const ps = s => typeof s === "object" ? parseFloat(s.value ?? s.displayValue ?? 0) : parseFloat(s);
+
+      gameRefs.push({
+        id: String(ev.id),
+        date: ev.date || "",
+        rawS: ps(mine?.score),
+        rawA: ps(opp?.score),
+        venue: mine?.homeAway || "",
+        oppId: String(opp?.team?.id || "")
+      });
+    }
+  });
+  }
+
+  if (!gameRefs.length) return null;
+
+  const seen = new Set();
+  const unique = gameRefs
+    .filter(g => {
+      if (seen.has(g.id)) return false;
+      seen.add(g.id);
+      return true;
+    })
+    .sort((a, b) => {
+      const da = a.date ? new Date(a.date).getTime() : 0;
+      const db = b.date ? new Date(b.date).getTime() : 0;
+      return db - da;
+    });
+
+  const strictFiltered = requiredVenue ? unique.filter(g => g.venue === requiredVenue) : unique;
+  const venueReliable = strictFiltered.length >= 2;
+  const usedVenueFallback = !!requiredVenue && !venueReliable && unique.length >= 2 && allowFallback;
+  const chosen = venueReliable ? strictFiltered : (allowFallback ? unique : strictFiltered);
+
+  if (chosen.length < 2) return null;
+
+  const scored10 = [];
+  const allowed10 = [];
+  const h1Scored10 = [];
+  const h1Allowed10 = [];
+
+  const qS = { q1:[], q2:[], q3:[], q4:[] };
+  const qA = { q1:[], q2:[], q3:[], q4:[] };
+
+    const _chosenForSummary = chosen.slice(0, Math.min(chosen.length, 10));
+    const summaries = await Promise.all(_chosenForSummary.map(async ref => {
+      let ms = ref.rawS;
+      let os = ref.rawA;
+      let h1m = 0, h1o = 0;
+      let gotLS = false;
+      let advanced = null;
+
+      try {
+    const key = `${base}:sum:${ref.id}`;
+    const data = await (_summaryCache.has(key)
+      ? _summaryCache.get(key)
+      : (() => {
+          const p = proxyFetch(`${base}/summary?event=${ref.id}`).catch(err => {
+            _summaryCache.delete(key);
+            throw err;
+          });
+          cacheSet(_summaryCache, key, p);
+          return p;
+        })());
+
+    const hc = data?.header?.competitions?.[0];
+    const boxscore = data?.boxscore;
+    const venueAddr = hc?.venue?.address || data?.gameInfo?.venue?.address || null;
+    ref.venueCity = venueAddr?.city || null;
+    ref.venueState = venueAddr?.state || null;
+
+    if (hc) {
+      const competitors = hc?.competitors || [];
+      const mine = competitors.find(c => matchesTeam(c, tId));
+      const opp = competitors.find(c => !matchesTeam(c, tId));
+
+      if (mine && opp) {
+        gotLS = true;
+        ms = parseFloat(mine.score) || ms;
+        os = parseFloat(opp.score) || os;
+
+        const lm = mine?.linescores || [];
+        const lo = opp?.linescores || [];
+
+        const _wentToOT = lm.length > rules.regulationPeriods && lo.length > rules.regulationPeriods;
+
+        if (lm.length >= 1 && lo.length >= 1) {
+          if (rules.regulationPeriods >= 4) {
+            h1m = (readVal(lm[0]) || 0) + (readVal(lm[1]) || 0);
+            h1o = (readVal(lo[0]) || 0) + (readVal(lo[1]) || 0);
+            if (lm.length >= 4 && lo.length >= 4) {
+              const _qm = [readVal(lm[0]), readVal(lm[1]), readVal(lm[2]), readVal(lm[3])];
+              const _qo = [readVal(lo[0]), readVal(lo[1]), readVal(lo[2]), readVal(lo[3])];
+              if (_qm.every(v => v > 0) && _qo.every(v => v > 0)) {
+                ref.qs = { m: _qm, o: _qo };
+              }
+            }
+          } else {
+            [h1m, h1o] = extractFirstHalf(lm, lo);
+          }
+          [ms, os] = stripOTFromScores(ms, os, lm, lo, rules.regulationPeriods);
+        }
+
+        if (boxscore && typeof boxscore === 'object') {
+          let sMap = {};
+          const safeTeams = Array.isArray(boxscore.teams) ? boxscore.teams : [];
+          const myBox = safeTeams.find(t => matchesTeam(t, tId));
+          
+          if (myBox && Array.isArray(myBox.statistics) && myBox.statistics.length > 0) {
+            myBox.statistics.forEach(s => { sMap[s.name] = s.displayValue; });
+          } else if (Array.isArray(boxscore.players)) {
+            const safePlayers = boxscore.players || [];
+            const myPlayers = safePlayers.find(p => matchesTeam(p, tId));
+            if (myPlayers && Array.isArray(myPlayers.statistics) && myPlayers.statistics[0] && Array.isArray(myPlayers.statistics[0].athletes)) {
+              let fga = 0, fta = 0, orb = 0, tov = 0;
+              const keys = myPlayers.statistics[0].names || [];
+              const iFga = keys.indexOf("FGA");
+              const iFta = keys.indexOf("FTA");
+              const iOrb = keys.indexOf("OREB");
+              const iTov = keys.indexOf("TO");
+              
+              myPlayers.statistics[0].athletes.forEach(ath => {
+                const st = ath.stats || [];
+                if (iFga >= 0) fga += parseFloat(st[iFga]) || 0;
+                if (iFta >= 0) fta += parseFloat(st[iFta]) || 0;
+                if (iOrb >= 0) orb += parseFloat(st[iOrb]) || 0;
+                if (iTov >= 0) tov += parseFloat(st[iTov]) || 0;
+              });
+              sMap = { fieldGoals: fga, freeThrows: fta, offensiveRebounds: orb, turnovers: tov };
+            }
+          }
+
+          
+          
+          if (Object.keys(sMap).length > 0 && !_wentToOT) {
+            const gameMinutes = leagueKey === "nba" ? 48 : 40;
+            const advResult = calculateAdvancedMetrics(sMap, ms, os, gameMinutes);
+            if (advResult) {
+              advanced = advResult;
+              trackerDebug(`Level 2 Stats Extracted: ${ref.id}`, advanced);
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    logDebug("fetchScheduleCore summary failed", e);
+  }
+
+  if (isNaN(ms) || isNaN(os) || ms <= 0 || os <= 0) return null;
+
+  return {
+    ms: Math.round(ms),
+    os: Math.round(os),
+    h1m: gotLS && h1m > 0 ? Math.round(h1m) : null,
+    h1o: gotLS && h1o > 0 ? Math.round(h1o) : null,
+    qs: ref.qs,
+    advanced: advanced,
+    
+    date: ref.date || null,
+    venueCity: ref.venueCity || null,
+    venueState: ref.venueState || null
+  };
+}));
+
+  const h1Scored10Dates = [];
+  const qDates = { q1:[], q2:[], q3:[], q4:[] };
+
+  summaries.filter(Boolean).forEach(game => {
+    scored10.push(game.ms);
+    allowed10.push(game.os);
+
+    if (game.h1m !== null && game.h1o !== null) {
+      h1Scored10.push(game.h1m);
+      h1Allowed10.push(game.h1o);
+      h1Scored10Dates.push(game.date || null);
+    }
+
+    if (game.qs) {
+      qS.q1.push(game.qs.m[0]); qS.q2.push(game.qs.m[1]); qS.q3.push(game.qs.m[2]); qS.q4.push(game.qs.m[3]);
+      qA.q1.push(game.qs.o[0]); qA.q2.push(game.qs.o[1]); qA.q3.push(game.qs.o[2]); qA.q4.push(game.qs.o[3]);
+      qDates.q1.push(game.date || null); qDates.q2.push(game.date || null);
+      qDates.q3.push(game.date || null); qDates.q4.push(game.date || null);
+    }
+  });
+
+    return scored10.length >= 2 
+? { 
+scored: scored10.slice(0, 10), 
+allowed: allowed10.slice(0, 10), 
+        h1Scored: h1Scored10.slice(0, 10), 
+h1Allowed: h1Allowed10.slice(0, 10), 
+q1Scored: qS.q1.slice(0, 10), q2Scored: qS.q2.slice(0, 10), q3Scored: qS.q3.slice(0, 10), q4Scored: qS.q4.slice(0, 10), 
+q1Allowed: qA.q1.slice(0, 10), q2Allowed: qA.q2.slice(0, 10), q3Allowed: qA.q3.slice(0, 10), q4Allowed: qA.q4.slice(0, 10), 
+        ortg10: summaries.filter(s => s && s.advanced).map(s => s.advanced.ortg),
+        drtg10: summaries.filter(s => s && s.advanced).map(s => s.advanced.drtg),
+        pace10: summaries.filter(s => s && s.advanced).map(s => s.advanced.pace),
+        scored10,
+        allowed10,
+        h1Scored10,
+        h1Allowed10,
+
+        h1ScoredDates: h1Scored10Dates,
+        q1ScoredDates: qDates.q1, q2ScoredDates: qDates.q2,
+        q3ScoredDates: qDates.q3, q4ScoredDates: qDates.q4,
+        lastGameDate: unique[0]?.date || null,
+        lastGameCity: (summaries.find(Boolean))?.venueCity || null,
+        lastGameState: (summaries.find(Boolean))?.venueState || null,
+        venueReliable,
+        usedVenueFallback,
+
+        sos: (() => {
+          const cache = window._espnStandingsCache?.[leagueKey]?.data;
+          if (!cache) return null;
+          const oppPcts = unique.slice(0, 10).map(g => cache[g.oppId]?.pct).filter(v => isFinite(v) && v > 0);
+          if (oppPcts.length < 3) return null;
+          return parseFloat((oppPcts.reduce((a, b) => a + b, 0) / oppPcts.length).toFixed(3));
+        })()
+      }
+    : null;
+
+}
+
+async function fetchH2HCore(base, teamAId, teamBId, leagueKey) {
+  const rules = LEAGUE_FETCH_RULES[leagueKey];
+  if (!rules) return [];
+
+  const tA = String(teamAId);
+  const tB = String(teamBId);
+  const currentSeason = getCurrentSeasonYear(leagueKey);
+
+  const lookbackYears = getParam("h2hLookbackSeasons", leagueKey) ?? 4;
+  const minSeason = currentSeason - lookbackYears;
+  const minDateTs = new Date(minSeason, 0, 1).getTime();
+
+  const scheduleJobs = [];
+
+  for (let season = currentSeason; season >= minSeason; season--) {
+    for (const stype of rules.h2hScheduleTypes) {
+
+      const key = `${base}:sched:${tA}:${season}:${stype}`;
+      const req = _schedCache.has(key)
+        ? _schedCache.get(key)
+        : (() => {
+            const p = proxyFetch(`${base}/teams/${teamAId}/schedule?season=${season}&seasontype=${stype}`).catch(err => {
+              _schedCache.delete(key);
+              throw err;
+            });
+            cacheSet(_schedCache, key, p);
+            return p;
+          })();
+
+      scheduleJobs.push(
+        req.catch(err => {
+          logDebug("fetchH2HCore schedule scan failed", err);
+          return null;
+        })
+      );
+    }
+  }
+
+  const schedulePayloads = await Promise.all(scheduleJobs);
+  const candidateMap = new Map();
+
+  schedulePayloads
+    .filter(Boolean)
+    .forEach(r => {
+      const events = [
+        ...(r?.events || []),
+        ...(r?.team?.schedule?.events || [])
+      ];
+
+      events.forEach(ev => {
+        const comp = ev?.competitions?.[0];
+        if (!ev?.id || !comp) return;
+
+        const done =
+          comp?.status?.type?.completed ||
+          comp?.status?.type?.name === "STATUS_FINAL" ||
+          comp?.status?.type?.state === "post";
+
+        if (!done) return;
+
+        const competitors = comp?.competitors || [];
+        if (competitors.length < 2) return;
+
+        const hasA = competitors.some(c => matchesTeam(c, tA));
+        const hasB = competitors.some(c => matchesTeam(c, tB));
+        if (!hasA || !hasB) return;
+
+        const rawDate = ev?.date || comp?.date || "";
+        const gameTs = rawDate ? Date.parse(rawDate) : NaN;
+        if (isFinite(gameTs) && gameTs < minDateTs) return;
+
+        candidateMap.set(String(ev.id), {
+          id: String(ev.id),
+          date: rawDate
+        });
+      });
+    });
+
+  if (!candidateMap.size) return [];
+
+  const refs = [...candidateMap.values()]
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+    .slice(0, 10);
+
+  const summaries = await Promise.all(
+    refs.map(async ref => {
+      try {
+        const key = `${base}:sum:${ref.id}`;
+        const data = await (_summaryCache.has(key)
+          ? _summaryCache.get(key)
+          : (() => {
+              const p = proxyFetch(`${base}/summary?event=${ref.id}`).catch(err => {
+                _summaryCache.delete(key);
+                throw err;
+              });
+              cacheSet(_summaryCache, key, p);
+              return p;
+            })());
+
+        const hc = data?.header?.competitions?.[0];
+        if (!hc) return null;
+
+        const done =
+          hc?.status?.type?.completed ||
+          hc?.status?.type?.name === "STATUS_FINAL" ||
+          hc?.status?.type?.state === "post";
+
+        if (!done) return null;
+
+        const gameDate = hc?.date || ref.date || "";
+        const gameTs = gameDate ? Date.parse(gameDate) : NaN;
+        if (isFinite(gameTs) && gameTs < minDateTs) return null;
+
+        const competitors = hc?.competitors || [];
+        const cA = competitors.find(c => matchesTeam(c, tA));
+        const cB = competitors.find(c => matchesTeam(c, tB));
+        if (!cA || !cB) return null;
+
+        const lA = cA?.linescores || [];
+        const lB = cB?.linescores || [];
+
+        let sA = readVal(cA?.score);
+        let sB = readVal(cB?.score);
+
+        if ((!isFinite(sA) || sA <= 0) && lA.length) {
+          sA = lA.reduce((t, p) => t + readVal(p), 0);
+        }
+        if ((!isFinite(sB) || sB <= 0) && lB.length) {
+          sB = lB.reduce((t, p) => t + readVal(p), 0);
+        }
+
+        if (!isFinite(sA) || !isFinite(sB) || sA <= 0 || sB <= 0) return null;
+
+        let h1A = 0;
+        let h1B = 0;
+        let h2A = 0;
+        let h2B = 0;
+
+        if (lA.length && lB.length) {
+          if (rules.regulationPeriods >= 4) {
+            h1A = lA.length >= 2 ? readVal(lA[0]) + readVal(lA[1]) : 0;
+            h1B = lB.length >= 2 ? readVal(lB[0]) + readVal(lB[1]) : 0;
+            h2A = lA.length >= 4 ? readVal(lA[2]) + readVal(lA[3]) : 0;
+            h2B = lB.length >= 4 ? readVal(lB[2]) + readVal(lB[3]) : 0;
+          } else {
+            [h1A, h1B] = extractFirstHalf(lA, lB);
+            [h2A, h2B] = extractSecondHalf(lA, lB);
+          }
+
+                    [sA, sB] = stripOTFromScores(sA, sB, lA, lB, rules.regulationPeriods);
+        }
+
+        return {
+          eventId: ref.id,
+          teamAId: tA,
+          teamBId: tB,
+          scoreA: Math.round(sA),
+          scoreB: Math.round(sB),
+          h1A: Math.round(h1A),
+          h1B: Math.round(h1B),
+          h2A: Math.round(h2A),
+          h2B: Math.round(h2B),
+          q1A: readVal(lA[0]), q1B: readVal(lB[0]),
+          q2A: readVal(lA[1]), q2B: readVal(lB[1]),
+          q3A: readVal(lA[2]), q3B: readVal(lB[2]),
+          q4A: readVal(lA[3]), q4B: readVal(lB[3]),
+          date: gameDate
+        };
+      } catch (e) {
+        logDebug("fetchH2HCore summary failed", e);
+        return null;
+      }
+    })
+  );
+
+  return summaries
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+    .slice(0, 10);
+}
+
+async function fetchNcaaSchedule(base, teamId, requiredVenue, allowFallback = true, leagueKey = "ncaa") {
+  return fetchScheduleCore(base, teamId, leagueKey, requiredVenue, allowFallback);
+}
+
+async function fetchNcaaH2H(base, teamAId, teamBId, leagueKey = "ncaa") {
+  return fetchH2HCore(base, teamAId, teamBId, leagueKey);
+}
 
 function renderInjuryBox(boxId, contentId, inj) {
       const box = document.getElementById(boxId);
@@ -14336,20 +15525,80 @@ function computeFTProjection({ league, parsed, lines, injMultA = 1, injMultB = 1
   const aVenueDiag = combineVenueDiag(aScoredBlendFT.diag, aAllowedBlendFT.diag);
   const bVenueDiag = combineVenueDiag(bScoredBlendFT.diag, bAllowedBlendFT.diag);
 
+  const isEspnLeague = ["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl","euroleague","eurocup","champions_league","turkey_bsl","acb","bbl","ausnbl","lba","bleague","united_league","proa"].includes(league);
+  const leaguePaceBase = LEAGUE_PACE_BASES[league] || LEAGUE_PACE_BASES.default || 74;
+  const leagueRatingBase = LEAGUE_RATING_BASES[league] || LEAGUE_RATING_BASES.default || 110;
+  // FIX #23: defensiveFloorFlag below compares raw points-allowed (aAllowed/
+  // bAllowed) against a per-100-possession rating base, which is only
+  // roughly the same magnitude for NBA-paced leagues. compute1HProjection
+  // already does this correctly with a points-basis constant (leagueBase1H)
+  // — add the FT equivalent (per-team full-game points) here.
   const leagueBaseFT = eb / 2;
+  let synPace = leaguePaceBase;
+
   const ctxA = AppState.context.data?.A || {};
   const ctxB = AppState.context.data?.B || {};
+  const avgPaceA = avgOrNaN(ctxA.pace10);
+  const avgPaceB = avgOrNaN(ctxB.pace10);
+  
+  const clamp = getEffectivePaceClamp(league);
 
-  const _tw = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.60;
-  const _ow = 1 - _tw;
+    let hasRealPace = isFinite(avgPaceA) && avgPaceA > 0 && isFinite(avgPaceB) && avgPaceB > 0;
 
-  let aS = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw + bAllowed * _ow) : aS_pre;
-  let bS = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw + aAllowed * _ow) : bS_pre;
+  hasRealPace = hasRealPace && (ctxA.pace10 || []).length >= 5 && (ctxB.pace10 || []).length >= 5;
 
-  let synNetA = isFinite(aOverallAvg) && isFinite(aAllowed) ? (aOverallAvg - aAllowed) : NaN;
-  let synNetB = isFinite(bOverallAvg) && isFinite(bAllowed) ? (bOverallAvg - bAllowed) : NaN;
+  
+  let hasRealRatings = isFinite(avgOrNaN(ctxA.ortg10)) && isFinite(avgOrNaN(ctxA.drtg10)) && isFinite(avgOrNaN(ctxB.ortg10)) && isFinite(avgOrNaN(ctxB.drtg10))
+    && (ctxA.ortg10 || []).length >= 5 && (ctxB.ortg10 || []).length >= 5;
+  engineDebug("FT advanced stats availability", {
+    hasRealPace, hasRealRatings,
+    ortg10A: (ctxA.ortg10 || []).length, drtg10A: (ctxA.drtg10 || []).length, pace10A: (ctxA.pace10 || []).length,
+    ortg10B: (ctxB.ortg10 || []).length, drtg10B: (ctxB.drtg10 || []).length, pace10B: (ctxB.pace10 || []).length
+  });
+
+  let synNetA = NaN, synNetB = NaN;
   let usedAdvanced = false;
-  let synPace = 1.0;
+
+  if (hasRealPace) {
+    
+    const rawPace = (avgPaceA + avgPaceB) / 2;
+    synPace = clampNumber(rawPace, leaguePaceBase * clamp.min, leaguePaceBase * clamp.max);
+  } else {
+    const totalA = avgOrNaN(aFTS) + avgOrNaN(aFTA);
+    const totalB = avgOrNaN(bFTS) + avgOrNaN(bFTA);
+    if (isFinite(totalA) && isFinite(totalB)) {
+      const rawPace = ((totalA + totalB) / (eb * 2)) * leaguePaceBase;
+      synPace = clampNumber(rawPace, leaguePaceBase * clamp.min, leaguePaceBase * clamp.max);
+    }
+  }
+
+  let aS, bS;
+  if (isEspnLeague && hasRealRatings && hasRealPace) {
+    const projectedRatingA = avgOrNaN(ctxA.ortg10) + avgOrNaN(ctxB.drtg10) - leagueRatingBase;
+    const projectedRatingB = avgOrNaN(ctxB.ortg10) + avgOrNaN(ctxA.drtg10) - leagueRatingBase;
+
+    const _ftRegMinutes = getLeagueRegulationMinutes(league);
+    const _ftDivisor = 100 * (48 / _ftRegMinutes);
+    aS = (synPace * projectedRatingA) / _ftDivisor;
+    bS = (synPace * projectedRatingB) / _ftDivisor;
+    synNetA = avgOrNaN(ctxA.ortg10) - avgOrNaN(ctxA.drtg10);
+    synNetB = avgOrNaN(ctxB.ortg10) - avgOrNaN(ctxB.drtg10);
+    usedAdvanced = true;
+
+    const VENUE_ADVANCED_BLEND_FACTOR = 0.35;
+    if (aVenueDiag.enabled && isFinite(aVenueAvg) && isFinite(aOverallAvg)) {
+      aS += (aVenueAvg - aOverallAvg) * VENUE_ADVANCED_BLEND_FACTOR;
+    }
+    if (bVenueDiag.enabled && isFinite(bVenueAvg) && isFinite(bOverallAvg)) {
+      bS += (bVenueAvg - bOverallAvg) * VENUE_ADVANCED_BLEND_FACTOR;
+    }
+  } else {
+    
+    const _tw = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.65;
+    const _ow = 1 - _tw;
+    aS = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw + bAllowed * _ow) : aS_pre;
+    bS = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw + aAllowed * _ow) : bS_pre;
+  }
 
   if (!isFinite(synNetA) && isFinite(aOverallAvg) && isFinite(aAllowed)) {
     synNetA = aOverallAvg - aAllowed;
@@ -14512,18 +15761,56 @@ function compute1HProjection({ league, parsed, lines, injMultA = 1, injMultB = 1
   const bVenueDiag1 = combineVenueDiag(bScoredBlend1.diag, bAllowedBlend1.diag);
 
   const sampleSize = Math.min(aS1.length, bS1.length);
-  const leagueBase1H = (eb / 2) * 0.44;
+  const leagueBase1H = (eb / 2) * 0.5;
   let aS_pre = anchorProjection(aScoredBlend1.value, sampleSize, leagueBase1H);
   let bS_pre = anchorProjection(bScoredBlend1.value, sampleSize, leagueBase1H);
 
   let aAllowed = aAllowedBlend1.value;
   let bAllowed = bAllowedBlend1.value;
 
-  const _tw1 = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.60;
-  const _ow1 = 1 - _tw1;
+  const isEspnLeague = ["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl","euroleague","eurocup","champions_league","turkey_bsl","acb","bbl","ausnbl","lba","bleague","united_league","proa"].includes(league);
+  const leaguePaceBase = LEAGUE_PACE_BASES[league] || LEAGUE_PACE_BASES.default || 74;
+  const leagueRatingBase = LEAGUE_RATING_BASES[league] || LEAGUE_RATING_BASES.default || 110;
 
-  let projA1H = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw1 + bAllowed * _ow1) : aS_pre;
-  let projB1H = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw1 + aAllowed * _ow1) : bS_pre;
+  const ctxA = AppState.context.data?.A || {};
+  const ctxB = AppState.context.data?.B || {};
+  const avgPaceA = avgOrNaN(ctxA.pace10);
+  const avgPaceB = avgOrNaN(ctxB.pace10);
+  const clamp = getEffectivePaceClamp(league);
+
+  let hasRealPace = isFinite(avgPaceA) && avgPaceA > 0 && isFinite(avgPaceB) && avgPaceB > 0;
+  // FIX #27: computeFTProjection gates hasRealPace on >=5 pace10 points per
+  // side before trusting the advanced-stats branch; this function was missing
+  // that same gate, letting H1 flip into the ratings-based projection off a
+  // single fetched data point while FT requires 5. Match FT's standard.
+  hasRealPace = hasRealPace && (ctxA.pace10 || []).length >= 5 && (ctxB.pace10 || []).length >= 5;
+
+  let hasRealRatings = isFinite(avgOrNaN(ctxA.ortg10)) && isFinite(avgOrNaN(ctxA.drtg10)) && isFinite(avgOrNaN(ctxB.ortg10)) && isFinite(avgOrNaN(ctxB.drtg10))
+    && (ctxA.ortg10 || []).length >= 5 && (ctxB.ortg10 || []).length >= 5;
+
+  let synPace = leaguePaceBase;
+  if (hasRealPace) {
+    const rawPace = (avgPaceA + avgPaceB) / 2;
+    synPace = clampNumber(rawPace, leaguePaceBase * clamp.min, leaguePaceBase * clamp.max);
+  }
+
+  let projA1H, projB1H;
+  if (isEspnLeague && hasRealRatings && hasRealPace) {
+
+    const projectedRatingA = avgOrNaN(ctxA.ortg10) + avgOrNaN(ctxB.drtg10) - leagueRatingBase;
+    const projectedRatingB = avgOrNaN(ctxB.ortg10) + avgOrNaN(ctxA.drtg10) - leagueRatingBase;
+
+    const _h1RegMinutes = getLeagueRegulationMinutes(league);
+    const halfDivisor = 200 * (48 / _h1RegMinutes);
+    projA1H = (synPace * projectedRatingA) / halfDivisor;
+    projB1H = (synPace * projectedRatingB) / halfDivisor;
+  } else {
+
+    const _tw1 = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.65;
+    const _ow1 = 1 - _tw1;
+    projA1H = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw1 + bAllowed * _ow1) : aS_pre;
+    projB1H = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw1 + aAllowed * _ow1) : bS_pre;
+  }
 
   projA1H = applyVolatility(projA1H, aS1, volLimit, league);
   projB1H = applyVolatility(projB1H, bS1, volLimit, league);
@@ -15798,6 +17085,7 @@ function withErrorBoundary(fn, context) {
 }
 
 function extractInputs(league) {
+  const isNbaOrNcaa = league === "nba" || league === "wnba" || league === "wnba_pre" || league === "ncaa";
   function readLine(id) {
     const v = parseMarketLine((document.getElementById(id)?.value || "").trim());
     return isFinite(v) ? v : null;
@@ -15812,17 +17100,36 @@ function extractInputs(league) {
     bFTScored:  readSeries("bFTScored"),  bFTAllowed: readSeries("bFTAllowed"),
     a1HScored:  readSeries("a1HScored"),  a1HAllowed: readSeries("a1HAllowed"),
     b1HScored:  readSeries("b1HScored"),  b1HAllowed: readSeries("b1HAllowed"),
-    aFTH2H:     readSeries("aFTH2H"),     bFTH2H:     readSeries("bFTH2H"),
-    a1HH2H:     readSeries("a1HH2H"),     b1HH2H:     readSeries("b1HH2H"),
+    aQ1Scored:  readSeries("aQ1Scored"),  aQ1Allowed: readSeries("aQ1Allowed"),
+    aQ2Scored:  readSeries("aQ2Scored"),  aQ2Allowed: readSeries("aQ2Allowed"),
+    aQ3Scored:  readSeries("aQ3Scored"),  aQ3Allowed: readSeries("aQ3Allowed"),
+    aQ4Scored:  readSeries("aQ4Scored"),  aQ4Allowed: readSeries("aQ4Allowed"),
+    bQ1Scored:  readSeries("bQ1Scored"),  bQ1Allowed: readSeries("bQ1Allowed"),
+    bQ2Scored:  readSeries("bQ2Scored"),  bQ2Allowed: readSeries("bQ2Allowed"),
+    bQ3Scored:  readSeries("bQ3Scored"),  bQ3Allowed: readSeries("bQ3Allowed"),
+    bQ4Scored:  readSeries("bQ4Scored"),  bQ4Allowed: readSeries("bQ4Allowed"),
+    aFTH2H: readSeries("aFTH2H"),  bFTH2H: readSeries("bFTH2H"),
+    a1HH2H: readSeries("a1HH2H"),  b1HH2H: readSeries("b1HH2H"),
+    aQ1H2H: readSeries("aQ1H2H"),  bQ1H2H: readSeries("bQ1H2H"),
+    aQ2H2H: readSeries("aQ2H2H"),  bQ2H2H: readSeries("bQ2H2H"),
+    aQ3H2H: readSeries("aQ3H2H"),  bQ3H2H: readSeries("bQ3H2H"),
+    aQ4H2H: readSeries("aQ4H2H"),  bQ4H2H: readSeries("bQ4H2H"),
     aFTScoredHome: readSeries("aFTScoredHome"), aFTAllowedHome: readSeries("aFTAllowedHome"),
     aFTScoredAway: readSeries("aFTScoredAway"), aFTAllowedAway: readSeries("aFTAllowedAway"),
     bFTScoredHome: readSeries("bFTScoredHome"), bFTAllowedHome: readSeries("bFTAllowedHome"),
-    bFTScoredAway: readSeries("bFTScoredAway"), bFTAllowedAway: readSeries("bFTAllowedAway")
+    bFTScoredAway: readSeries("bFTScoredAway"), bFTAllowedAway: readSeries("bFTAllowedAway"),
   };
   const lines = {
     ftLine, h1Line,
-    aLine: readLine("teamAMarket"),
-    bLine: readLine("teamBMarket")
+
+    aLine:     readLine("teamAMarket"),
+    bLine:     readLine("teamBMarket"),
+    q1aLine:   readLine("q1TeamAMarket"),
+    q1bLine:   readLine("q1TeamBMarket"),
+    h1aLine:   readLine("h1TeamAMarket"),
+    h1bLine:   readLine("h1TeamBMarket"),
+    highQLine: readLine("highQTotalMarket"),
+    lowQLine:  readLine("lowQTotalMarket"),
   };
   return { parsed, lines };
 }
@@ -16202,7 +17509,314 @@ const h1Calc = compute1HProjection({
         let h1aPick = getPick(h1aEdge, finalLines.h1aLine, league, "h1", { teamSc: h1Calc.aS1 });
         let h1bPick = getPick(h1bEdge, finalLines.h1bLine, league, "h1", { teamSc: h1Calc.bS1 });
 
-        const q1 = null, q2 = null, q3 = null, q4 = null;
+        const hasLevel2 = (AppState.context.data.A.ortg10?.length >= 1) && 
+                          (AppState.context.data.B.ortg10?.length >= 1);
+        const hasManual1H = (safeArr(parsed.a1HScored)?.length >= 2) && (safeArr(parsed.b1HScored)?.length >= 2);
+
+        if ((league === "nba" || league === "wnba" || league === "wnba_pre") && !hasLevel2 && !hasManual1H) {
+          h1Pick = "NO PLAY";
+          h1Calc.projA1H = NaN;
+          h1Calc.projB1H = NaN;
+        }
+
+                            const computeQ = (qKey, lineVal, injA = g_injA.scoringMult, injB = g_injB.scoringMult, config = {}) => {
+
+      const aS = getManualSeries("A", qKey, parsed);
+      const bS = getManualSeries("B", qKey, parsed);
+
+      const _dateAwareAvgAQ = getDateAwareOrFallbackAverage(aS, "A", qKey);
+      const _dateAwareAvgBQ = getDateAwareOrFallbackAverage(bS, "B", qKey);
+
+      const pKeyA = "a" + qKey.toUpperCase() + "Allowed";
+      const pKeyB = "b" + qKey.toUpperCase() + "Allowed";
+      const aA = (parsed[pKeyA] && parsed[pKeyA].length) ? parsed[pKeyA] : (AppState.context.data.A[qKey + "Allowed"] || []);
+      const bA = (parsed[pKeyB] && parsed[pKeyB].length) ? parsed[pKeyB] : (AppState.context.data.B[qKey + "Allowed"] || []);
+
+      
+      const volLimit = getMarketVolLimit(league, qKey);
+      const sampleSize = Math.min(aS.length, bS.length);
+      const leagueBaseQ = (LEAGUE_BASES[league] || 160) / 8;
+
+      const ctxAQ = AppState.context.data?.A || {};
+      const ctxBQ = AppState.context.data?.B || {};
+
+      const hasAdvancedQ = isFinite(avgOrNaN(ctxAQ.ortg10)) && isFinite(avgOrNaN(ctxAQ.drtg10)) &&
+                           isFinite(avgOrNaN(ctxBQ.ortg10)) && isFinite(avgOrNaN(ctxBQ.drtg10)) &&
+                           isFinite(avgOrNaN(ctxAQ.pace10)) && avgOrNaN(ctxAQ.pace10) > 0 &&
+                           isFinite(avgOrNaN(ctxBQ.pace10)) && avgOrNaN(ctxBQ.pace10) > 0 &&
+                           (ctxAQ.ortg10 || []).length >= 5 && (ctxBQ.ortg10 || []).length >= 5;
+      const leaguePaceBaseQ = LEAGUE_PACE_BASES[league] || 74;
+      const leagueRatingBaseQ = LEAGUE_RATING_BASES[league] || 110;
+
+      let projA, projB;
+      const _dynWeightsQ = getDynamicWeights(
+        getSampleTier(aS, bS),
+        globalModelState?.volState?.combinedVolRatio ?? 0.5,
+        league
+      );
+      if (hasAdvancedQ) {
+        const synPaceQ = (avgOrNaN(ctxAQ.pace10) + avgOrNaN(ctxBQ.pace10)) / 2;
+        const projRatingAQ = avgOrNaN(ctxAQ.ortg10) + avgOrNaN(ctxBQ.drtg10) - leagueRatingBaseQ;
+        const projRatingBQ = avgOrNaN(ctxBQ.ortg10) + avgOrNaN(ctxAQ.drtg10) - leagueRatingBaseQ;
+
+        const _qRegMinutes = getLeagueRegulationMinutes(league);
+        const qDivisor = 400 * (48 / _qRegMinutes);
+        projA = anchorProjection((synPaceQ * projRatingAQ) / qDivisor, sampleSize, leagueBaseQ);
+        projB = anchorProjection((synPaceQ * projRatingBQ) / qDivisor, sampleSize, leagueBaseQ);
+      } else {
+
+        const _twQ = isFinite(_dynWeightsQ?.teamWeight) ? Number(_dynWeightsQ.teamWeight) : 0.65;
+        const _owQ = 1 - _twQ;
+
+        projA = anchorProjection(_dateAwareAvgAQ * _twQ + avgOrNaN(bA) * _owQ, sampleSize, leagueBaseQ);
+        projB = anchorProjection(_dateAwareAvgBQ * _twQ + avgOrNaN(aA) * _owQ, sampleSize, leagueBaseQ);
+      }
+
+      // AUDIT FIX #5: was hardcoded to 1 (always full-strength, no way to dial
+      // down without editing the literal). Now reads the tunable registry entry.
+      const QUARTER_VENUE_PROXY_FACTOR = isFinite(getParam("quarterVenueProxyFactor", league)) ? Number(getParam("quarterVenueProxyFactor", league)) : 1;
+      if (ftCalc.aVenueEnabled && isFinite(ftCalc.aVenueAdjustment?.offensiveAdjustment)) {
+        projA += (ftCalc.aVenueAdjustment.offensiveAdjustment / 4) * QUARTER_VENUE_PROXY_FACTOR;
+      }
+      if (ftCalc.bVenueEnabled && isFinite(ftCalc.bVenueAdjustment?.offensiveAdjustment)) {
+        projB += (ftCalc.bVenueAdjustment.offensiveAdjustment / 4) * QUARTER_VENUE_PROXY_FACTOR;
+      }
+
+      projA = applyVolatility(projA, aS, volLimit, league);
+      projB = applyVolatility(projB, bS, volLimit, league);
+
+      projA *= injA;
+      projB *= injB;
+
+      
+
+      const _qInjOppBoostFactor = getParam("injuryOppBoostFactor", league) ?? INJURY_OPPONENT_BOOST_FACTOR;
+      if (injA < 1) projB *= (1 + (1 - injA) * _qInjOppBoostFactor);
+      if (injB < 1) projA *= (1 + (1 - injB) * _qInjOppBoostFactor);
+
+      // FIX #17: quarters previously never received the rest-days/back-to-back/
+      // travel intelligence signal that FT and H1 both apply via STEP6. Wire it
+      // in here the same way FT does (per-team signal, damped by the opponent's
+      // volatility), scaled down proportionally for a quarter: H1 already scales
+      // the signal by /4 for a half, so a quarter (half of a half) uses /8.
+      const aVolQ = getVolatilityRatioForSeries(aS, volLimit);
+      const bVolQ = getVolatilityRatioForSeries(bS, volLimit);
+      const intelQ = computeIntelligencePack(league);
+      const intelSignalAQ = buildTeamMarketIntelSignal(intelQ, "A");
+      const intelSignalBQ = buildTeamMarketIntelSignal(intelQ, "B");
+      if (isFinite(intelSignalAQ.signal) && intelSignalAQ.signal !== 0) {
+        projA = applyDampedIntelSignal(projA, intelSignalAQ.signal / 8, bVolQ);
+      }
+      if (isFinite(intelSignalBQ.signal) && intelSignalBQ.signal !== 0) {
+        projB = applyDampedIntelSignal(projB, intelSignalBQ.signal / 8, aVolQ);
+      }
+
+      const aH2H = getH2HSeries("A", qKey, parsed);
+      const bH2H = getH2HSeries("B", qKey, parsed);
+      const hasH2H = maybeReadH2HEnabled(qKey) && aH2H.length >= 2 && bH2H.length >= 2;
+      const tier = getSampleTier(aS, bS);
+
+      const qFullModel = tier === "full";
+      const qProjectionOnly = !hasH2H && tier === "thin";
+      if (hasH2H) {
+
+        
+        
+        const massacreH2HQ = getMassacreH2HSeries(qKey, getCurrentFixtureMeta(), parsed);
+        const decayH2HA = massacreH2HQ.A.length >= 2 ? massacreH2HQ.A : aH2H;
+        const decayH2HB = massacreH2HQ.B.length >= 2 ? massacreH2HQ.B : bH2H;
+
+        const usedDecayA = massacreH2HQ.A.length >= 2;
+        const usedDecayB = massacreH2HQ.B.length >= 2;
+        const qVolRatio = getVolatilityRatioForSeries(aS.concat(bS), volLimit);
+
+        const _qH2hFactor = isFinite(config?.h2hFactor) ? Number(config.h2hFactor) : 1.0;
+        const hw = getH2HWeight(decayH2HA.length, decayH2HB.length, qKey, tier, Math.abs(projA - projB), league, leagueBaseQ, _qH2hFactor, {
+          enabled: hasH2H,
+          injMultA: injA,
+          injMultB: injB,
+          volRatio: qVolRatio,
+          blowoutGap: Math.abs(projA - projB),
+          paceGapRisk: Math.abs((avgOrNaN(ctxAQ.pace10) || 74) - (avgOrNaN(ctxBQ.pace10) || 74)) > 6
+        });
+        const avgH2HA = avgOrNaN(decayH2HA);
+        const avgH2HB = avgOrNaN(decayH2HB);
+        projA = isFinite(avgH2HA) ? ((projA * (1 - hw)) + (avgH2HA * hw)) : projA;
+        projB = isFinite(avgH2HB) ? ((projB * (1 - hw)) + (avgH2HB * hw)) : projB;
+
+        // FIX #3 (quarters): same clamp-bypass pattern as FT/H1 — re-clamp
+        // after the raw H2H blend so the earlier volatility damping on
+        // projA/projB still bounds the number that leaves this block.
+        // AUDIT FIX: anchor to the injury/opponent-boost-adjusted baseline,
+        // same reasoning as the FT and H1 versions of this fix.
+        const _aInjAdjBaselineQ = avgOrNaN(aS) * injA * (injB < 1 ? (1 + (1 - injB) * _qInjOppBoostFactor) : 1);
+        const _bInjAdjBaselineQ = avgOrNaN(bS) * injB * (injA < 1 ? (1 + (1 - injA) * _qInjOppBoostFactor) : 1);
+        projA = applyVolatility(projA, aS, volLimit, league, _aInjAdjBaselineQ);
+        projB = applyVolatility(projB, bS, volLimit, league, _bInjAdjBaselineQ);
+      }
+
+      const teamANameForShape = document.getElementById("teamAName")?.value?.trim() || "";
+      const teamBNameForShape = document.getElementById("teamBName")?.value?.trim() || "";
+      const shapeSignalA = getTeamQuarterShapeSignal(league, teamANameForShape, qKey);
+      const shapeSignalB = getTeamQuarterShapeSignal(league, teamBNameForShape, qKey);
+      if (shapeSignalA && shapeSignalA.direction !== "neutral") {
+        projA *= (1 + clampNumber(shapeSignalA.z, -3, 3) * 0.02);
+      }
+      if (shapeSignalB && shapeSignalB.direction !== "neutral") {
+        projB *= (1 + clampNumber(shapeSignalB.z, -3, 3) * 0.02);
+      }
+
+      const qProj = projA + projB;
+      const qEdge = lineVal ? qProj - lineVal : NaN;
+      const qPick = getPick(qEdge, lineVal, league, qKey, { aSc: avgOrNaN(aS), bSc: avgOrNaN(bS) });
+
+      // FIX #18 (quarters residual): detectTrap() is wired into FT/H1/Team
+      // confidence grades but was never called for quarters, so qConf always
+      // graded as non-trap by default. Compute it the same way here.
+      const qTrap = detectTrap(qEdge, lineVal, qPick, league, qKey, stdDev(aS.concat(bS)));
+      const qConf = getConfidenceGrade({
+        pick: qPick, line: lineVal, edge: qEdge, sampleTier: tier,
+        volatility: stdDev(aS.concat(bS)), volLimit,
+        fullModel: qFullModel, projectionOnly: qProjectionOnly, trap: qTrap,
+        // FIX #19: quarters previously never discounted their own confidence
+        // grade for pace-gap risk or a wide projection blowout either.
+        paceGapRisk: Math.abs((avgOrNaN(ctxAQ.pace10) || 74) - (avgOrNaN(ctxBQ.pace10) || 74)) > 6,
+        blowoutGap: Math.abs(projA - projB),
+
+        marketKey: qKey, hasH2H: hasH2H,
+
+        siblingEdge: (qKey === "q1" || qKey === "q2") ? h1Calc.h1Edge : ftCalc.ftEdge,
+        league
+      });
+
+      // FIX #20: expose paceGapRisk on the returned object so the post-anchor
+      // confidence recompute below (which currently drops trap/paceGapRisk/
+      // blowoutGap entirely) can restore these discounts instead of grading
+      // blind on the common path where H1/FT anchoring fires.
+      const qPaceGapRisk = Math.abs((avgOrNaN(ctxAQ.pace10) || 74) - (avgOrNaN(ctxBQ.pace10) || 74)) > 6;
+      return { proj: qProj, edge: qEdge, line: lineVal, pick: qPick, confidence: qConf, tier, projA, projB, hasH2H, volatility: stdDev(aS.concat(bS)), fullModel: qFullModel, projectionOnly: qProjectionOnly, paceGapRisk: qPaceGapRisk };
+    };
+
+    const q1 = computeQ("q1", parseMarketLine(document.getElementById("q1Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
+    const q2 = computeQ("q2", parseMarketLine(document.getElementById("q2Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
+    const q3 = computeQ("q3", parseMarketLine(document.getElementById("q3Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
+    const q4 = computeQ("q4", parseMarketLine(document.getElementById("q4Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
+
+    if (q4 && isFinite(q4.projA) && isFinite(q4.projB) && q4.line &&
+        isFinite(ftCalc.blowoutGap) && ftCalc.blowoutGap > 15) {
+      const isFavorA = ftCalc.projAFT > ftCalc.projBFT;
+      q4.projA = isFavorA ? q4.projA * 0.85 : q4.projA * 1.10;
+      q4.projB = isFavorA ? q4.projB * 1.10 : q4.projB * 0.85;
+      q4.proj = q4.projA + q4.projB;
+      q4.edge = q4.proj - q4.line;
+      q4.pick = getPick(q4.edge, q4.line, league, "q4", {});
+    }
+
+    const rawQ12Sum = (q1?.proj || 0) + (q2?.proj || 0);
+    const rawQ34Sum = (q3?.proj || 0) + (q4?.proj || 0);
+    const h1Target = isFinite(h1Calc.h1Proj) && h1Calc.h1Proj > 0 ? h1Calc.h1Proj : rawQ12Sum;
+    const h2Target = isFinite(ftCalc.ftProj) && h1Target > 0 ? ftCalc.ftProj - h1Target : rawQ34Sum;
+
+            if (rawQ12Sum > 0 && isFinite(h1Target)) {
+          // AUDIT FIX #10: q1Weight/q2Weight were always hardcoded to 1.0,
+          // making this a plain proportional split dressed up as a weighted
+          // blend. Simplified — no behavior change, just removes the
+          // vestigial weight variables.
+          const totalWeightedRaw = (q1?.proj || 0) + (q2?.proj || 0);
+          const q1Scale = (h1Target * (q1?.proj || 0)) / (totalWeightedRaw || 1) / (q1?.proj || 1);
+          const q2Scale = (h1Target * (q2?.proj || 0)) / (totalWeightedRaw || 1) / (q2?.proj || 1);
+
+          if (q1 && isFinite(q1.proj) && isFinite(q1.line)) {
+
+            q1.proj = q1.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q1.proj * q1Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
+            q1.edge = q1.proj - q1.line;
+
+            q1.pick = getPick(q1.edge, q1.line, league, "q1", {});
+
+            // FIX #20: this recompute previously dropped trap/paceGapRisk/
+            // blowoutGap entirely, so the grade that survives to the pick on
+            // the common (anchored) path was never discounted for any of
+            // them, even though computeQ's own pre-anchor grade included all
+            // three. Recompute trap against the post-anchor edge/pick and
+            // restore the other two from the quarter's own data.
+            const _q1VolSafe = isFinite(q1.volatility) ? q1.volatility : 0;
+            const _q1TrapPostAnchor = detectTrap(q1.edge, q1.line, q1.pick, league, "q1", _q1VolSafe);
+            q1.trap = _q1TrapPostAnchor;
+            q1.confidence = getConfidenceGrade({
+              pick: q1.pick, line: q1.line, edge: q1.edge, sampleTier: q1.tier,
+              volatility: _q1VolSafe, volLimit: getMarketVolLimit(league, "q1"), marketKey: "q1", hasH2H: q1.hasH2H,
+              fullModel: q1.fullModel, projectionOnly: q1.projectionOnly,
+              trap: _q1TrapPostAnchor, paceGapRisk: q1.paceGapRisk, blowoutGap: Math.abs((q1.projA || 0) - (q1.projB || 0)),
+              siblingEdge: h1Calc.h1Edge, league
+            });
+          }
+          if (q2 && isFinite(q2.proj) && isFinite(q2.line)) {
+
+            q2.proj = q2.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q2.proj * q2Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
+            q2.edge = q2.proj - q2.line;
+
+            q2.pick = getPick(q2.edge, q2.line, league, "q2", {});
+
+            // FIX #20: same restoration as Q1 above.
+            const _q2VolSafe = isFinite(q2.volatility) ? q2.volatility : 0;
+            const _q2TrapPostAnchor = detectTrap(q2.edge, q2.line, q2.pick, league, "q2", _q2VolSafe);
+            q2.trap = _q2TrapPostAnchor;
+            q2.confidence = getConfidenceGrade({
+              pick: q2.pick, line: q2.line, edge: q2.edge, sampleTier: q2.tier,
+              volatility: _q2VolSafe, volLimit: getMarketVolLimit(league, "q2"), marketKey: "q2", hasH2H: q2.hasH2H,
+              fullModel: q2.fullModel, projectionOnly: q2.projectionOnly,
+              trap: _q2TrapPostAnchor, paceGapRisk: q2.paceGapRisk, blowoutGap: Math.abs((q2.projA || 0) - (q2.projB || 0)),
+              siblingEdge: h1Calc.h1Edge, league
+            });
+          }
+        }
+
+        if (rawQ34Sum > 0 && isFinite(h2Target) && h2Target > 0) {
+          // AUDIT FIX #10: q3Weight/q4Weight were always hardcoded to 1.0 —
+          // same vestigial pattern as Q1/Q2 above. Simplified, no behavior change.
+          const totalWeightedRaw = (q3?.proj || 0) + (q4?.proj || 0);
+          const q3Scale = (h2Target * (q3?.proj || 0)) / (totalWeightedRaw || 1) / (q3?.proj || 1);
+          const q4Scale = (h2Target * (q4?.proj || 0)) / (totalWeightedRaw || 1) / (q4?.proj || 1);
+
+          if (q3 && isFinite(q3.proj) && isFinite(q3.line)) {
+
+            q3.proj = q3.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q3.proj * q3Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
+            q3.edge = q3.proj - q3.line;
+
+            q3.pick = getPick(q3.edge, q3.line, league, "q3", {});
+
+            // FIX #20: same restoration as Q1/Q2 above.
+            const _q3VolSafe = isFinite(q3.volatility) ? q3.volatility : 0;
+            const _q3TrapPostAnchor = detectTrap(q3.edge, q3.line, q3.pick, league, "q3", _q3VolSafe);
+            q3.trap = _q3TrapPostAnchor;
+            q3.confidence = getConfidenceGrade({
+              pick: q3.pick, line: q3.line, edge: q3.edge, sampleTier: q3.tier,
+              volatility: _q3VolSafe, volLimit: getMarketVolLimit(league, "q3"), marketKey: "q3", hasH2H: q3.hasH2H,
+              fullModel: q3.fullModel, projectionOnly: q3.projectionOnly,
+              trap: _q3TrapPostAnchor, paceGapRisk: q3.paceGapRisk, blowoutGap: Math.abs((q3.projA || 0) - (q3.projB || 0)),
+              siblingEdge: ftCalc.ftEdge, league
+            });
+          }
+          if (q4 && isFinite(q4.proj) && isFinite(q4.line)) {
+
+            q4.proj = q4.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q4.proj * q4Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
+            q4.edge = q4.proj - q4.line;
+
+            q4.pick = getPick(q4.edge, q4.line, league, "q4", {});
+
+            // FIX #20: same restoration as Q1/Q2/Q3 above.
+            const _q4VolSafe = isFinite(q4.volatility) ? q4.volatility : 0;
+            const _q4TrapPostAnchor = detectTrap(q4.edge, q4.line, q4.pick, league, "q4", _q4VolSafe);
+            q4.trap = _q4TrapPostAnchor;
+            q4.confidence = getConfidenceGrade({
+              pick: q4.pick, line: q4.line, edge: q4.edge, sampleTier: q4.tier,
+              volatility: _q4VolSafe, volLimit: getMarketVolLimit(league, "q4"), marketKey: "q4", hasH2H: q4.hasH2H,
+              fullModel: q4.fullModel, projectionOnly: q4.projectionOnly,
+              trap: _q4TrapPostAnchor, paceGapRisk: q4.paceGapRisk, blowoutGap: Math.abs((q4.projA || 0) - (q4.projB || 0)),
+              siblingEdge: ftCalc.ftEdge, league
+            });
+          }
+        }
 
     if (ftCalc.ftSampleTier === "insufficient") {
       ftPick = "NO PLAY";
@@ -16462,103 +18076,153 @@ const ftNote = ftCalc.ftNote || ftCalc.ftProjectionNote || null;
     const _coeffFitted = isConfidenceCoeffFitted(league);
 
     const picks = [
-      {
-        _idx: 0,
-        name: "FT Total Goals" + ftBadge,
-        marketKey: "ft",
-        marketType: "ft",
-        league,
-        context: { aSc: ftCalc.aS, bSc: ftCalc.bS },
-        line: ftLine,
-        proj: ftCalc.ftProj,
-        edge: ftCalc.ftEdge,
-        pick: ftPick,
-        confidence: ftConfidence,
-        note: ftNote,
-        fullModel: ftCalc.ftFullModel,
-        sampleTier: ftCalc.ftSampleTier,
-        hasH2H: ftCalc.ftHasH2H,
-        trap: ftTrap,
-        volatility: ftVolatilityForConf,
-        volLimit: getMarketVolLimit(league, "ft"),
-        coeffFitted: _coeffFitted,
-        aVenueEnabled: ftCalc.aVenueEnabled,
-        bVenueEnabled: ftCalc.bVenueEnabled,
-        aVenueAdjustment: ftCalc.aVenueAdjustment,
-        bVenueAdjustment: ftCalc.bVenueAdjustment,
-        netVenueEffect: ftCalc.netVenueEffect
-      },
-      {
-        _idx: 1,
-        name: "1H Total Goals" + h1Badge,
-        marketKey: "h1",
-        marketType: "h1",
-        league,
-        context: { aSc: h1Calc.aS1, bSc: h1Calc.bS1 },
-        line: h1Line,
-        proj: h1Calc.h1Proj,
-        edge: h1Calc.h1Edge,
-        pick: h1Pick,
-        confidence: h1ConfidenceFinal,
-        note: h1Note,
-        fullModel: h1Calc.h1FullModel,
-        sampleTier: h1Calc.h1SampleTier,
-        hasH2H: h1Calc.h1HasH2H,
-        trap: h1Trap,
-        volatility: h1VolatilityForConf,
-        volLimit: getMarketVolLimit(league, "h1"),
-        coeffFitted: _coeffFitted,
-        aVenueEnabled: h1Calc.aVenueEnabled,
-        bVenueEnabled: h1Calc.bVenueEnabled,
-        aVenueAdjustment: h1Calc.aVenueAdjustment,
-        bVenueAdjustment: h1Calc.bVenueAdjustment
-      },
-      {
-        _idx: 2,
-        name: "Team A Total Goals" + aBadge,
-        marketKey: "team_a",
-        marketType: "team",
-        league,
-        context: { teamSc: ftCalc.aS },
-        line: aLine,
-        proj: ftCalc.projAFT,
-        edge: ftCalc.aEdge,
-        pick: aPick,
-        confidence: aConfidence,
-        note: ftNote,
-        fullModel: ftCalc.teamFullModel,
-        sampleTier: ftCalc.ftSampleTier,
-        hasH2H: ftCalc.ftHasH2H,
-        trap: aTrap,
-        volatility: ftCalc.aVol,
-        volLimit: getMarketVolLimit(league, "ft"),
-        coeffFitted: _coeffFitted,
-        aVenueEnabled: ftCalc.aVenueEnabled,
-        aVenueAdjustment: ftCalc.aVenueAdjustment
-      },
-      {
-        _idx: 3,
-        name: "Team B Total Goals" + bBadge,
-        marketKey: "team_b",
-        marketType: "team",
-        league,
-        context: { teamSc: ftCalc.bS },
-        line: bLine,
-        proj: ftCalc.projBFT,
-        edge: ftCalc.bEdge,
-        pick: bPick,
-        confidence: bConfidence,
-        note: ftNote,
-        fullModel: ftCalc.teamFullModel,
-        sampleTier: ftCalc.ftSampleTier,
-        hasH2H: ftCalc.ftHasH2H,
-        trap: bTrap,
-        volatility: ftCalc.bVol,
-        volLimit: getMarketVolLimit(league, "ft"),
-        coeffFitted: _coeffFitted,
-        bVenueEnabled: ftCalc.bVenueEnabled,
-        bVenueAdjustment: ftCalc.bVenueAdjustment
-      }
+  {
+    _idx: 0,
+    name: "FT Total" + ftBadge,
+    marketKey: "ft",
+    marketType: "ft",
+    league,
+    context: { aSc: ftCalc.aS, bSc: ftCalc.bS },
+    line: ftLine,
+    proj: ftCalc.ftProj,
+    edge: ftCalc.ftEdge,
+    pick: ftPick,
+    confidence: ftConfidence,
+    note: ftNote,
+    fullModel: ftCalc.ftFullModel,
+    sampleTier: ftCalc.ftSampleTier,
+    hasH2H: ftCalc.ftHasH2H,
+    trap: ftTrap,
+    // AUDIT FIX #2: volatility/volLimit weren't carried onto the FT pick object,
+    // so the final win-probability display loop had no way to use FT's own
+    // volatility (it had to reuse it as a hack for every OTHER market instead).
+    volatility: ftVolatilityForConf,
+    volLimit: getMarketVolLimit(league, "ft"),
+    coeffFitted: _coeffFitted,
+
+    aVenueEnabled: ftCalc.aVenueEnabled,
+    bVenueEnabled: ftCalc.bVenueEnabled,
+    aVenueAdjustment: ftCalc.aVenueAdjustment,
+    bVenueAdjustment: ftCalc.bVenueAdjustment,
+    netVenueEffect: ftCalc.netVenueEffect
+  },
+  {
+    _idx: 1,
+    name: "1H Total" + h1Badge,
+    marketKey: "h1",
+    marketType: "h1",
+    league,
+    context: { aSc: h1Calc.aS1, bSc: h1Calc.bS1 },
+    line: h1Line,
+    proj: h1Calc.h1Proj,
+    edge: h1Calc.h1Edge,
+    pick: h1Pick,
+    confidence: h1ConfidenceFinal,
+    note: h1Note,
+    fullModel: h1Calc.h1FullModel,
+    sampleTier: h1Calc.h1SampleTier,
+    hasH2H: h1Calc.h1HasH2H,
+    trap: h1Trap,
+    // AUDIT FIX #2: same as FT above — carry H1's own volatility/volLimit
+    // onto the pick object so the display loop can use H1's real numbers.
+    volatility: h1VolatilityForConf,
+    volLimit: getMarketVolLimit(league, "h1"),
+    coeffFitted: _coeffFitted,
+    aVenueEnabled: h1Calc.aVenueEnabled,
+    bVenueEnabled: h1Calc.bVenueEnabled,
+    aVenueAdjustment: h1Calc.aVenueAdjustment,
+    bVenueAdjustment: h1Calc.bVenueAdjustment
+  },
+
+      { _idx: 10, name: "Q1 Total", marketKey: "q1", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q1Market")?.value), proj: q1?.proj, edge: q1?.edge, pick: q1?.pick || "NO PLAY", confidence: q1?.confidence || "NaN", note: null, fullModel: q1?.fullModel ?? false, sampleTier: q1?.tier, hasH2H: q1?.hasH2H, trap: q1?.trap ?? false, volatility: q1?.volatility, volLimit: getMarketVolLimit(league, "q1"), coeffFitted: _coeffFitted, projectionOnly: q1?.projectionOnly ?? false },
+      { _idx: 11, name: "Q2 Total", marketKey: "q2", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q2Market")?.value), proj: q2?.proj, edge: q2?.edge, pick: q2?.pick || "NO PLAY", confidence: q2?.confidence || "NaN", note: null, fullModel: q2?.fullModel ?? false, sampleTier: q2?.tier, hasH2H: q2?.hasH2H, trap: q2?.trap ?? false, volatility: q2?.volatility, volLimit: getMarketVolLimit(league, "q2"), coeffFitted: _coeffFitted, projectionOnly: q2?.projectionOnly ?? false },
+      { _idx: 12, name: "Q3 Total", marketKey: "q3", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q3Market")?.value), proj: q3?.proj, edge: q3?.edge, pick: q3?.pick || "NO PLAY", confidence: q3?.confidence || "NaN", note: null, fullModel: q3?.fullModel ?? false, sampleTier: q3?.tier, hasH2H: q3?.hasH2H, trap: q3?.trap ?? false, volatility: q3?.volatility, volLimit: getMarketVolLimit(league, "q3"), coeffFitted: _coeffFitted, projectionOnly: q3?.projectionOnly ?? false },
+      { _idx: 13, name: "Q4 Total", marketKey: "q4", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q4Market")?.value), proj: q4?.proj, edge: q4?.edge, pick: q4?.pick || "NO PLAY", confidence: q4?.confidence || "NaN", note: null, fullModel: q4?.fullModel ?? false, sampleTier: q4?.tier, hasH2H: q4?.hasH2H, trap: q4?.trap ?? false, volatility: q4?.volatility, volLimit: getMarketVolLimit(league, "q4"), coeffFitted: _coeffFitted, projectionOnly: q4?.projectionOnly ?? false },
+  {
+    _idx: 3,
+    name: "Team A Total" + aBadge,
+    marketKey: "team_a",
+    marketType: "team",
+    league,
+    context: { teamSc: ftCalc.aS },
+    line: aLine,
+    proj: ftCalc.projAFT,
+    edge: ftCalc.aEdge,
+    pick: aPick,
+    confidence: aConfidence,
+    note: ftNote,
+    fullModel: ftCalc.teamFullModel,
+    sampleTier: ftCalc.ftSampleTier,
+    hasH2H: ftCalc.ftHasH2H,
+    // AUDIT FIX #2: Team A previously carried no trap/volatility/volLimit at
+    // all, so the display loop had nothing real to use for this market.
+    trap: aTrap,
+    volatility: ftCalc.aVol,
+    volLimit: getMarketVolLimit(league, "ft"),
+    coeffFitted: _coeffFitted,
+    aVenueEnabled: ftCalc.aVenueEnabled,
+    aVenueAdjustment: ftCalc.aVenueAdjustment
+  },
+  {
+    _idx: 4,
+    name: "Team B Total" + bBadge,
+    marketKey: "team_b",
+    marketType: "team",
+    league,
+    context: { teamSc: ftCalc.bS },
+    line: bLine,
+    proj: ftCalc.projBFT,
+    edge: ftCalc.bEdge,
+    pick: bPick,
+    confidence: bConfidence,
+    note: ftNote,
+    fullModel: ftCalc.teamFullModel,
+    sampleTier: ftCalc.ftSampleTier,
+    hasH2H: ftCalc.ftHasH2H,
+    // AUDIT FIX #2: same as Team A above.
+    trap: bTrap,
+    volatility: ftCalc.bVol,
+    volLimit: getMarketVolLimit(league, "ft"),
+    coeffFitted: _coeffFitted,
+    bVenueEnabled: ftCalc.bVenueEnabled,
+    bVenueAdjustment: ftCalc.bVenueAdjustment
+  },
+  {
+    _idx: 14,
+    name: "Team A 1H",
+    marketKey: "h1_team_a",
+    marketType: "h1",
+    league,
+    context: { teamSc: h1Calc.aS1 },
+    line: finalLines.h1aLine,
+    proj: h1Calc.projA1H,
+    edge: h1aEdge,
+    pick: h1aPick,
+    confidence: h1aConfidence,
+    note: h1Note,
+    fullModel: h1Calc.h1FullModel,
+    sampleTier: h1Calc.h1SampleTier,
+    hasH2H: h1Calc.h1HasH2H,
+    coeffFitted: _coeffFitted
+  },
+  {
+    _idx: 15,
+    name: "Team B 1H",
+    marketKey: "h1_team_b",
+    marketType: "h1",
+    league,
+    context: { teamSc: h1Calc.bS1 },
+    line: finalLines.h1bLine,
+    proj: h1Calc.projB1H,
+    edge: h1bEdge,
+    pick: h1bPick,
+    confidence: h1bConfidence,
+    note: h1Note,
+    fullModel: h1Calc.h1FullModel,
+    sampleTier: h1Calc.h1SampleTier,
+    hasH2H: h1Calc.h1HasH2H,
+    coeffFitted: _coeffFitted
+  }
     ];
 
     if (ftCalc.ftSampleTier === "insufficient") {
@@ -16713,19 +18377,15 @@ await applyMassacreFrameworkToPicks(finalPicksForDisplay, league, parsed, fixtur
         const netBDisplay = isFinite(netB) ? (netB >= 0 ? "+" : "") + netB.toFixed(1) : "—";
         const netAColor = !isFinite(netA) ? 'var(--muted)' : (netA >= 0 ? '#3a9c35' : '#c91920');
         const netBColor = !isFinite(netB) ? 'var(--muted)' : (netB >= 0 ? '#3a9c35' : '#c91920');
-        const xgADisplay = isFinite(ftCalc.projAFT) ? ftCalc.projAFT.toFixed(2) : "—";
-        const xgBDisplay = isFinite(ftCalc.projBFT) ? ftCalc.projBFT.toFixed(2) : "—";
-        const totalXgDisplay = isFinite(ftCalc.ftProj) ? ftCalc.ftProj.toFixed(2) : "—";
-
         const dashHtml = `
         <div style="background: #333; color: #ffd700; padding: 8px 10px; font-weight: 800; font-size: 11px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--panel-border);">
-          <span>FOOTBALL GOAL INSIGHT</span>
-          <span style="color: ${ftCalc.ftFullModel ? '#4CAF50' : '#ffa500'}">${ftCalc.ftFullModel ? '🟢 FULL GOAL MODEL' : '🟡 LIMITED PASTE DATA'}</span>
+          <span>SYNDICATE INSIGHT (LEVEL 2)</span>
+          <span style="color: ${ftCalc.ftFullModel ? '#4CAF50' : '#ffa500'}">${ftCalc.ftFullModel ? '🟢 FULL MODEL' : '🟡 LIMITED DATA'}</span>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 12px; text-align: center; gap: 5px;">
-          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team A xG</div><div style="font-size: 18px; font-weight: 900; color: #3a9c35">${xgADisplay}</div></div>
-          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Match Expected Goals</div><div style="font-size: 18px; font-weight: 900; color: var(--tracker-strong)">⚽ ${totalXgDisplay}</div></div>
-          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team B xG</div><div style="font-size: 18px; font-weight: 900; color: #3a9c35">${xgBDisplay}</div></div>
+          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team A Net</div><div style="font-size: 18px; font-weight: 900; color: ${netAColor}">${netADisplay}</div></div>
+          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Pace</div><div style="font-size: 18px; font-weight: 900; color: var(--tracker-strong)">${paceIcon} ${paceDisplay}</div></div>
+          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team B Net</div><div style="font-size: 18px; font-weight: 900; color: ${netBColor}">${netBDisplay}</div></div>
         </div>`;
 
         let existingDash = document.getElementById('syndicateDashboard');
@@ -17463,7 +19123,7 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
 
       setFieldValues(FIELD_GROUPS.periodInputs);
 
-      const teamMarketSection = document.getElementById("teamMarketSection");
+            const teamMarketSection = document.getElementById("teamMarketSection");
       if (teamMarketSection) {
         teamMarketSection.style.gridTemplateColumns = "1fr 1fr";
       }
@@ -17472,9 +19132,43 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
         ftH1MarketRow.style.gridTemplateColumns = "1fr 1fr";
       }
 
-      ["a1HSection", "b1HSection", "h2h1HSection", "h1MarketSection"].forEach(id => {
+      const _espnEl = document.getElementById("espnSection");
+      if (_espnEl) _espnEl.style.display = _isBig5 ? "block" : "none";
+      const _sofaEl = document.getElementById("sofascoreManualSection");
+      if (_sofaEl) _sofaEl.style.display = (!league || _isBig5) ? "none" : "block";
+
+      document.getElementById("aQSection").style.display = isQs || !isNbaOrNcaa ? "block" : "none";
+      document.getElementById("bQSection").style.display = isQs || !isNbaOrNcaa ? "block" : "none";
+
+      ["a1HSection", "b1HSection", "h2h1HSection"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = leagueVal ? "block" : "none";
+      });
+      ["a2HSection", "b2HSection", "h2h2HSection"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
+      });
+      const h2hQ = document.getElementById("h2hQSection");
+      if (h2hQ) h2hQ.style.display = (isQs && isNbaOrNcaa) || !isNbaOrNcaa ? "block" : "none";
+      
+      const h1MarketEl = document.getElementById("h1MarketSection");
+      if (h1MarketEl) h1MarketEl.style.display = leagueVal ? "block" : "none";
+      const h1TeamEl = document.getElementById("h1TeamMarketSection");
+      if (h1TeamEl) h1TeamEl.style.display = (isNbaOrNcaa && !isWnba) ? "grid" : "none";
+
+      const h1MarketElManual = document.getElementById("h1MarketSection");
+      if (h1MarketElManual) h1MarketElManual.style.display = leagueVal ? "block" : "none";
+
+      ["q1q2MarketSection", "q3q4MarketSection"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = leagueVal ? "grid" : "none";
+      });
+      const highLowQEl = document.getElementById("highLowQMarketSection");
+      if (highLowQEl) highLowQEl.style.display = "none";
+
+      ["q1TeamMarketSection", "exoticMarketSection"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
       });
 
               if (!isNbaOrNcaa) {
@@ -17525,7 +19219,6 @@ const isWnba = leagueVal === "wnba" || leagueVal === "wnba_pre";
         if (_isBig5) {
           accordionOpen("espnSection");
           loadFixtures(0);
-          if (typeof fetchLeagueStandings === "function") fetchLeagueStandings(league);
         } else {
           accordionOpen("sofascoreManualSection");
         }
@@ -17674,9 +19367,6 @@ if (headerErrorBtn) {
       if (dropB) {
         dropB.addEventListener("mousedown", () => cancelDropClose("dropB"));
       }
-
-      const fetchBtn = document.getElementById("fetchBtn");
-if (fetchBtn) fetchBtn.addEventListener("click", withErrorBoundary(fetchESPN, "fetchESPN"));
 
       const runBtn = document.getElementById("runBtn");
       if (runBtn) runBtn.addEventListener("click", withErrorBoundary(runEngine, "runEngine"));
@@ -19159,19 +20849,21 @@ window.INTEGRATION_TEST_SUITE = (() => {
     try {
 
       const ls = document.getElementById("leagueSelect");
-      if (ls) ls.value = "epl";
+      if (ls) ls.value = "nba";
       selectedTeamIds = { A: null, B: null };
       setVal("teamAName", TEAM_A);
       setVal("teamBName", TEAM_B);
-      setVal("aFTScored", "2,1,3,2,1");
-      setVal("aFTAllowed", "0,1,1,0,1");
-      setVal("bFTScored", "1,2,0,1,3");
-      setVal("bFTAllowed", "1,0,2,1,1");
+      setVal("aFTScored", "115,118,120,117,119");
+      setVal("aFTAllowed", "100,98,102,101,99");
+      setVal("bFTScored", "112,110,115,111,113");
+      setVal("bFTAllowed", "105,103,107,104,106");
 
-      setVal("ftMarket", "2.5");
-      setVal("h1Market", "1.0");
-      setVal("teamAMarket", "1.5");
-      setVal("teamBMarket", "1.5");
+      setVal("ftMarket", "150.5-152.5");
+      setVal("h1Market", "");
+      setVal("teamAMarket", "");
+      setVal("teamBMarket", "");
+      setVal("q1Market", ""); setVal("q2Market", "");
+      setVal("q3Market", ""); setVal("q4Market", "");
       g_injA = defaultInjuryMeta();
       g_injB = defaultInjuryMeta();
 
@@ -19179,13 +20871,14 @@ window.INTEGRATION_TEST_SUITE = (() => {
 
       const savedPick = (g_trackerState.activePicks || []).find(p => isTestPick(p) && p.marketKey === "ft");
       check("FT pick was saved to tracker after runEngine", !!savedPick);
+      check("Saved pick side is OVER (large positive edge expected)", getPickSideFromText(savedPick?.predictionText || "") === "over");
       check("Saved pick starts pending", savedPick?.resultStatus === "pending");
 
       if (!savedPick) {
         throw new Error("No tracked pick was produced — cannot continue to settle step.");
       }
 
-      savedPick.actualScore = "3-1"; 
+      savedPick.actualScore = "235-210"; 
       const settleOk = await applyManualSettlementToTrackedPick(savedPick.signature, "win");
       check("applyManualSettlementToTrackedPick returned true", settleOk === true);
 
