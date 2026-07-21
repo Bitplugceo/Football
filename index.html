@@ -2592,3 +2592,377 @@ body.dark-mode .tracker-analytics-section-head {
   </div>
 
 </div>
+<script>
+(function () {
+  if (window.__FBENGINE_WATCHDOG_LOADED) return;
+  window.__FBENGINE_WATCHDOG_LOADED = true;
+  window.__FBENGINE_BOOT_SEEN = false;
+
+  function spawnFatalTerminal(msg, file, line, col, stack) {
+    if (document.getElementById("fatalGodModeTerminal")) return;
+    const t = document.createElement("div");
+    t.id = "fatalGodModeTerminal";
+    t.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); z-index:1000000; padding:20px; box-sizing:border-box; overflow-y:auto; font-family: ui-monospace, Consolas, monospace; color: #0f0;";
+
+    const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    t.innerHTML = `
+      <div style="border:2px solid #ff5c61; background:#111; max-width:900px; margin:20px auto; box-shadow: 0 0 50px rgba(255, 0, 0, 0.3);">
+        <div style="background:#3b0000; color:#ff5c61; padding:15px; font-size:16px; font-weight:900; border-bottom:2px solid #ff5c61; display:flex; justify-content:space-between; text-transform:uppercase;">
+          <span>🚨 FATAL ENGINE CRASH</span>
+          <span>[SYSTEM LOCK]</span>
+        </div>
+        <div style="padding:25px;">
+          <div style="color:#ffcf73; margin-bottom:20px; font-size:14px; border-left: 3px solid #ffcf73; padding-left: 15px; font-weight:800;">
+            CATASTROPHIC ERROR: The engine parser died. The UI is disabled to protect your data.
+          </div>
+          <div style="display:grid; gap:12px; margin-bottom:25px;">
+            <div><strong style="color:#fff; text-transform:uppercase; font-size:11px;">Error Message:</strong><br><span style="color:#ff5c61; font-size:15px; font-weight:bold;">${esc(msg)}</span></div>
+            <div style="display:flex; gap:30px;">
+                <div><strong style="color:#fff; text-transform:uppercase; font-size:11px;">Line:</strong><br><span style="color:#0f0; font-size:18px; font-weight:900;">${line}</span></div>
+                <div><strong style="color:#fff; text-transform:uppercase; font-size:11px;">Column:</strong><br><span style="color:#0f0; font-size:18px; font-weight:900;">${col}</span></div>
+                <div><strong style="color:#fff; text-transform:uppercase; font-size:11px;">Source:</strong><br><span style="color:#aaa; font-size:13px;">${esc(file)}</span></div>
+            </div>
+          </div>
+          <strong style="color:#777; text-transform:uppercase; font-size:11px;">Debug Stack Trace:</strong>
+          <div style="background:#000; border: 1px solid #222; padding:15px; color:#555; margin-top:8px; white-space:pre-wrap; overflow-x:auto; font-size:11px; line-height:1.4;">${esc(stack || 'Syntax Error: No trace available for parser death.')}</div>
+          <button onclick="location.reload()" style="margin-top:25px; background:#ff5c61; color:#fff; border:none; padding:12px 24px; font-weight:900; cursor:pointer; font-family:inherit; text-transform:uppercase;">Try Reboot</button>
+        </div>
+      </div>
+    `;
+
+    document.body ? document.body.appendChild(t) : document.addEventListener("DOMContentLoaded", () => document.body.appendChild(t));
+  }
+
+  window.addEventListener("error", function (e) {
+    if (e.message === "Script error." && e.lineno === 0) return;
+    const file = e.filename ? e.filename.split('/').pop() : "Inline Script";
+    if (typeof window.engineDebug === "function") {
+      window.engineDebug("ENGINE BREAKDOWN", `${e.message} | Loc: ${file}:${e.lineno}`);
+    }
+  });
+
+  window.addEventListener("unhandledrejection", function (e) {
+    const reason = e.reason?.message || String(e.reason);
+    const reasonLower = reason.toLowerCase();
+    if (reasonLower.includes("fetch") || reasonLower.includes("load failed") || reasonLower.includes("networkerror")) return;
+    if (typeof window.engineDebug === "function") {
+      window.engineDebug("NETWORK/PROMISE ERROR", { detail: reason });
+    }
+    if (typeof window.triggerGlobalEngineAlert === "function") {
+      window.triggerGlobalEngineAlert("Watchdog: Network connection to Cloudflare was blocked.");
+    }
+  });
+
+  const originalFetch = window.fetch;
+  window.fetch = async function(...args) {
+    try {
+      const response = await originalFetch.apply(this, args);
+      if (!response.ok && response.status !== 400 && typeof window.engineDebug === "function") {
+        window.engineDebug(`API ERROR: HTTP ${response.status}`, { url: args[0] });
+      }
+      return response;
+    } catch (err) {
+      if (typeof window.engineDebug === "function") {
+        window.engineDebug("CRITICAL NETWORK BLOCK", { url: args[0], error: err.message });
+      }
+      throw err;
+    }
+  };
+
+  window.addEventListener("load", function () {
+    setTimeout(function () {
+      if (!window.__FBENGINE_BOOT_SEEN) {
+        spawnFatalTerminal("Initialization Failure", "Core Logic", "Check Syntax", "N/A", "The script stopped running immediately after load. Check for missing '}' or illegal characters like '!!!' in the code.");
+      }
+    }, 15000);
+  });
+})();
+</script>
+
+<script>
+window.__FBENGINE_BOOT_SEEN = true;
+window.__FBENGINE_PARSE_OK = true;
+window.__FBENGINE_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
+
+const APP_BUILD_VERSION = "fb_tracker_cleanup_v1";
+const STANDALONE_BUILD_MARKER = "fb_engine_standalone_build";
+const WORKER_URL = "https://thebetceo-engine.ridwantunde636.workers.dev/";
+
+const DEBUG = false;
+const CACHE_MAX = 300;
+
+const FB_CONFIG = {
+  limits: { activePicks: 500, archivePruneDays: 90 },
+  timeouts: { fetch: 15000 },
+  version: "Path-A-v1-Football"
+};
+
+// Football league scoring bases (avg total goals per match, both teams combined)
+// Replaces basketball's LEAGUE_BASES (points-per-game).
+let LEAGUE_BASES = {
+  epl: 2.75, championship: 2.55, league_one: 2.65, league_two: 2.60,
+  la_liga: 2.55, la_liga2: 2.35,
+  bundesliga: 3.10, bundesliga2: 2.85,
+  serie_a: 2.70, serie_b: 2.45,
+  ligue_1: 2.60, ligue_2: 2.40,
+  eredivisie: 3.00, primeira_liga: 2.55,
+  champions_league: 2.85, europa_league: 2.75, conference_league: 2.65,
+  world_cup: 2.55, euros: 2.45, nations_league: 2.55,
+  mls: 2.90, usl_championship: 2.60,
+  liga_mx: 2.75,
+  brazil_serie_a: 2.35, brazil_serie_b: 2.30,
+  argentina_liga: 2.20,
+  copa_libertadores: 2.30, copa_sudamericana: 2.45, mls_leagues_cup: 2.85,
+  scot_prem: 2.75, belgium_pro: 2.95, turkey_super_lig: 2.85,
+  greece_super_league: 2.45, switzerland_super_league: 3.00,
+  austria_bundesliga: 3.05, denmark_superliga: 2.85, norway_eliteserien: 2.90,
+  sweden_allsvenskan: 2.70, poland_ekstraklasa: 2.55,
+  ukraine_premier: 2.45, russia_premier: 2.40, croatia_hnl: 2.60,
+  serbia_superliga: 2.50, czech_first_league: 2.80, ireland_prem: 2.65,
+  saudi_pro_league: 2.80, j_league: 2.65, k_league: 2.45,
+  china_super_league: 2.55, a_league: 2.85, egypt_premier: 2.15,
+  south_africa_psl: 2.20, india_isl: 2.35,
+  nwsl: 2.60, wsl: 2.65, womens_champions_league: 2.55,
+  unknown: 2.60
+};
+
+// ESPN soccer API league slugs (ESPN paths are /apis/site/v2/sports/soccer/{slug})
+const ESPN_SOCCER_SLUGS = {
+  epl: "eng.1", championship: "eng.2", league_one: "eng.3", league_two: "eng.4",
+  la_liga: "esp.1", la_liga2: "esp.2",
+  bundesliga: "ger.1", bundesliga2: "ger.2",
+  serie_a: "ita.1", serie_b: "ita.2",
+  ligue_1: "fra.1", ligue_2: "fra.2",
+  eredivisie: "ned.1", primeira_liga: "por.1",
+  champions_league: "uefa.champions", europa_league: "uefa.europa",
+  conference_league: "uefa.europa.conf",
+  world_cup: "fifa.world", euros: "uefa.euro", nations_league: "uefa.nations",
+  mls: "usa.1", usl_championship: "usa.usl.1",
+  liga_mx: "mex.1",
+  brazil_serie_a: "bra.1", brazil_serie_b: "bra.2",
+  argentina_liga: "arg.1",
+  copa_libertadores: "conmebol.libertadores", copa_sudamericana: "conmebol.sudamericana",
+  mls_leagues_cup: "concacaf.leagues.cup",
+  scot_prem: "sco.1", belgium_pro: "bel.1", turkey_super_lig: "tur.1",
+  greece_super_league: "gre.1", switzerland_super_league: "sui.1",
+  austria_bundesliga: "aut.1", denmark_superliga: "den.1", norway_eliteserien: "nor.1",
+  sweden_allsvenskan: "swe.1", poland_ekstraklasa: "pol.1",
+  ukraine_premier: "ukr.1", russia_premier: "rus.1", croatia_hnl: "cro.1",
+  serbia_superliga: "srb.1", czech_first_league: "cze.1", ireland_prem: "irl.1",
+  saudi_pro_league: "ksa.1", j_league: "jpn.1", k_league: "kor.1",
+  china_super_league: "chn.1", a_league: "aus.1", egypt_premier: "egy.1",
+  south_africa_psl: "rsa.1", india_isl: "ind.1",
+  nwsl: "usa.nwsl", wsl: "eng.w.1", womens_champions_league: "uefa.wchampions"
+};
+
+function getLeagueBase(league) {
+  const l = String(league || "").toLowerCase();
+  const BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/";
+  return ESPN_SOCCER_SLUGS[l] ? BASE + ESPN_SOCCER_SLUGS[l] : "";
+}
+
+// Fetch schedule/H2H rules per league. Football matches have no "seasontype"
+// split the way US sports do (regular/playoffs/preseason) in the same sense —
+// ESPN soccer scoreboard/team schedule endpoints return the full season by
+// date range instead. regulationPeriods=2 (halves) replaces basketball's
+// 2 or 4 (halves/quarters); football has no quarter markets at all.
+const LEAGUE_FETCH_RULES = {
+  epl: { recentSeasons: 2, regulationPeriods: 2 },
+  championship: { recentSeasons: 2, regulationPeriods: 2 },
+  la_liga: { recentSeasons: 2, regulationPeriods: 2 },
+  bundesliga: { recentSeasons: 2, regulationPeriods: 2 },
+  serie_a: { recentSeasons: 2, regulationPeriods: 2 },
+  ligue_1: { recentSeasons: 2, regulationPeriods: 2 },
+  eredivisie: { recentSeasons: 2, regulationPeriods: 2 },
+  primeira_liga: { recentSeasons: 2, regulationPeriods: 2 },
+  champions_league: { recentSeasons: 2, regulationPeriods: 2 },
+  europa_league: { recentSeasons: 2, regulationPeriods: 2 },
+  mls: { recentSeasons: 2, regulationPeriods: 2 },
+  liga_mx: { recentSeasons: 2, regulationPeriods: 2 },
+  brazil_serie_a: { recentSeasons: 2, regulationPeriods: 2 },
+  scot_prem: { recentSeasons: 2, regulationPeriods: 2 },
+  saudi_pro_league: { recentSeasons: 2, regulationPeriods: 2 }
+  // Leagues not listed fall back to a default of { recentSeasons: 1, regulationPeriods: 2 }
+  // applied at the call site, same pattern as the basketball original's fallback.
+};
+
+// Edge point thresholds — football goals are a much smaller-magnitude stat
+// than basketball points, so thresholds live in fractional-goal units
+// (0.3–0.9) rather than basketball's 3–10 point range. "team" = team total
+// goals market; "q" is retained as a key name only for structural parity with
+// the tunable-param registry, but is UNUSED for football (no quarters exist) —
+// it's set equal to h1 as an inert placeholder rather than removed outright,
+// so any shared code path that still reads market.q doesn't silently break.
+const LEAGUE_EDGE_GOAL_THRESHOLDS = {
+  epl:               { ft: 0.55, h1: 0.40, team: 0.45 },
+  championship:      { ft: 0.55, h1: 0.40, team: 0.45 },
+  la_liga:           { ft: 0.55, h1: 0.40, team: 0.45 },
+  bundesliga:        { ft: 0.60, h1: 0.45, team: 0.50 },
+  serie_a:           { ft: 0.55, h1: 0.40, team: 0.45 },
+  ligue_1:           { ft: 0.55, h1: 0.40, team: 0.45 },
+  eredivisie:        { ft: 0.60, h1: 0.45, team: 0.50 },
+  primeira_liga:     { ft: 0.50, h1: 0.38, team: 0.42 },
+  champions_league:  { ft: 0.55, h1: 0.40, team: 0.45 },
+  europa_league:     { ft: 0.55, h1: 0.40, team: 0.45 },
+  conference_league: { ft: 0.50, h1: 0.38, team: 0.42 },
+  world_cup:         { ft: 0.50, h1: 0.38, team: 0.42 },
+  euros:             { ft: 0.50, h1: 0.38, team: 0.42 },
+  mls:               { ft: 0.60, h1: 0.45, team: 0.50 },
+  liga_mx:           { ft: 0.55, h1: 0.40, team: 0.45 },
+  brazil_serie_a:    { ft: 0.48, h1: 0.36, team: 0.40 },
+  scot_prem:         { ft: 0.55, h1: 0.40, team: 0.45 },
+  saudi_pro_league:  { ft: 0.55, h1: 0.40, team: 0.45 },
+  nwsl:              { ft: 0.55, h1: 0.40, team: 0.45 },
+  wsl:               { ft: 0.55, h1: 0.40, team: 0.45 },
+  default:           { ft: 0.50, h1: 0.38, team: 0.42 }
+};
+
+// Volatility limits (std-dev-of-goals ceiling used to scale the volatility
+// ratio). Football's per-game goal variance is naturally lower than
+// basketball's per-game point variance, so these are much smaller numbers.
+const LEAGUE_VOL_LIMITS = {
+  epl: 1.6, championship: 1.6, la_liga: 1.5, bundesliga: 1.8,
+  serie_a: 1.5, ligue_1: 1.5, eredivisie: 1.8, primeira_liga: 1.5,
+  champions_league: 1.7, europa_league: 1.7, mls: 1.8, liga_mx: 1.6,
+  brazil_serie_a: 1.4, scot_prem: 1.6, saudi_pro_league: 1.6,
+  default: 1.6
+};
+
+const LEAGUE_TRUST_PROFILES = {
+  trusted: [
+    "epl", "championship", "la_liga", "bundesliga", "serie_a", "ligue_1",
+    "eredivisie", "primeira_liga", "champions_league", "europa_league",
+    "mls", "liga_mx", "brazil_serie_a", "scot_prem", "saudi_pro_league"
+  ],
+  advisory: [
+    "league_one", "league_two", "la_liga2", "bundesliga2", "serie_b", "ligue_2",
+    "conference_league", "world_cup", "euros", "nations_league",
+    "usl_championship", "brazil_serie_b", "argentina_liga",
+    "copa_libertadores", "copa_sudamericana", "mls_leagues_cup",
+    "belgium_pro", "turkey_super_lig", "greece_super_league",
+    "switzerland_super_league", "austria_bundesliga", "denmark_superliga",
+    "norway_eliteserien", "sweden_allsvenskan", "poland_ekstraklasa",
+    "croatia_hnl", "serbia_superliga", "czech_first_league", "ireland_prem",
+    "j_league", "k_league", "a_league", "nwsl", "wsl", "womens_champions_league"
+  ],
+  blocked: [
+    "ukraine_premier", "russia_premier", "china_super_league",
+    "egypt_premier", "south_africa_psl", "india_isl"
+  ]
+};
+
+function normalizeLeagueTrustKey(league) {
+  return String(league || "unknown").trim().toLowerCase() || "unknown";
+}
+
+function getLeagueTrustMeta(league) {
+  const key = normalizeLeagueTrustKey(league);
+  if (LEAGUE_TRUST_PROFILES.trusted.includes(key)) {
+    return { key, level: "trusted", label: "Trusted", mode: "full",
+      guidance: "Full plays are allowed. Keep monitoring record and checkpoint review." };
+  }
+  if (LEAGUE_TRUST_PROFILES.blocked.includes(key)) {
+    return { key, level: "blocked", label: "Do not use", mode: "block",
+      guidance: "No-play only until this league is retuned and revalidated." };
+  }
+  return { key, level: "advisory", label: "Needs retune", mode: "advisory",
+    guidance: "Advisory only for now. Treat any edge as a lean until thresholds are retuned." };
+}
+
+// Team ID maps for autocomplete/ID lookup on ESPN's main soccer leagues.
+// IDs are ESPN's internal team IDs for the soccer API.
+const EPL_TEAM_MAP = {
+  "arsenal":359,"aston villa":362,"bournemouth":349,"brentford":337,
+  "brighton":331,"chelsea":363,"crystal palace":384,"everton":368,
+  "fulham":370,"ipswich":373,"leicester":375,"liverpool":364,
+  "manchester city":382,"man city":382,"manchester united":360,"man united":360,"man utd":360,
+  "newcastle":361,"newcastle united":361,"nottingham forest":393,"forest":393,
+  "southampton":376,"tottenham":367,"spurs":367,"west ham":371,
+  "wolves":380,"wolverhampton":380,"burnley":379,"luton":301,"sheffield united":398
+};
+
+const LA_LIGA_TEAM_MAP = {
+  "real madrid":86,"barcelona":83,"atletico madrid":1068,"atletico":1068,
+  "sevilla":243,"real sociedad":89,"villarreal":102,"real betis":244,
+  "athletic bilbao":93,"athletic club":93,"valencia":94,"celta vigo":85,
+  "osasuna":97,"getafe":2922,"girona":9812,"rayo vallecano":101,
+  "mallorca":84,"alaves":96,"las palmas":88,"espanyol":88011,"leganes":90,
+  "real valladolid":95
+};
+
+const BUNDESLIGA_TEAM_MAP = {
+  "bayern munich":132,"bayern":132,"borussia dortmund":124,"dortmund":124,
+  "rb leipzig":11420,"leipzig":11420,"bayer leverkusen":131,"leverkusen":131,
+  "eintracht frankfurt":124659,"frankfurt":124659,"vfb stuttgart":134,"stuttgart":134,
+  "borussia monchengladbach":121,"gladbach":121,"union berlin":127,
+  "wolfsburg":126,"freiburg":123,"mainz":133,"hoffenheim":11420,
+  "werder bremen":130,"augsburg":2919,"heidenheim":30820,"holstein kiel":22581,
+  "st pauli":131791,"bochum":125
+};
+
+const SERIE_A_TEAM_MAP = {
+  "juventus":111,"inter milan":110,"inter":110,"ac milan":103,"milan":103,
+  "napoli":114,"roma":104,"as roma":104,"lazio":112,"atalanta":105,
+  "fiorentina":109,"bologna":107,"torino":239,"udinese":115,
+  "sassuolo":490,"genoa":113,"cagliari":382,"empoli":345,"lecce":3243,
+  "verona":108,"hellas verona":108,"parma":481,"como":1032,"venezia":11448,"monza":1049
+};
+
+const LIGUE_1_TEAM_MAP = {
+  "psg":160,"paris saint-germain":160,"marseille":176,"monaco":174,
+  "lyon":167,"lille":166,"nice":167219,"rennes":173,"lens":169,
+  "strasbourg":163,"nantes":171,"montpellier":259,"toulouse":165,
+  "brest":177,"reims":568,"le havre":170,"angers":161,"auxerre":168,
+  "saint-etienne":172
+};
+
+const MLS_TEAM_MAP = {
+  "inter miami":20906,"lafc":18967,"la galaxy":187,"seattle sounders":9727,
+  "atlanta united":18418,"nashville sc":20232,"columbus crew":183,
+  "fc cincinnati":20223,"philadelphia union":10739,"new york city fc":17362,"nycfc":17362,
+  "new york red bulls":190,"ny red bulls":190,"orlando city":15128,
+  "austin fc":21300,"charlotte fc":21856,"toronto fc":12193,
+  "cf montreal":9720,"montreal":9720,"vancouver whitecaps":9727,
+  "portland timbers":9723,"real salt lake":195,"colorado rapids":184,
+  "sporting kansas city":186,"fc dallas":185,"houston dynamo":11512,
+  "st louis city":22615,"chicago fire":182,"dc united":193,
+  "new england revolution":189,"minnesota united":17362
+};
+
+const NBA_2026_TEAM_BASELINES = null; // N/A for football — removed, no basketball advanced-rating baselines apply here.
+
+// Team-map lookup dispatcher used by autocomplete/ID-resolution, mirroring
+// the basketball original's per-league NBA_TEAM_MAP/NCAA_TEAM_MAP/WNBA_TEAM_MAP
+// dispatch pattern but keyed off the football league value.
+function getTeamMapForLeague(league) {
+  const l = String(league || "").toLowerCase();
+  if (l === "epl") return EPL_TEAM_MAP;
+  if (l === "la_liga") return LA_LIGA_TEAM_MAP;
+  if (l === "bundesliga") return BUNDESLIGA_TEAM_MAP;
+  if (l === "serie_a") return SERIE_A_TEAM_MAP;
+  if (l === "ligue_1") return LIGUE_1_TEAM_MAP;
+  if (l === "mls") return MLS_TEAM_MAP;
+  return null;
+}
+
+function lookupTeamId(name, leagueHint) {
+  const n = normalizeTeamName(name);
+  const map = getTeamMapForLeague(leagueHint);
+  if (!map) return null;
+  if (map[n] !== undefined) return map[n];
+  let bestKey = null, bestLen = 0;
+  for (const key of Object.keys(map)) {
+    if (n.includes(key) && key.length > bestLen) { bestKey = key; bestLen = key.length; }
+  }
+  if (bestKey) return map[bestKey];
+  if (n.length >= 3) {
+    bestKey = null; bestLen = 0;
+    for (const key of Object.keys(map)) {
+      if (key.includes(n) && key.length > bestLen) { bestKey = key; bestLen = key.length; }
+    }
+    if (bestKey) return map[bestKey];
+  }
+  return null;
+}
+</script>
