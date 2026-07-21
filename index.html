@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3093,7 +3092,7 @@ function detectTournamentIdIntersection(eventsA, eventsB) {
   function countByTournament(events) {
     const counts = {};
     events.forEach(ev => {
-      if (!ssIsBasketballEvent(ev)) return;
+      if (!ssIsFootballEvent(ev)) return;
       const sType = ev.status?.type ?? "";
       const done = sType === "finished" || sType === "afterExtraTime" || sType === "afterPenalties" || ev.status?.finished === true;
       if (!done) return;
@@ -3127,7 +3126,7 @@ function detectPrimaryTournamentForEvents(events) {
   
   const counts = {};
   events.forEach(ev => {
-    if (!ssIsBasketballEvent(ev)) return;
+    if (!ssIsFootballEvent(ev)) return;
     const sType = ev.status?.type ?? "";
     const done = sType === "finished" || sType === "afterExtraTime" || sType === "afterPenalties" || ev.status?.finished === true;
     if (!done) return;
@@ -3148,7 +3147,7 @@ function detectPrimaryTournamentForEvents(events) {
 
   const fallbackCounts = {};
   events.forEach(ev => {
-    if (!ssIsBasketballEvent(ev)) return;
+    if (!ssIsFootballEvent(ev)) return;
     const tid = ev?.tournament?.uniqueTournament?.id;
     if (tid != null) {
       const key = String(tid);
@@ -3225,26 +3224,6 @@ function updateTeamUIFromStats(side, stats) {
     if (!AppState.context.data[side].venue) AppState.context.data[side].venue = {};
     AppState.context.data[side].venue.h1Scored10 = _venueH1Scored;
     AppState.context.data[side].venue.h1Allowed10 = _venueH1Allowed;
-  }
-
-  if (stats.q1ScoredList?.length >= 2) {
-    AppState.context.data[side].q1Scored = stats.q1ScoredList.slice(0, 10);
-    AppState.context.data[side].q2Scored = stats.q2ScoredList.slice(0, 10);
-    AppState.context.data[side].q3Scored = stats.q3ScoredList.slice(0, 10);
-    AppState.context.data[side].q4Scored = stats.q4ScoredList.slice(0, 10);
-    AppState.context.data[side].q1Allowed = stats.q1AllowedList.slice(0, 10);
-    AppState.context.data[side].q2Allowed = stats.q2AllowedList.slice(0, 10);
-    AppState.context.data[side].q3Allowed = stats.q3AllowedList.slice(0, 10);
-    AppState.context.data[side].q4Allowed = stats.q4AllowedList.slice(0, 10);
-
-    const teamName = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName")?.value?.trim() ||
-                     document.getElementById(side === "A" ? "teamAName" : "teamBName")?.value?.trim() || "";
-    updateTeamQuarterShapeProfile(
-      document.getElementById("leagueSelect")?.value || "",
-      teamName,
-      stats.q1ScoredList.slice(0, 10), stats.q2ScoredList.slice(0, 10),
-      stats.q3ScoredList.slice(0, 10), stats.q4ScoredList.slice(0, 10)
-    );
   }
 
   const tagEl = document.getElementById(prefix + "AutoTag");
@@ -3461,7 +3440,7 @@ function extractH2HFromPastedEvents() {
       window.__h2hEntryCache = [];
       const h2hTag = document.getElementById("h2hAutoTag");
       if (h2hTag) h2hTag.style.display = "none";
-      ["aFTH2H","bFTH2H","a1HH2H","b1HH2H","aQ1H2H","bQ1H2H","aQ2H2H","bQ2H2H","aQ3H2H","bQ3H2H","aQ4H2H","bQ4H2H"].forEach(id => {
+      ["aFTH2H","bFTH2H","a1HH2H","b1HH2H"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = "";
       });
@@ -3469,10 +3448,6 @@ function extractH2HFromPastedEvents() {
       if (ftCb) ftCb.checked = false;
       const h1Cb = document.getElementById("use1HH2H");
       if (h1Cb) h1Cb.checked = false;
-      ["useQ1H2H","useQ2H2H","useQ3H2H","useQ4H2H"].forEach(id => {
-        const cb = document.getElementById(id);
-        if (cb) cb.checked = false;
-      });
     }
     return;
   }
@@ -5121,114 +5096,34 @@ function getLeagueUnderBlockRatio(league) {
 }
 
 const LEAGUE_EDGE_POINT_THRESHOLDS = {
-  nba:                { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  wnba:               { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  wnba_pre:           { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  ncaa:               { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  ncaaw:              { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  euroleague:         { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  eurocup:            { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  acb:                { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  lba:                { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  turkey_bsl:         { ft: 5.5, h1: 5.0, team: 5.5, q: 3.5 },
-  aba:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  ausnbl:             { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  bcl:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  champions_league:   { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  bnxt:               { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  bbl:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  bleague:            { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  cba:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  korea_kbl:          { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  pba:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  lkl:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  nba_gl:             { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-
-  nba_summer:         { ft: 6.5, h1: 6.0, team: 6.5, q: 4.0 },
-  bal:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  proa:               { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  brazil_nbb:         { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  plk:                { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  united_league:      { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  mexico_lnbp:        { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  puerto_rico_bsn:    { ft: 5.0, h1: 4.5, team: 5.0, q: 3.0 },
-  argentina_lnb:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  austria_superliga:  { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  belgium_top:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  cebl:               { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  croatia_premier:    { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  denmark_bliga:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  fiba_ac:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  fiba_eb:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  fiba_u20eb_a:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  fiba_u20eb_b:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  fiba_wc:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  finland_koris:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  france_lfb_w:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  germany_proa:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  hungary_nb1:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  isl:                { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  italy_a2:           { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  italy_a2_w:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  latvia_lbl:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  lebanon_1st:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  mexico_cibacopa:    { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  nbl_cz:             { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  nznbl:              { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  poland_1liga:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  portugal_lpb:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  portugal_taca:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  prob:               { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  romania_ln:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  serbia_kls:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  slovenia_1a:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  spain_primera:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  spain_segunda:      { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  sweden_sbl:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  swiss_sbl:          { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  taipei_tpbl:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  turkey_tbl:         { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  venezuela_sl:       { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  uruguay_lub:        { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  austria_zweite:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  bih_1st:            { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  brazil_lbf_w:       { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  bulgaria_nbl:       { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  cyprus_div_a:       { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  chile_lnb:          { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  chile_lnb2:         { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  el_salvador_lmb:    { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  england_slb:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  england_slb_w:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  estonia_kml:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  gb_super_league_w:  { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  georgia_super:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  iceland_1st:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  iceland_urvalsdeild:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  iceland_urvalsdeild_w: { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  indonesia_ibl:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  italy_a1_w:         { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  italy_serb:         { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  phil_mpbl:          { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  portugal_lfb_w:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  portugal_proliga:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  rwanda:             { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  turkey_tb2l:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  uruguay_lfb_w:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_big_v:          { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_big_v_w:        { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_east:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_east_w:    { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_north:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_north_w:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_south:     { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_south_w:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_west:      { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_west_w:    { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_central:   { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  aus_nbl1_central_w: { ft: 4.0, h1: 3.5, team: 4.0, q: 2.5 },
-  unknown:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 },
-  default:            { ft: 4.5, h1: 4.0, team: 4.5, q: 2.5 }
+  epl:           { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  championship:  { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  la_liga:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  la_liga2:      { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
+  serie_a:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  serie_b:       { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
+  bundesliga:    { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
+  bundesliga2:   { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
+  ligue1:        { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  ligue2:        { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
+  eredivisie:    { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
+  primeira_liga: { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  pro_league:    { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  super_lig:     { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  scottish_prem: { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  ucl:           { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
+  uel:           { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  uecl:          { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  fifa_wc:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  euro_comp:     { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
+  npfl:          { ft: 0.25, h1: 0.18, team: 0.20, btts: 0.18 },
+  mls:           { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
+  brasileirao:   { ft: 0.30, h1: 0.20, team: 0.25, btts: 0.20 },
+  argentina_lp:  { ft: 0.25, h1: 0.18, team: 0.20, btts: 0.18 },
+  saudi_pro:     { ft: 0.40, h1: 0.25, team: 0.35, btts: 0.25 },
+  other_football:{ ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  unknown:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 },
+  default:       { ft: 0.35, h1: 0.25, team: 0.30, btts: 0.25 }
 };
 
 function getLeagueEdgePointThreshold(league, marketKey) {
@@ -5301,83 +5196,7 @@ let LEAGUE_BASES = new Proxy(FOOTBALL_LEAGUE_GOAL_BASES, {
   get: (target, prop) => target[prop] ?? target.default
 });
 
-const NBA_2026_TEAM_BASELINES = {
-  ATL: { ortg: 116.1, drtg: 113.7, pace: 101.7, total: 234.5 },
-  BOS: { ortg: 120.8, drtg: 112.7, pace: 94.8,  total: 222.1 },
-  BRK: { ortg: 108.7, drtg: 119.0, pace: 97.1,  total: 221.8 },
-  CHO: { ortg: 119.4, drtg: 114.4, pace: 96.8,  total: 227.2 },
-  CHI: { ortg: 113.0, drtg: 118.1, pace: 102.5, total: 237.8 },
-  CLE: { ortg: 119.2, drtg: 115.1, pace: 99.9,  total: 234.9 },
-  DAL: { ortg: 111.2, drtg: 116.5, pace: 101.7, total: 233.7 },
-  DEN: { ortg: 122.6, drtg: 117.4, pace: 98.4,  total: 239.0 },
-  DET: { ortg: 112.3, drtg: 120.1, pace: 101.8, total: 234.9 },
-  GSW: { ortg: 115.0, drtg: 115.6, pace: 99.0,  total: 229.8 },
-  HOU: { ortg: 118.6, drtg: 113.2, pace: 96.1,  total: 225.2 },
-  IND: { ortg: 110.9, drtg: 118.8, pace: 101.0, total: 232.8 },
-  LAC: { ortg: 117.3, drtg: 116.1, pace: 96.5,  total: 226.4 },
-  LAL: { ortg: 118.2, drtg: 116.4, pace: 98.3,  total: 230.9 },
-  MEM: { ortg: 112.9, drtg: 118.8, pace: 101.3, total: 235.4 },
-  MIA: { ortg: 116.7, drtg: 114.5, pace: 103.4, total: 239.4 },
-  MIL: { ortg: 112.9, drtg: 119.3, pace: 97.6,  total: 227.4 },
-  MIN: { ortg: 116.8, drtg: 113.5, pace: 100.5, total: 232.6 },
-  NOP: { ortg: 114.4, drtg: 118.9, pace: 100.3, total: 235.5 },
-  NYK: { ortg: 119.8, drtg: 113.3, pace: 96.8,  total: 226.6 },
-  OKC: { ortg: 119.2, drtg: 111.8, pace: 99.6,  total: 231.0 },
-  ORL: { ortg: 114.9, drtg: 114.3, pace: 100.0, total: 230.8 },
-  PHI: { ortg: 115.4, drtg: 115.5, pace: 99.4,  total: 232.0 },
-  PHO: { ortg: 115.4, drtg: 113.9, pace: 97.2,  total: 223.7 },
-  POR: { ortg: 114.4, drtg: 114.7, pace: 100.5, total: 231.3 },
-  SAC: { ortg: 111.4, drtg: 121.5, pace: 99.2,  total: 232.0 },
-  SAS: { ortg: 114.5, drtg: 117.6, pace: 98.3,  total: 228.8 },
-  TOR: { ortg: 115.9, drtg: 113.0, pace: 98.4,  total: 226.4 },
-  UTA: { ortg: 114.1, drtg: 122.3, pace: 102.3, total: 243.6 },
-  WAS: { ortg: 111.0, drtg: 122.7, pace: 101.4, total: 237.8 }
-};
-
-const _NBA_NAME_TO_ABV = {
-  "atlanta hawks": "ATL", "boston celtics": "BOS", "brooklyn nets": "BRK",
-  "charlotte hornets": "CHO", "chicago bulls": "CHI", "cleveland cavaliers": "CLE",
-  "dallas mavericks": "DAL", "denver nuggets": "DEN", "detroit pistons": "DET",
-  "golden state warriors": "GSW", "houston rockets": "HOU", "indiana pacers": "IND",
-  "los angeles clippers": "LAC", "los angeles lakers": "LAL", "memphis grizzlies": "MEM",
-  "miami heat": "MIA", "milwaukee bucks": "MIL", "minnesota timberwolves": "MIN",
-  "new orleans pelicans": "NOP", "new york knicks": "NYK",
-  "oklahoma city thunder": "OKC", "orlando magic": "ORL",
-  "philadelphia 76ers": "PHI", "phoenix suns": "PHO", "portland trail blazers": "POR",
-  "sacramento kings": "SAC", "san antonio spurs": "SAS",
-  "toronto raptors": "TOR", "utah jazz": "UTA", "washington wizards": "WAS",
-  "hawks": "ATL", "celtics": "BOS", "nets": "BRK", "hornets": "CHO", "bulls": "CHI",
-  "cavaliers": "CLE", "cavs": "CLE", "mavericks": "DAL", "mavs": "DAL",
-  "nuggets": "DEN", "pistons": "DET", "warriors": "GSW", "rockets": "HOU",
-  "pacers": "IND", "clippers": "LAC", "lakers": "LAL", "grizzlies": "MEM",
-  "heat": "MIA", "bucks": "MIL", "timberwolves": "MIN", "wolves": "MIN",
-  "pelicans": "NOP", "knicks": "NYK", "thunder": "OKC", "magic": "ORL",
-  "76ers": "PHI", "sixers": "PHI", "suns": "PHO", "trail blazers": "POR",
-  "blazers": "POR", "kings": "SAC", "spurs": "SAS", "raptors": "TOR",
-  "jazz": "UTA", "wizards": "WAS",
-  "atlanta": "ATL", "boston": "BOS", "brooklyn": "BRK", "charlotte": "CHO",
-  "chicago": "CHI", "cleveland": "CLE", "dallas": "DAL", "denver": "DEN",
-  "detroit": "DET", "golden state": "GSW", "houston": "HOU", "indiana": "IND",
-  "la clippers": "LAC", "la lakers": "LAL", "memphis": "MEM", "miami": "MIA",
-  "milwaukee": "MIL", "minnesota": "MIN", "new orleans": "NOP", "new york": "NYK",
-  "oklahoma city": "OKC", "orlando": "ORL", "philadelphia": "PHI",
-  "phoenix": "PHO", "portland": "POR", "sacramento": "SAC", "san antonio": "SAS",
-  "toronto": "TOR", "utah": "UTA", "washington": "WAS",
-  "atl": "ATL", "bos": "BOS", "brk": "BRK", "cho": "CHO", "chi": "CHI",
-  "cle": "CLE", "dal": "DAL", "den": "DEN", "det": "DET", "gsw": "GSW",
-  "hou": "HOU", "ind": "IND", "lac": "LAC", "lal": "LAL", "mem": "MEM",
-  "mia": "MIA", "mil": "MIL", "min": "MIN", "nop": "NOP", "nyk": "NYK",
-  "okc": "OKC", "orl": "ORL", "phi": "PHI", "pho": "PHO", "por": "POR",
-  "sac": "SAC", "sas": "SAS", "tor": "TOR", "uta": "UTA", "was": "WAS"
-};
-
-function getNBASeasonBaseline(teamName, league) {
-  if (league !== "nba" || !teamName) return null;
-  const key = String(teamName).toLowerCase().trim();
-  const abv = _NBA_NAME_TO_ABV[key] || null;
-  if (!abv) return null;
-  return NBA_2026_TEAM_BASELINES[abv] || null;
-}
+function getNBASeasonBaseline() { return null; }
 
 const LEAGUE_PACE_BASES = {
   nba: 99.0,
@@ -5432,12 +5251,11 @@ const LEAGUE_RATING_BASES = {
 };
 
 const LEAGUE_REGULATION_MINUTES = {
-  nba: 48, nba_gl: 48, nba_summer: 48,
-  wnba: 40, wnba_pre: 40, ncaa: 40, ncaaw: 40,
-  default: 40
+  default: 90,
+  half: 45
 };
 function getLeagueRegulationMinutes(league) {
-  return LEAGUE_REGULATION_MINUTES[String(league || "").toLowerCase()] || LEAGUE_REGULATION_MINUTES.default;
+  return LEAGUE_REGULATION_MINUTES.default;
 }
 
 function getLeagueRecencyDefaults(league) {
@@ -5505,138 +5323,27 @@ function updateLeagueVolCache(league, values) {
   saveVolCache(cache);
 }
 
-const QSHAPE_STORAGE_KEY = "BB_TEAM_QSHAPE_V1";
-const QSHAPE_MIN_GAMES = 6;
+function updateTeamQuarterShapeProfile() {}
+function getTeamQuarterShapeSignal() { return null; }
 
-function getTeamQuarterShapeKey(league, teamName) {
-  return String(league || "unknown").toLowerCase() + "|" + normalizeTeamName(teamName || "");
-}
-
-function loadQuarterShapeStore() {
-  try {
-    const raw = localStorage.getItem(QSHAPE_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return (parsed && typeof parsed === "object") ? parsed : {};
-  } catch (e) {
-    engineDebug("loadQuarterShapeStore failed: " + (e?.message || String(e)), { error: e });
-    return {};
-  }
-}
-
-function saveQuarterShapeStore(store) {
-  try {
-    localStorage.setItem(QSHAPE_STORAGE_KEY, JSON.stringify(store));
-  } catch (e) {
-    engineDebug("saveQuarterShapeStore failed to persist", { error: e });
-  }
-}
-
-function updateTeamQuarterShapeProfile(league, teamName, q1s, q2s, q3s, q4s) {
-  const key = getTeamQuarterShapeKey(league, teamName);
-  if (!key) return;
-  const n = Math.min(
-    Array.isArray(q1s) ? q1s.length : 0,
-    Array.isArray(q2s) ? q2s.length : 0,
-    Array.isArray(q3s) ? q3s.length : 0,
-    Array.isArray(q4s) ? q4s.length : 0
-  );
-  if (n < 2) return;
-
-  const store = loadQuarterShapeStore();
-  const entry = store[key] || { n: 0, meanShare: [0.25, 0.25, 0.25, 0.25], m2: [0, 0, 0, 0] };
-
-  for (let i = 0; i < n; i++) {
-    const q1 = Number(q1s[i]), q2 = Number(q2s[i]), q3 = Number(q3s[i]), q4 = Number(q4s[i]);
-    const total = q1 + q2 + q3 + q4;
-    if (!isFinite(total) || total <= 0) continue;
-    const shares = [q1 / total, q2 / total, q3 / total, q4 / total];
-    entry.n += 1;
-    for (let qi = 0; qi < 4; qi++) {
-      const delta = shares[qi] - entry.meanShare[qi];
-      entry.meanShare[qi] += delta / entry.n;
-      const delta2 = shares[qi] - entry.meanShare[qi];
-      entry.m2[qi] += delta * delta2;
-    }
-  }
-
-  entry.updatedAt = new Date().toISOString();
-  store[key] = entry;
-  saveQuarterShapeStore(store);
-}
-
-function getTeamQuarterShapeSignal(league, teamName, qKey) {
-  const key = getTeamQuarterShapeKey(league, teamName);
-  const store = loadQuarterShapeStore();
-  const entry = store[key];
-  if (!entry || entry.n < QSHAPE_MIN_GAMES) return null;
-
-  const qIdx = { q1: 0, q2: 1, q3: 2, q4: 3 }[String(qKey || "").toLowerCase()];
-  if (qIdx === undefined) return null;
-
-  const share = entry.meanShare[qIdx];
-  const variance = entry.n > 1 ? entry.m2[qIdx] / (entry.n - 1) : 0;
-  const stdErr = Math.sqrt(Math.max(variance, 0.0001) / entry.n);
-  if (!isFinite(stdErr) || stdErr <= 0) return null;
-
-  const z = (share - 0.25) / stdErr;
-  return {
-    z: Number(z.toFixed(2)),
-    share: Number((share * 100).toFixed(1)),
-    sampleSize: entry.n,
-    direction: z >= 1.0 ? "fast" : z <= -1.0 ? "fade" : "neutral"
-  };
-}
-
-const LEAGUE_CONFIG_MAP = {
-  NBA: { volLimit:12, sanityMin:160, sanityMax:250 },
-  NCAA: { volLimit:15, sanityMin:120, sanityMax:200 },
-  NCAAW: { volLimit:15, sanityMin:100, sanityMax:175 },
-  WNBA: { volLimit:13, sanityMin:130, sanityMax:200 },
-  WNBA_PRE: { volLimit:14, sanityMin:125, sanityMax:200 },
-  NBA_GL: { volLimit:13, sanityMin:155, sanityMax:245 },
-  NBA_SUMMER: { volLimit:15, sanityMin:130, sanityMax:210 },
-  EUROLEAGUE: { volLimit:10, sanityMin:130, sanityMax:200 },
-  EUROCUP: { volLimit:11, sanityMin:125, sanityMax:195 },
-  CHAMPIONS_LEAGUE: { volLimit:11, sanityMin:120, sanityMax:195 },
-  ACB: { volLimit:11, sanityMin:130, sanityMax:200 },
-  LBA: { volLimit:11, sanityMin:125, sanityMax:195 },
-  BBL: { volLimit:12, sanityMin:130, sanityMax:205 },
-  TURKEY_BSL: { volLimit:12, sanityMin:130, sanityMax:205 },
-  AUSNBL: { volLimit:12, sanityMin:130, sanityMax:210 }
-};
+const LEAGUE_CONFIG_MAP = {};
 
 initLeagueOverridesFromDefaults();
 pruneUnverifiedLeagueOverrideDrift();
 
 const LEAGUE_TRUST_PROFILES = {
   trusted: [
-    "nba", "ncaa", "nba_gl", "ncaaw", "wnba", "euroleague", "eurocup", "champions_league", 
-    "acb", "lba", "bbl", "bcl", "turkey_bsl", "isl", "cba", "pba", 
-    "ausnbl", "proa", "united_league", "bleague", "korea_kbl",
-    "aus_nbl1_east", "aus_nbl1_north", "aus_nbl1_south", "aus_nbl1_west", "aus_nbl1_central", "aus_big_v",
-    "nznbl"
+    "epl", "championship", "la_liga", "la_liga2", "serie_a", "serie_b", "bundesliga",
+    "bundesliga2", "ligue1", "ligue2", "eredivisie", "primeira_liga", "pro_league",
+    "super_lig", "scottish_prem", "ucl", "uel", "uecl", "fifa_wc", "euro_comp",
+    "mls", "brasileirao", "saudi_pro"
   ],
   advisory: [
-    "nba_summer", "wnba_pre", "aba", "lkl", "plk", "prob", "germany_proa", "serbia_kls", "croatia_premier", 
-    "romania_ln", "hungary_nb1", "nbl_cz", "denmark_bliga", "england_slb", "england_slb_w",
-    "finland_koris", "italy_a2", "italy_serb", "italy_a1_w", "poland_1liga",
-    "portugal_lpb", "portugal_proliga", "spain_primera", "spain_segunda", "sweden_sbl",
-    "swiss_sbl", "turkey_tbl", "turkey_tb2l", "china_nbl", "taipei_tpbl",
-    "austria_superliga", "belgium_top", "bih_1st", "bulgaria_nbl", "georgia_super", 
-    "argentina_lnb", "brazil_nbb", "chile_lnb", "mexico_lnbp", "mexico_cibacopa", 
-    "puerto_rico_bsn", "uruguay_lub", "cebl",
-    "aus_nbl1_east_w", "aus_nbl1_north_w", "aus_nbl1_south_w", "aus_nbl1_west_w", "aus_nbl1_central_w", "aus_big_v_w",
-    "bnxt", "cyprus_div_a", "estonia_kml", "iceland_urvalsdeild", "latvia_lbl", 
-    "lebanon_1st", "slovenia_1a", "gb_super_league_w", "france_lfb_w"
+    "npfl", "argentina_lp", "other_football"
   ],
-  blocked: [
-    "brazil_lbf_w", "chile_lnb2", "uruguay_lfb_w", "venezuela_sl", "el_salvador_lmb",
-    "bal", "nigeria", "rwanda",
-    "phil_mpbl", "indonesia_ibl", "italy_a2_w", "austria_zweite", 
-    "iceland_urvalsdeild_w", "iceland_1st", "portugal_taca", "portugal_lfb_w",
-    "fiba_wc", "fiba_eb", "fiba_u20eb_a", "fiba_u20eb_b", "fiba_ac"
-  ]
+  blocked: []
 };
+
 function normalizeLeagueTrustKey(league) {
   return String(league || "unknown").trim().toLowerCase() || "unknown";
 }
@@ -5697,106 +5404,11 @@ function getLeagueTrustSortRank(level) {
 }
 
 const LEAGUE_FETCH_RULES = {
-    nba: {
+  default: {
     recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  wnba: {
-    recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  wnba_pre: {
-    recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  ncaa: {
-    recentSeasons: 3,
-    scheduleTypes: ["2", "3"],
-    h2hScheduleTypes: ["2", "3"],
     regulationPeriods: 2
-  },
-
-  ncaaw: {
-    recentSeasons: 3,
-    scheduleTypes: ["2", "3"],
-    h2hScheduleTypes: ["2", "3"],
-    regulationPeriods: 2
-  },
-  nba_gl: {
-    recentSeasons: 2,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-
-  nba_summer: {
-    recentSeasons: 1,
-    scheduleTypes: ["1", "2", "3"],
-    h2hScheduleTypes: ["1", "2", "3"],
-    regulationPeriods: 4
-  },
-  euroleague:      { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  eurocup:         { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  champions_league:{ recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  turkey_bsl:      { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  acb:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  bbl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  ausnbl:          { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  lba:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  bleague:         { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  united_league:   { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  proa:            { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  bcl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  aba:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  isl:             { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 },
-  cebl:            { recentSeasons: 2, scheduleTypes: ["1","2","3"], h2hScheduleTypes: ["1","2","3"], regulationPeriods: 4 }
+  }
 };
-
-    const NBA_TEAM_MAP = {
-      "hawks":1,"atlanta":1,"celtics":2,"boston":2,"nets":17,"brooklyn":17,
-      "hornets":30,"charlotte":30,"bulls":4,"chicago":4,"cavaliers":5,"cavs":5,"cleveland":5,
-      "mavericks":6,"mavs":6,"dallas":6,"nuggets":7,"denver":7,"pistons":8,"detroit":8,
-      "warriors":9,"golden state":9,"gsw":9,"rockets":10,"houston":10,"pacers":11,"indiana":11,
-      "clippers":12,"la clippers":12,"lakers":13,"los angeles lakers":13,"la lakers":13,
-      "grizzlies":29,"memphis":29,"heat":14,"miami":14,"bucks":15,"milwaukee":15,
-      "timberwolves":16,"wolves":16,"minnesota":16,"pelicans":3,"new orleans":3,
-      "knicks":18,"new york":18,"thunder":25,"okc":25,"oklahoma city":25,"magic":19,"orlando":19,
-      "76ers":20,"sixers":20,"philadelphia":20,"suns":21,"phoenix":21,
-      "trail blazers":22,"trailblazers":22,"blazers":22,"portland":22,
-      "kings":23,"sacramento":23,"spurs":24,"san antonio":24,"raptors":28,"toronto":28,
-      "jazz":26,"utah":26,"wizards":27,"washington":27
-    };
-
-    const NCAA_TEAM_MAP = {
-      "duke":150,"kentucky":96,"kansas":2305,"unc":153,"north carolina":153,"uconn":41,"connecticut":41,
-      "arizona":12,"gonzaga":2250,"purdue":2509,"ucla":26,"houston":248,"baylor":239,"tennessee":2633,
-      "alabama":333,"auburn":2,"michigan state":127,"wisconsin":275,"illinois":356,"texas":251,
-      "arkansas":8,"memphis":235,"florida":57,"virginia":258,"villanova":222,"marquette":269,
-      "creighton":156,"xavier":2752,"saint marys":2608,"st marys":2608,"san diego state":21,
-      "new mexico":167,"dayton":2168,"byu":252,"iowa state":66,"texas tech":2641,"texas a&m":245,
-      "texas a and m":245,"missouri":142,"indiana":84,"ohio state":194,"michigan":130,"usc":30,"oregon":2483,
-      "nevada":4,"boise state":68,"colorado state":36,"utah state":328,"providence":2507,"seton hall":2550,
-      "st johns":2599,"saint johns":2599,"wake forest":154,"clemson":228,"florida atlantic":2226,
-      "fau":2226,"miami":2390,"texas christian":2628,"tcu":2628,"nc state":152,"north carolina state":152,
-      "louisville":97,"syracuse":183,"notre dame":87,"georgetown":46,"georgia":61,"ole miss":145,
-      "mississippi state":344,"lsu":99,"vanderbilt":238,"butler":2086,"belmont":2057,"drake":2181,
-      "oregon state":204,"washington":264,"washington state":265
-    };
-
-    const WNBA_TEAM_MAP = {
-      "aces":17,"las vegas":17,"liberty":9,"new york":9,"sun":18,"connecticut":18,
-      "lynx":8,"minnesota":8,"storm":14,"seattle":14,"mercury":11,"phoenix":11,
-      "fever":5,"indiana":5,"dream":20,"atlanta":20,"sky":19,"chicago":19,
-      "wings":3,"dallas":3,"mystics":16,"washington":16,"sparks":6,"los angeles":6,
-      "valkyries":129689,"golden state":129689,"fire":132052,"portland":132052,
-      "tempo":131935,"toronto":131935
-    };
 
     const _schedCache = new Map();
     const _summaryCache = new Map();
@@ -11995,28 +11607,12 @@ function isPickPeriodComplete(marketKey, currentPeriod, isHalfTime, isGameFinal,
   const lsHome = home.linescores || [];
   const lsAway = away.linescores || [];
   
-  let h1Home = 0, h1Away = 0;
-  let q1Home = 0, q1Away = 0, q2Home = 0, q2Away = 0, q3Home = 0, q3Away = 0, q4Home = 0, q4Away = 0;
-  
-  if (lsHome.length >= 2 && lsAway.length >= 2) {
-     if (pick.league === "nba" || pick.league === "wnba" || pick.league === "wnba_pre" || pick.league === "nba_gl" || pick.league === "nba_summer") {
-                q1Home = getVal(lsHome[0]); q1Away = getVal(lsAway[0]);
-                q2Home = getVal(lsHome[1]); q2Away = getVal(lsAway[1]);
-                h1Home = q1Home + q2Home;
-                h1Away = q1Away + q2Away;
-                if (lsHome.length >= 4 && lsAway.length >= 4) {
-                  q3Home = getVal(lsHome[2]); q3Away = getVal(lsAway[2]);
-                  q4Home = getVal(lsHome[3]); q4Away = getVal(lsAway[3]);
-                }
-     } else {
-                h1Home = getVal(lsHome[0]);
-                h1Away = getVal(lsAway[0]);
-     }
-  }
+  let h1Home = lsHome.length > 0 ? getVal(lsHome[0]) : 0;
+  let h1Away = lsAway.length > 0 ? getVal(lsAway[0]) : 0;
 
   const market = pick.marketKey;
   const marketLine = parseFloat(pick.line);
-  if (isNaN(marketLine) && market !== "margin_team" && market !== "margin_any" && market !== "high_q" && market !== "low_q" && market !== "htft" && market !== "player") return "pending";
+  if (isNaN(marketLine) && market !== "btts") return "pending";
 
   let actual = 0;
   const isTeamAHome = String(pick.homeId) === String(home.id) || pick.homeTeam === home.team?.displayName;
@@ -12024,7 +11620,7 @@ function isPickPeriodComplete(marketKey, currentPeriod, isHalfTime, isGameFinal,
   if (market === "ft") {
      actual = sHome + sAway;
   } else if (market === "h1") {
-     actual = (home.linescores?.[0]?.value ?? 0) + (away.linescores?.[0]?.value ?? 0);
+     actual = h1Home + h1Away;
   } else if (market === "team_a") {
      actual = isTeamAHome ? sHome : sAway;
   } else if (market === "team_b") {
@@ -12584,17 +12180,7 @@ function getEffectivePaceClamp(league) {
 }
 
     function getLineSanityBands(league) {
-  const cfg = LEAGUE_CONFIG_MAP[String(league || "").toUpperCase()];
-  if (cfg && isFinite(cfg.sanityMin) && isFinite(cfg.sanityMax)) {
-    return { ft: [cfg.sanityMin, cfg.sanityMax], h1: [cfg.sanityMin * 0.46, cfg.sanityMax * 0.54], team: [cfg.sanityMin * 0.44, cfg.sanityMax * 0.56] };
-  }
-  const defaults = {
-    nba: { ft:[160,260], h1:[74,130], team:[70,130] },
-    ncaa: { ft:[120,200], h1:[56,100], team:[54,100] },
-    wnba: { ft:[130,200], h1:[60,100], team:[58,100] },
-    euroleague: { ft:[130,200], h1:[60,100], team:[56,100] }
-  };
-  return defaults[String(league || "").toLowerCase()] || { ft:[100,300], h1:[44,154], team:[40,155] };
+  return { ft: [1.0, 6.5], h1: [0.5, 3.5], team: [0.25, 4.5] };
 }
 
     function validateLines(league, ftLine, h1Line, aLine, bLine) {
@@ -14750,80 +14336,20 @@ function computeFTProjection({ league, parsed, lines, injMultA = 1, injMultB = 1
   const aVenueDiag = combineVenueDiag(aScoredBlendFT.diag, aAllowedBlendFT.diag);
   const bVenueDiag = combineVenueDiag(bScoredBlendFT.diag, bAllowedBlendFT.diag);
 
-  const isEspnLeague = ["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl","euroleague","eurocup","champions_league","turkey_bsl","acb","bbl","ausnbl","lba","bleague","united_league","proa"].includes(league);
-  const leaguePaceBase = LEAGUE_PACE_BASES[league] || LEAGUE_PACE_BASES.default || 74;
-  const leagueRatingBase = LEAGUE_RATING_BASES[league] || LEAGUE_RATING_BASES.default || 110;
-  // FIX #23: defensiveFloorFlag below compares raw points-allowed (aAllowed/
-  // bAllowed) against a per-100-possession rating base, which is only
-  // roughly the same magnitude for NBA-paced leagues. compute1HProjection
-  // already does this correctly with a points-basis constant (leagueBase1H)
-  // — add the FT equivalent (per-team full-game points) here.
   const leagueBaseFT = eb / 2;
-  let synPace = leaguePaceBase;
-
   const ctxA = AppState.context.data?.A || {};
   const ctxB = AppState.context.data?.B || {};
-  const avgPaceA = avgOrNaN(ctxA.pace10);
-  const avgPaceB = avgOrNaN(ctxB.pace10);
-  
-  const clamp = getEffectivePaceClamp(league);
 
-    let hasRealPace = isFinite(avgPaceA) && avgPaceA > 0 && isFinite(avgPaceB) && avgPaceB > 0;
+  const _tw = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.60;
+  const _ow = 1 - _tw;
 
-  hasRealPace = hasRealPace && (ctxA.pace10 || []).length >= 5 && (ctxB.pace10 || []).length >= 5;
+  let aS = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw + bAllowed * _ow) : aS_pre;
+  let bS = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw + aAllowed * _ow) : bS_pre;
 
-  
-  let hasRealRatings = isFinite(avgOrNaN(ctxA.ortg10)) && isFinite(avgOrNaN(ctxA.drtg10)) && isFinite(avgOrNaN(ctxB.ortg10)) && isFinite(avgOrNaN(ctxB.drtg10))
-    && (ctxA.ortg10 || []).length >= 5 && (ctxB.ortg10 || []).length >= 5;
-  engineDebug("FT advanced stats availability", {
-    hasRealPace, hasRealRatings,
-    ortg10A: (ctxA.ortg10 || []).length, drtg10A: (ctxA.drtg10 || []).length, pace10A: (ctxA.pace10 || []).length,
-    ortg10B: (ctxB.ortg10 || []).length, drtg10B: (ctxB.drtg10 || []).length, pace10B: (ctxB.pace10 || []).length
-  });
-
-  let synNetA = NaN, synNetB = NaN;
+  let synNetA = isFinite(aOverallAvg) && isFinite(aAllowed) ? (aOverallAvg - aAllowed) : NaN;
+  let synNetB = isFinite(bOverallAvg) && isFinite(bAllowed) ? (bOverallAvg - bAllowed) : NaN;
   let usedAdvanced = false;
-
-  if (hasRealPace) {
-    
-    const rawPace = (avgPaceA + avgPaceB) / 2;
-    synPace = clampNumber(rawPace, leaguePaceBase * clamp.min, leaguePaceBase * clamp.max);
-  } else {
-    const totalA = avgOrNaN(aFTS) + avgOrNaN(aFTA);
-    const totalB = avgOrNaN(bFTS) + avgOrNaN(bFTA);
-    if (isFinite(totalA) && isFinite(totalB)) {
-      const rawPace = ((totalA + totalB) / (eb * 2)) * leaguePaceBase;
-      synPace = clampNumber(rawPace, leaguePaceBase * clamp.min, leaguePaceBase * clamp.max);
-    }
-  }
-
-  let aS, bS;
-  if (isEspnLeague && hasRealRatings && hasRealPace) {
-    const projectedRatingA = avgOrNaN(ctxA.ortg10) + avgOrNaN(ctxB.drtg10) - leagueRatingBase;
-    const projectedRatingB = avgOrNaN(ctxB.ortg10) + avgOrNaN(ctxA.drtg10) - leagueRatingBase;
-
-    const _ftRegMinutes = getLeagueRegulationMinutes(league);
-    const _ftDivisor = 100 * (48 / _ftRegMinutes);
-    aS = (synPace * projectedRatingA) / _ftDivisor;
-    bS = (synPace * projectedRatingB) / _ftDivisor;
-    synNetA = avgOrNaN(ctxA.ortg10) - avgOrNaN(ctxA.drtg10);
-    synNetB = avgOrNaN(ctxB.ortg10) - avgOrNaN(ctxB.drtg10);
-    usedAdvanced = true;
-
-    const VENUE_ADVANCED_BLEND_FACTOR = 0.35;
-    if (aVenueDiag.enabled && isFinite(aVenueAvg) && isFinite(aOverallAvg)) {
-      aS += (aVenueAvg - aOverallAvg) * VENUE_ADVANCED_BLEND_FACTOR;
-    }
-    if (bVenueDiag.enabled && isFinite(bVenueAvg) && isFinite(bOverallAvg)) {
-      bS += (bVenueAvg - bOverallAvg) * VENUE_ADVANCED_BLEND_FACTOR;
-    }
-  } else {
-    
-    const _tw = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.65;
-    const _ow = 1 - _tw;
-    aS = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw + bAllowed * _ow) : aS_pre;
-    bS = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw + aAllowed * _ow) : bS_pre;
-  }
+  let synPace = 1.0;
 
   if (!isFinite(synNetA) && isFinite(aOverallAvg) && isFinite(aAllowed)) {
     synNetA = aOverallAvg - aAllowed;
@@ -14986,56 +14512,18 @@ function compute1HProjection({ league, parsed, lines, injMultA = 1, injMultB = 1
   const bVenueDiag1 = combineVenueDiag(bScoredBlend1.diag, bAllowedBlend1.diag);
 
   const sampleSize = Math.min(aS1.length, bS1.length);
-  const leagueBase1H = (eb / 2) * 0.5;
+  const leagueBase1H = (eb / 2) * 0.44;
   let aS_pre = anchorProjection(aScoredBlend1.value, sampleSize, leagueBase1H);
   let bS_pre = anchorProjection(bScoredBlend1.value, sampleSize, leagueBase1H);
 
   let aAllowed = aAllowedBlend1.value;
   let bAllowed = bAllowedBlend1.value;
 
-  const isEspnLeague = ["nba","wnba","wnba_pre","ncaa","ncaaw","nba_gl","euroleague","eurocup","champions_league","turkey_bsl","acb","bbl","ausnbl","lba","bleague","united_league","proa"].includes(league);
-  const leaguePaceBase = LEAGUE_PACE_BASES[league] || LEAGUE_PACE_BASES.default || 74;
-  const leagueRatingBase = LEAGUE_RATING_BASES[league] || LEAGUE_RATING_BASES.default || 110;
+  const _tw1 = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.60;
+  const _ow1 = 1 - _tw1;
 
-  const ctxA = AppState.context.data?.A || {};
-  const ctxB = AppState.context.data?.B || {};
-  const avgPaceA = avgOrNaN(ctxA.pace10);
-  const avgPaceB = avgOrNaN(ctxB.pace10);
-  const clamp = getEffectivePaceClamp(league);
-
-  let hasRealPace = isFinite(avgPaceA) && avgPaceA > 0 && isFinite(avgPaceB) && avgPaceB > 0;
-  // FIX #27: computeFTProjection gates hasRealPace on >=5 pace10 points per
-  // side before trusting the advanced-stats branch; this function was missing
-  // that same gate, letting H1 flip into the ratings-based projection off a
-  // single fetched data point while FT requires 5. Match FT's standard.
-  hasRealPace = hasRealPace && (ctxA.pace10 || []).length >= 5 && (ctxB.pace10 || []).length >= 5;
-
-  let hasRealRatings = isFinite(avgOrNaN(ctxA.ortg10)) && isFinite(avgOrNaN(ctxA.drtg10)) && isFinite(avgOrNaN(ctxB.ortg10)) && isFinite(avgOrNaN(ctxB.drtg10))
-    && (ctxA.ortg10 || []).length >= 5 && (ctxB.ortg10 || []).length >= 5;
-
-  let synPace = leaguePaceBase;
-  if (hasRealPace) {
-    const rawPace = (avgPaceA + avgPaceB) / 2;
-    synPace = clampNumber(rawPace, leaguePaceBase * clamp.min, leaguePaceBase * clamp.max);
-  }
-
-  let projA1H, projB1H;
-  if (isEspnLeague && hasRealRatings && hasRealPace) {
-
-    const projectedRatingA = avgOrNaN(ctxA.ortg10) + avgOrNaN(ctxB.drtg10) - leagueRatingBase;
-    const projectedRatingB = avgOrNaN(ctxB.ortg10) + avgOrNaN(ctxA.drtg10) - leagueRatingBase;
-
-    const _h1RegMinutes = getLeagueRegulationMinutes(league);
-    const halfDivisor = 200 * (48 / _h1RegMinutes);
-    projA1H = (synPace * projectedRatingA) / halfDivisor;
-    projB1H = (synPace * projectedRatingB) / halfDivisor;
-  } else {
-
-    const _tw1 = isFinite(config?.teamWeight) ? Number(config.teamWeight) : 0.65;
-    const _ow1 = 1 - _tw1;
-    projA1H = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw1 + bAllowed * _ow1) : aS_pre;
-    projB1H = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw1 + aAllowed * _ow1) : bS_pre;
-  }
+  let projA1H = isFinite(aS_pre) && isFinite(bAllowed) ? (aS_pre * _tw1 + bAllowed * _ow1) : aS_pre;
+  let projB1H = isFinite(bS_pre) && isFinite(aAllowed) ? (bS_pre * _tw1 + aAllowed * _ow1) : bS_pre;
 
   projA1H = applyVolatility(projA1H, aS1, volLimit, league);
   projB1H = applyVolatility(projB1H, bS1, volLimit, league);
@@ -16714,314 +16202,7 @@ const h1Calc = compute1HProjection({
         let h1aPick = getPick(h1aEdge, finalLines.h1aLine, league, "h1", { teamSc: h1Calc.aS1 });
         let h1bPick = getPick(h1bEdge, finalLines.h1bLine, league, "h1", { teamSc: h1Calc.bS1 });
 
-        const hasLevel2 = (AppState.context.data.A.ortg10?.length >= 1) && 
-                          (AppState.context.data.B.ortg10?.length >= 1);
-        const hasManual1H = (safeArr(parsed.a1HScored)?.length >= 2) && (safeArr(parsed.b1HScored)?.length >= 2);
-
-        if ((league === "nba" || league === "wnba" || league === "wnba_pre") && !hasLevel2 && !hasManual1H) {
-          h1Pick = "NO PLAY";
-          h1Calc.projA1H = NaN;
-          h1Calc.projB1H = NaN;
-        }
-
-                            const computeQ = (qKey, lineVal, injA = g_injA.scoringMult, injB = g_injB.scoringMult, config = {}) => {
-
-      const aS = getManualSeries("A", qKey, parsed);
-      const bS = getManualSeries("B", qKey, parsed);
-
-      const _dateAwareAvgAQ = getDateAwareOrFallbackAverage(aS, "A", qKey);
-      const _dateAwareAvgBQ = getDateAwareOrFallbackAverage(bS, "B", qKey);
-
-      const pKeyA = "a" + qKey.toUpperCase() + "Allowed";
-      const pKeyB = "b" + qKey.toUpperCase() + "Allowed";
-      const aA = (parsed[pKeyA] && parsed[pKeyA].length) ? parsed[pKeyA] : (AppState.context.data.A[qKey + "Allowed"] || []);
-      const bA = (parsed[pKeyB] && parsed[pKeyB].length) ? parsed[pKeyB] : (AppState.context.data.B[qKey + "Allowed"] || []);
-
-      
-      const volLimit = getMarketVolLimit(league, qKey);
-      const sampleSize = Math.min(aS.length, bS.length);
-      const leagueBaseQ = (LEAGUE_BASES[league] || 160) / 8;
-
-      const ctxAQ = AppState.context.data?.A || {};
-      const ctxBQ = AppState.context.data?.B || {};
-
-      const hasAdvancedQ = isFinite(avgOrNaN(ctxAQ.ortg10)) && isFinite(avgOrNaN(ctxAQ.drtg10)) &&
-                           isFinite(avgOrNaN(ctxBQ.ortg10)) && isFinite(avgOrNaN(ctxBQ.drtg10)) &&
-                           isFinite(avgOrNaN(ctxAQ.pace10)) && avgOrNaN(ctxAQ.pace10) > 0 &&
-                           isFinite(avgOrNaN(ctxBQ.pace10)) && avgOrNaN(ctxBQ.pace10) > 0 &&
-                           (ctxAQ.ortg10 || []).length >= 5 && (ctxBQ.ortg10 || []).length >= 5;
-      const leaguePaceBaseQ = LEAGUE_PACE_BASES[league] || 74;
-      const leagueRatingBaseQ = LEAGUE_RATING_BASES[league] || 110;
-
-      let projA, projB;
-      const _dynWeightsQ = getDynamicWeights(
-        getSampleTier(aS, bS),
-        globalModelState?.volState?.combinedVolRatio ?? 0.5,
-        league
-      );
-      if (hasAdvancedQ) {
-        const synPaceQ = (avgOrNaN(ctxAQ.pace10) + avgOrNaN(ctxBQ.pace10)) / 2;
-        const projRatingAQ = avgOrNaN(ctxAQ.ortg10) + avgOrNaN(ctxBQ.drtg10) - leagueRatingBaseQ;
-        const projRatingBQ = avgOrNaN(ctxBQ.ortg10) + avgOrNaN(ctxAQ.drtg10) - leagueRatingBaseQ;
-
-        const _qRegMinutes = getLeagueRegulationMinutes(league);
-        const qDivisor = 400 * (48 / _qRegMinutes);
-        projA = anchorProjection((synPaceQ * projRatingAQ) / qDivisor, sampleSize, leagueBaseQ);
-        projB = anchorProjection((synPaceQ * projRatingBQ) / qDivisor, sampleSize, leagueBaseQ);
-      } else {
-
-        const _twQ = isFinite(_dynWeightsQ?.teamWeight) ? Number(_dynWeightsQ.teamWeight) : 0.65;
-        const _owQ = 1 - _twQ;
-
-        projA = anchorProjection(_dateAwareAvgAQ * _twQ + avgOrNaN(bA) * _owQ, sampleSize, leagueBaseQ);
-        projB = anchorProjection(_dateAwareAvgBQ * _twQ + avgOrNaN(aA) * _owQ, sampleSize, leagueBaseQ);
-      }
-
-      // AUDIT FIX #5: was hardcoded to 1 (always full-strength, no way to dial
-      // down without editing the literal). Now reads the tunable registry entry.
-      const QUARTER_VENUE_PROXY_FACTOR = isFinite(getParam("quarterVenueProxyFactor", league)) ? Number(getParam("quarterVenueProxyFactor", league)) : 1;
-      if (ftCalc.aVenueEnabled && isFinite(ftCalc.aVenueAdjustment?.offensiveAdjustment)) {
-        projA += (ftCalc.aVenueAdjustment.offensiveAdjustment / 4) * QUARTER_VENUE_PROXY_FACTOR;
-      }
-      if (ftCalc.bVenueEnabled && isFinite(ftCalc.bVenueAdjustment?.offensiveAdjustment)) {
-        projB += (ftCalc.bVenueAdjustment.offensiveAdjustment / 4) * QUARTER_VENUE_PROXY_FACTOR;
-      }
-
-      projA = applyVolatility(projA, aS, volLimit, league);
-      projB = applyVolatility(projB, bS, volLimit, league);
-
-      projA *= injA;
-      projB *= injB;
-
-      
-
-      const _qInjOppBoostFactor = getParam("injuryOppBoostFactor", league) ?? INJURY_OPPONENT_BOOST_FACTOR;
-      if (injA < 1) projB *= (1 + (1 - injA) * _qInjOppBoostFactor);
-      if (injB < 1) projA *= (1 + (1 - injB) * _qInjOppBoostFactor);
-
-      // FIX #17: quarters previously never received the rest-days/back-to-back/
-      // travel intelligence signal that FT and H1 both apply via STEP6. Wire it
-      // in here the same way FT does (per-team signal, damped by the opponent's
-      // volatility), scaled down proportionally for a quarter: H1 already scales
-      // the signal by /4 for a half, so a quarter (half of a half) uses /8.
-      const aVolQ = getVolatilityRatioForSeries(aS, volLimit);
-      const bVolQ = getVolatilityRatioForSeries(bS, volLimit);
-      const intelQ = computeIntelligencePack(league);
-      const intelSignalAQ = buildTeamMarketIntelSignal(intelQ, "A");
-      const intelSignalBQ = buildTeamMarketIntelSignal(intelQ, "B");
-      if (isFinite(intelSignalAQ.signal) && intelSignalAQ.signal !== 0) {
-        projA = applyDampedIntelSignal(projA, intelSignalAQ.signal / 8, bVolQ);
-      }
-      if (isFinite(intelSignalBQ.signal) && intelSignalBQ.signal !== 0) {
-        projB = applyDampedIntelSignal(projB, intelSignalBQ.signal / 8, aVolQ);
-      }
-
-      const aH2H = getH2HSeries("A", qKey, parsed);
-      const bH2H = getH2HSeries("B", qKey, parsed);
-      const hasH2H = maybeReadH2HEnabled(qKey) && aH2H.length >= 2 && bH2H.length >= 2;
-      const tier = getSampleTier(aS, bS);
-
-      const qFullModel = tier === "full";
-      const qProjectionOnly = !hasH2H && tier === "thin";
-      if (hasH2H) {
-
-        
-        
-        const massacreH2HQ = getMassacreH2HSeries(qKey, getCurrentFixtureMeta(), parsed);
-        const decayH2HA = massacreH2HQ.A.length >= 2 ? massacreH2HQ.A : aH2H;
-        const decayH2HB = massacreH2HQ.B.length >= 2 ? massacreH2HQ.B : bH2H;
-
-        const usedDecayA = massacreH2HQ.A.length >= 2;
-        const usedDecayB = massacreH2HQ.B.length >= 2;
-        const qVolRatio = getVolatilityRatioForSeries(aS.concat(bS), volLimit);
-
-        const _qH2hFactor = isFinite(config?.h2hFactor) ? Number(config.h2hFactor) : 1.0;
-        const hw = getH2HWeight(decayH2HA.length, decayH2HB.length, qKey, tier, Math.abs(projA - projB), league, leagueBaseQ, _qH2hFactor, {
-          enabled: hasH2H,
-          injMultA: injA,
-          injMultB: injB,
-          volRatio: qVolRatio,
-          blowoutGap: Math.abs(projA - projB),
-          paceGapRisk: Math.abs((avgOrNaN(ctxAQ.pace10) || 74) - (avgOrNaN(ctxBQ.pace10) || 74)) > 6
-        });
-        const avgH2HA = avgOrNaN(decayH2HA);
-        const avgH2HB = avgOrNaN(decayH2HB);
-        projA = isFinite(avgH2HA) ? ((projA * (1 - hw)) + (avgH2HA * hw)) : projA;
-        projB = isFinite(avgH2HB) ? ((projB * (1 - hw)) + (avgH2HB * hw)) : projB;
-
-        // FIX #3 (quarters): same clamp-bypass pattern as FT/H1 — re-clamp
-        // after the raw H2H blend so the earlier volatility damping on
-        // projA/projB still bounds the number that leaves this block.
-        // AUDIT FIX: anchor to the injury/opponent-boost-adjusted baseline,
-        // same reasoning as the FT and H1 versions of this fix.
-        const _aInjAdjBaselineQ = avgOrNaN(aS) * injA * (injB < 1 ? (1 + (1 - injB) * _qInjOppBoostFactor) : 1);
-        const _bInjAdjBaselineQ = avgOrNaN(bS) * injB * (injA < 1 ? (1 + (1 - injA) * _qInjOppBoostFactor) : 1);
-        projA = applyVolatility(projA, aS, volLimit, league, _aInjAdjBaselineQ);
-        projB = applyVolatility(projB, bS, volLimit, league, _bInjAdjBaselineQ);
-      }
-
-      const teamANameForShape = document.getElementById("teamAName")?.value?.trim() || "";
-      const teamBNameForShape = document.getElementById("teamBName")?.value?.trim() || "";
-      const shapeSignalA = getTeamQuarterShapeSignal(league, teamANameForShape, qKey);
-      const shapeSignalB = getTeamQuarterShapeSignal(league, teamBNameForShape, qKey);
-      if (shapeSignalA && shapeSignalA.direction !== "neutral") {
-        projA *= (1 + clampNumber(shapeSignalA.z, -3, 3) * 0.02);
-      }
-      if (shapeSignalB && shapeSignalB.direction !== "neutral") {
-        projB *= (1 + clampNumber(shapeSignalB.z, -3, 3) * 0.02);
-      }
-
-      const qProj = projA + projB;
-      const qEdge = lineVal ? qProj - lineVal : NaN;
-      const qPick = getPick(qEdge, lineVal, league, qKey, { aSc: avgOrNaN(aS), bSc: avgOrNaN(bS) });
-
-      // FIX #18 (quarters residual): detectTrap() is wired into FT/H1/Team
-      // confidence grades but was never called for quarters, so qConf always
-      // graded as non-trap by default. Compute it the same way here.
-      const qTrap = detectTrap(qEdge, lineVal, qPick, league, qKey, stdDev(aS.concat(bS)));
-      const qConf = getConfidenceGrade({
-        pick: qPick, line: lineVal, edge: qEdge, sampleTier: tier,
-        volatility: stdDev(aS.concat(bS)), volLimit,
-        fullModel: qFullModel, projectionOnly: qProjectionOnly, trap: qTrap,
-        // FIX #19: quarters previously never discounted their own confidence
-        // grade for pace-gap risk or a wide projection blowout either.
-        paceGapRisk: Math.abs((avgOrNaN(ctxAQ.pace10) || 74) - (avgOrNaN(ctxBQ.pace10) || 74)) > 6,
-        blowoutGap: Math.abs(projA - projB),
-
-        marketKey: qKey, hasH2H: hasH2H,
-
-        siblingEdge: (qKey === "q1" || qKey === "q2") ? h1Calc.h1Edge : ftCalc.ftEdge,
-        league
-      });
-
-      // FIX #20: expose paceGapRisk on the returned object so the post-anchor
-      // confidence recompute below (which currently drops trap/paceGapRisk/
-      // blowoutGap entirely) can restore these discounts instead of grading
-      // blind on the common path where H1/FT anchoring fires.
-      const qPaceGapRisk = Math.abs((avgOrNaN(ctxAQ.pace10) || 74) - (avgOrNaN(ctxBQ.pace10) || 74)) > 6;
-      return { proj: qProj, edge: qEdge, line: lineVal, pick: qPick, confidence: qConf, tier, projA, projB, hasH2H, volatility: stdDev(aS.concat(bS)), fullModel: qFullModel, projectionOnly: qProjectionOnly, paceGapRisk: qPaceGapRisk };
-    };
-
-    const q1 = computeQ("q1", parseMarketLine(document.getElementById("q1Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
-    const q2 = computeQ("q2", parseMarketLine(document.getElementById("q2Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
-    const q3 = computeQ("q3", parseMarketLine(document.getElementById("q3Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
-    const q4 = computeQ("q4", parseMarketLine(document.getElementById("q4Market")?.value), g_injA.scoringMult, g_injB.scoringMult, { h2hFactor: ftConfigOverride?.h2hFactor });
-
-    if (q4 && isFinite(q4.projA) && isFinite(q4.projB) && q4.line &&
-        isFinite(ftCalc.blowoutGap) && ftCalc.blowoutGap > 15) {
-      const isFavorA = ftCalc.projAFT > ftCalc.projBFT;
-      q4.projA = isFavorA ? q4.projA * 0.85 : q4.projA * 1.10;
-      q4.projB = isFavorA ? q4.projB * 1.10 : q4.projB * 0.85;
-      q4.proj = q4.projA + q4.projB;
-      q4.edge = q4.proj - q4.line;
-      q4.pick = getPick(q4.edge, q4.line, league, "q4", {});
-    }
-
-    const rawQ12Sum = (q1?.proj || 0) + (q2?.proj || 0);
-    const rawQ34Sum = (q3?.proj || 0) + (q4?.proj || 0);
-    const h1Target = isFinite(h1Calc.h1Proj) && h1Calc.h1Proj > 0 ? h1Calc.h1Proj : rawQ12Sum;
-    const h2Target = isFinite(ftCalc.ftProj) && h1Target > 0 ? ftCalc.ftProj - h1Target : rawQ34Sum;
-
-            if (rawQ12Sum > 0 && isFinite(h1Target)) {
-          // AUDIT FIX #10: q1Weight/q2Weight were always hardcoded to 1.0,
-          // making this a plain proportional split dressed up as a weighted
-          // blend. Simplified — no behavior change, just removes the
-          // vestigial weight variables.
-          const totalWeightedRaw = (q1?.proj || 0) + (q2?.proj || 0);
-          const q1Scale = (h1Target * (q1?.proj || 0)) / (totalWeightedRaw || 1) / (q1?.proj || 1);
-          const q2Scale = (h1Target * (q2?.proj || 0)) / (totalWeightedRaw || 1) / (q2?.proj || 1);
-
-          if (q1 && isFinite(q1.proj) && isFinite(q1.line)) {
-
-            q1.proj = q1.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q1.proj * q1Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
-            q1.edge = q1.proj - q1.line;
-
-            q1.pick = getPick(q1.edge, q1.line, league, "q1", {});
-
-            // FIX #20: this recompute previously dropped trap/paceGapRisk/
-            // blowoutGap entirely, so the grade that survives to the pick on
-            // the common (anchored) path was never discounted for any of
-            // them, even though computeQ's own pre-anchor grade included all
-            // three. Recompute trap against the post-anchor edge/pick and
-            // restore the other two from the quarter's own data.
-            const _q1VolSafe = isFinite(q1.volatility) ? q1.volatility : 0;
-            const _q1TrapPostAnchor = detectTrap(q1.edge, q1.line, q1.pick, league, "q1", _q1VolSafe);
-            q1.trap = _q1TrapPostAnchor;
-            q1.confidence = getConfidenceGrade({
-              pick: q1.pick, line: q1.line, edge: q1.edge, sampleTier: q1.tier,
-              volatility: _q1VolSafe, volLimit: getMarketVolLimit(league, "q1"), marketKey: "q1", hasH2H: q1.hasH2H,
-              fullModel: q1.fullModel, projectionOnly: q1.projectionOnly,
-              trap: _q1TrapPostAnchor, paceGapRisk: q1.paceGapRisk, blowoutGap: Math.abs((q1.projA || 0) - (q1.projB || 0)),
-              siblingEdge: h1Calc.h1Edge, league
-            });
-          }
-          if (q2 && isFinite(q2.proj) && isFinite(q2.line)) {
-
-            q2.proj = q2.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q2.proj * q2Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
-            q2.edge = q2.proj - q2.line;
-
-            q2.pick = getPick(q2.edge, q2.line, league, "q2", {});
-
-            // FIX #20: same restoration as Q1 above.
-            const _q2VolSafe = isFinite(q2.volatility) ? q2.volatility : 0;
-            const _q2TrapPostAnchor = detectTrap(q2.edge, q2.line, q2.pick, league, "q2", _q2VolSafe);
-            q2.trap = _q2TrapPostAnchor;
-            q2.confidence = getConfidenceGrade({
-              pick: q2.pick, line: q2.line, edge: q2.edge, sampleTier: q2.tier,
-              volatility: _q2VolSafe, volLimit: getMarketVolLimit(league, "q2"), marketKey: "q2", hasH2H: q2.hasH2H,
-              fullModel: q2.fullModel, projectionOnly: q2.projectionOnly,
-              trap: _q2TrapPostAnchor, paceGapRisk: q2.paceGapRisk, blowoutGap: Math.abs((q2.projA || 0) - (q2.projB || 0)),
-              siblingEdge: h1Calc.h1Edge, league
-            });
-          }
-        }
-
-        if (rawQ34Sum > 0 && isFinite(h2Target) && h2Target > 0) {
-          // AUDIT FIX #10: q3Weight/q4Weight were always hardcoded to 1.0 —
-          // same vestigial pattern as Q1/Q2 above. Simplified, no behavior change.
-          const totalWeightedRaw = (q3?.proj || 0) + (q4?.proj || 0);
-          const q3Scale = (h2Target * (q3?.proj || 0)) / (totalWeightedRaw || 1) / (q3?.proj || 1);
-          const q4Scale = (h2Target * (q4?.proj || 0)) / (totalWeightedRaw || 1) / (q4?.proj || 1);
-
-          if (q3 && isFinite(q3.proj) && isFinite(q3.line)) {
-
-            q3.proj = q3.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q3.proj * q3Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
-            q3.edge = q3.proj - q3.line;
-
-            q3.pick = getPick(q3.edge, q3.line, league, "q3", {});
-
-            // FIX #20: same restoration as Q1/Q2 above.
-            const _q3VolSafe = isFinite(q3.volatility) ? q3.volatility : 0;
-            const _q3TrapPostAnchor = detectTrap(q3.edge, q3.line, q3.pick, league, "q3", _q3VolSafe);
-            q3.trap = _q3TrapPostAnchor;
-            q3.confidence = getConfidenceGrade({
-              pick: q3.pick, line: q3.line, edge: q3.edge, sampleTier: q3.tier,
-              volatility: _q3VolSafe, volLimit: getMarketVolLimit(league, "q3"), marketKey: "q3", hasH2H: q3.hasH2H,
-              fullModel: q3.fullModel, projectionOnly: q3.projectionOnly,
-              trap: _q3TrapPostAnchor, paceGapRisk: q3.paceGapRisk, blowoutGap: Math.abs((q3.projA || 0) - (q3.projB || 0)),
-              siblingEdge: ftCalc.ftEdge, league
-            });
-          }
-          if (q4 && isFinite(q4.proj) && isFinite(q4.line)) {
-
-            q4.proj = q4.proj * (1 - MODEL_TUNING.quarterAnchorBlendWeight) + (q4.proj * q4Scale) * MODEL_TUNING.quarterAnchorBlendWeight;
-            q4.edge = q4.proj - q4.line;
-
-            q4.pick = getPick(q4.edge, q4.line, league, "q4", {});
-
-            // FIX #20: same restoration as Q1/Q2/Q3 above.
-            const _q4VolSafe = isFinite(q4.volatility) ? q4.volatility : 0;
-            const _q4TrapPostAnchor = detectTrap(q4.edge, q4.line, q4.pick, league, "q4", _q4VolSafe);
-            q4.trap = _q4TrapPostAnchor;
-            q4.confidence = getConfidenceGrade({
-              pick: q4.pick, line: q4.line, edge: q4.edge, sampleTier: q4.tier,
-              volatility: _q4VolSafe, volLimit: getMarketVolLimit(league, "q4"), marketKey: "q4", hasH2H: q4.hasH2H,
-              fullModel: q4.fullModel, projectionOnly: q4.projectionOnly,
-              trap: _q4TrapPostAnchor, paceGapRisk: q4.paceGapRisk, blowoutGap: Math.abs((q4.projA || 0) - (q4.projB || 0)),
-              siblingEdge: ftCalc.ftEdge, league
-            });
-          }
-        }
+        const q1 = null, q2 = null, q3 = null, q4 = null;
 
     if (ftCalc.ftSampleTier === "insufficient") {
       ftPick = "NO PLAY";
@@ -17281,153 +16462,103 @@ const ftNote = ftCalc.ftNote || ftCalc.ftProjectionNote || null;
     const _coeffFitted = isConfidenceCoeffFitted(league);
 
     const picks = [
-  {
-    _idx: 0,
-    name: "FT Total" + ftBadge,
-    marketKey: "ft",
-    marketType: "ft",
-    league,
-    context: { aSc: ftCalc.aS, bSc: ftCalc.bS },
-    line: ftLine,
-    proj: ftCalc.ftProj,
-    edge: ftCalc.ftEdge,
-    pick: ftPick,
-    confidence: ftConfidence,
-    note: ftNote,
-    fullModel: ftCalc.ftFullModel,
-    sampleTier: ftCalc.ftSampleTier,
-    hasH2H: ftCalc.ftHasH2H,
-    trap: ftTrap,
-    // AUDIT FIX #2: volatility/volLimit weren't carried onto the FT pick object,
-    // so the final win-probability display loop had no way to use FT's own
-    // volatility (it had to reuse it as a hack for every OTHER market instead).
-    volatility: ftVolatilityForConf,
-    volLimit: getMarketVolLimit(league, "ft"),
-    coeffFitted: _coeffFitted,
-
-    aVenueEnabled: ftCalc.aVenueEnabled,
-    bVenueEnabled: ftCalc.bVenueEnabled,
-    aVenueAdjustment: ftCalc.aVenueAdjustment,
-    bVenueAdjustment: ftCalc.bVenueAdjustment,
-    netVenueEffect: ftCalc.netVenueEffect
-  },
-  {
-    _idx: 1,
-    name: "1H Total" + h1Badge,
-    marketKey: "h1",
-    marketType: "h1",
-    league,
-    context: { aSc: h1Calc.aS1, bSc: h1Calc.bS1 },
-    line: h1Line,
-    proj: h1Calc.h1Proj,
-    edge: h1Calc.h1Edge,
-    pick: h1Pick,
-    confidence: h1ConfidenceFinal,
-    note: h1Note,
-    fullModel: h1Calc.h1FullModel,
-    sampleTier: h1Calc.h1SampleTier,
-    hasH2H: h1Calc.h1HasH2H,
-    trap: h1Trap,
-    // AUDIT FIX #2: same as FT above — carry H1's own volatility/volLimit
-    // onto the pick object so the display loop can use H1's real numbers.
-    volatility: h1VolatilityForConf,
-    volLimit: getMarketVolLimit(league, "h1"),
-    coeffFitted: _coeffFitted,
-    aVenueEnabled: h1Calc.aVenueEnabled,
-    bVenueEnabled: h1Calc.bVenueEnabled,
-    aVenueAdjustment: h1Calc.aVenueAdjustment,
-    bVenueAdjustment: h1Calc.bVenueAdjustment
-  },
-
-      { _idx: 10, name: "Q1 Total", marketKey: "q1", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q1Market")?.value), proj: q1?.proj, edge: q1?.edge, pick: q1?.pick || "NO PLAY", confidence: q1?.confidence || "NaN", note: null, fullModel: q1?.fullModel ?? false, sampleTier: q1?.tier, hasH2H: q1?.hasH2H, trap: q1?.trap ?? false, volatility: q1?.volatility, volLimit: getMarketVolLimit(league, "q1"), coeffFitted: _coeffFitted, projectionOnly: q1?.projectionOnly ?? false },
-      { _idx: 11, name: "Q2 Total", marketKey: "q2", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q2Market")?.value), proj: q2?.proj, edge: q2?.edge, pick: q2?.pick || "NO PLAY", confidence: q2?.confidence || "NaN", note: null, fullModel: q2?.fullModel ?? false, sampleTier: q2?.tier, hasH2H: q2?.hasH2H, trap: q2?.trap ?? false, volatility: q2?.volatility, volLimit: getMarketVolLimit(league, "q2"), coeffFitted: _coeffFitted, projectionOnly: q2?.projectionOnly ?? false },
-      { _idx: 12, name: "Q3 Total", marketKey: "q3", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q3Market")?.value), proj: q3?.proj, edge: q3?.edge, pick: q3?.pick || "NO PLAY", confidence: q3?.confidence || "NaN", note: null, fullModel: q3?.fullModel ?? false, sampleTier: q3?.tier, hasH2H: q3?.hasH2H, trap: q3?.trap ?? false, volatility: q3?.volatility, volLimit: getMarketVolLimit(league, "q3"), coeffFitted: _coeffFitted, projectionOnly: q3?.projectionOnly ?? false },
-      { _idx: 13, name: "Q4 Total", marketKey: "q4", marketType: "h1", league, context: {}, line: parseMarketLine(document.getElementById("q4Market")?.value), proj: q4?.proj, edge: q4?.edge, pick: q4?.pick || "NO PLAY", confidence: q4?.confidence || "NaN", note: null, fullModel: q4?.fullModel ?? false, sampleTier: q4?.tier, hasH2H: q4?.hasH2H, trap: q4?.trap ?? false, volatility: q4?.volatility, volLimit: getMarketVolLimit(league, "q4"), coeffFitted: _coeffFitted, projectionOnly: q4?.projectionOnly ?? false },
-  {
-    _idx: 3,
-    name: "Team A Total" + aBadge,
-    marketKey: "team_a",
-    marketType: "team",
-    league,
-    context: { teamSc: ftCalc.aS },
-    line: aLine,
-    proj: ftCalc.projAFT,
-    edge: ftCalc.aEdge,
-    pick: aPick,
-    confidence: aConfidence,
-    note: ftNote,
-    fullModel: ftCalc.teamFullModel,
-    sampleTier: ftCalc.ftSampleTier,
-    hasH2H: ftCalc.ftHasH2H,
-    // AUDIT FIX #2: Team A previously carried no trap/volatility/volLimit at
-    // all, so the display loop had nothing real to use for this market.
-    trap: aTrap,
-    volatility: ftCalc.aVol,
-    volLimit: getMarketVolLimit(league, "ft"),
-    coeffFitted: _coeffFitted,
-    aVenueEnabled: ftCalc.aVenueEnabled,
-    aVenueAdjustment: ftCalc.aVenueAdjustment
-  },
-  {
-    _idx: 4,
-    name: "Team B Total" + bBadge,
-    marketKey: "team_b",
-    marketType: "team",
-    league,
-    context: { teamSc: ftCalc.bS },
-    line: bLine,
-    proj: ftCalc.projBFT,
-    edge: ftCalc.bEdge,
-    pick: bPick,
-    confidence: bConfidence,
-    note: ftNote,
-    fullModel: ftCalc.teamFullModel,
-    sampleTier: ftCalc.ftSampleTier,
-    hasH2H: ftCalc.ftHasH2H,
-    // AUDIT FIX #2: same as Team A above.
-    trap: bTrap,
-    volatility: ftCalc.bVol,
-    volLimit: getMarketVolLimit(league, "ft"),
-    coeffFitted: _coeffFitted,
-    bVenueEnabled: ftCalc.bVenueEnabled,
-    bVenueAdjustment: ftCalc.bVenueAdjustment
-  },
-  {
-    _idx: 14,
-    name: "Team A 1H",
-    marketKey: "h1_team_a",
-    marketType: "h1",
-    league,
-    context: { teamSc: h1Calc.aS1 },
-    line: finalLines.h1aLine,
-    proj: h1Calc.projA1H,
-    edge: h1aEdge,
-    pick: h1aPick,
-    confidence: h1aConfidence,
-    note: h1Note,
-    fullModel: h1Calc.h1FullModel,
-    sampleTier: h1Calc.h1SampleTier,
-    hasH2H: h1Calc.h1HasH2H,
-    coeffFitted: _coeffFitted
-  },
-  {
-    _idx: 15,
-    name: "Team B 1H",
-    marketKey: "h1_team_b",
-    marketType: "h1",
-    league,
-    context: { teamSc: h1Calc.bS1 },
-    line: finalLines.h1bLine,
-    proj: h1Calc.projB1H,
-    edge: h1bEdge,
-    pick: h1bPick,
-    confidence: h1bConfidence,
-    note: h1Note,
-    fullModel: h1Calc.h1FullModel,
-    sampleTier: h1Calc.h1SampleTier,
-    hasH2H: h1Calc.h1HasH2H,
-    coeffFitted: _coeffFitted
-  }
+      {
+        _idx: 0,
+        name: "FT Total Goals" + ftBadge,
+        marketKey: "ft",
+        marketType: "ft",
+        league,
+        context: { aSc: ftCalc.aS, bSc: ftCalc.bS },
+        line: ftLine,
+        proj: ftCalc.ftProj,
+        edge: ftCalc.ftEdge,
+        pick: ftPick,
+        confidence: ftConfidence,
+        note: ftNote,
+        fullModel: ftCalc.ftFullModel,
+        sampleTier: ftCalc.ftSampleTier,
+        hasH2H: ftCalc.ftHasH2H,
+        trap: ftTrap,
+        volatility: ftVolatilityForConf,
+        volLimit: getMarketVolLimit(league, "ft"),
+        coeffFitted: _coeffFitted,
+        aVenueEnabled: ftCalc.aVenueEnabled,
+        bVenueEnabled: ftCalc.bVenueEnabled,
+        aVenueAdjustment: ftCalc.aVenueAdjustment,
+        bVenueAdjustment: ftCalc.bVenueAdjustment,
+        netVenueEffect: ftCalc.netVenueEffect
+      },
+      {
+        _idx: 1,
+        name: "1H Total Goals" + h1Badge,
+        marketKey: "h1",
+        marketType: "h1",
+        league,
+        context: { aSc: h1Calc.aS1, bSc: h1Calc.bS1 },
+        line: h1Line,
+        proj: h1Calc.h1Proj,
+        edge: h1Calc.h1Edge,
+        pick: h1Pick,
+        confidence: h1ConfidenceFinal,
+        note: h1Note,
+        fullModel: h1Calc.h1FullModel,
+        sampleTier: h1Calc.h1SampleTier,
+        hasH2H: h1Calc.h1HasH2H,
+        trap: h1Trap,
+        volatility: h1VolatilityForConf,
+        volLimit: getMarketVolLimit(league, "h1"),
+        coeffFitted: _coeffFitted,
+        aVenueEnabled: h1Calc.aVenueEnabled,
+        bVenueEnabled: h1Calc.bVenueEnabled,
+        aVenueAdjustment: h1Calc.aVenueAdjustment,
+        bVenueAdjustment: h1Calc.bVenueAdjustment
+      },
+      {
+        _idx: 2,
+        name: "Team A Total Goals" + aBadge,
+        marketKey: "team_a",
+        marketType: "team",
+        league,
+        context: { teamSc: ftCalc.aS },
+        line: aLine,
+        proj: ftCalc.projAFT,
+        edge: ftCalc.aEdge,
+        pick: aPick,
+        confidence: aConfidence,
+        note: ftNote,
+        fullModel: ftCalc.teamFullModel,
+        sampleTier: ftCalc.ftSampleTier,
+        hasH2H: ftCalc.ftHasH2H,
+        trap: aTrap,
+        volatility: ftCalc.aVol,
+        volLimit: getMarketVolLimit(league, "ft"),
+        coeffFitted: _coeffFitted,
+        aVenueEnabled: ftCalc.aVenueEnabled,
+        aVenueAdjustment: ftCalc.aVenueAdjustment
+      },
+      {
+        _idx: 3,
+        name: "Team B Total Goals" + bBadge,
+        marketKey: "team_b",
+        marketType: "team",
+        league,
+        context: { teamSc: ftCalc.bS },
+        line: bLine,
+        proj: ftCalc.projBFT,
+        edge: ftCalc.bEdge,
+        pick: bPick,
+        confidence: bConfidence,
+        note: ftNote,
+        fullModel: ftCalc.teamFullModel,
+        sampleTier: ftCalc.ftSampleTier,
+        hasH2H: ftCalc.ftHasH2H,
+        trap: bTrap,
+        volatility: ftCalc.bVol,
+        volLimit: getMarketVolLimit(league, "ft"),
+        coeffFitted: _coeffFitted,
+        bVenueEnabled: ftCalc.bVenueEnabled,
+        bVenueAdjustment: ftCalc.bVenueAdjustment
+      }
     ];
 
     if (ftCalc.ftSampleTier === "insufficient") {
@@ -17582,15 +16713,19 @@ await applyMassacreFrameworkToPicks(finalPicksForDisplay, league, parsed, fixtur
         const netBDisplay = isFinite(netB) ? (netB >= 0 ? "+" : "") + netB.toFixed(1) : "—";
         const netAColor = !isFinite(netA) ? 'var(--muted)' : (netA >= 0 ? '#3a9c35' : '#c91920');
         const netBColor = !isFinite(netB) ? 'var(--muted)' : (netB >= 0 ? '#3a9c35' : '#c91920');
+        const xgADisplay = isFinite(ftCalc.projAFT) ? ftCalc.projAFT.toFixed(2) : "—";
+        const xgBDisplay = isFinite(ftCalc.projBFT) ? ftCalc.projBFT.toFixed(2) : "—";
+        const totalXgDisplay = isFinite(ftCalc.ftProj) ? ftCalc.ftProj.toFixed(2) : "—";
+
         const dashHtml = `
         <div style="background: #333; color: #ffd700; padding: 8px 10px; font-weight: 800; font-size: 11px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--panel-border);">
-          <span>SYNDICATE INSIGHT (LEVEL 2)</span>
-          <span style="color: ${ftCalc.ftFullModel ? '#4CAF50' : '#ffa500'}">${ftCalc.ftFullModel ? '🟢 FULL MODEL' : '🟡 LIMITED DATA'}</span>
+          <span>FOOTBALL GOAL INSIGHT</span>
+          <span style="color: ${ftCalc.ftFullModel ? '#4CAF50' : '#ffa500'}">${ftCalc.ftFullModel ? '🟢 FULL GOAL MODEL' : '🟡 LIMITED PASTE DATA'}</span>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 12px; text-align: center; gap: 5px;">
-          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team A Net</div><div style="font-size: 18px; font-weight: 900; color: ${netAColor}">${netADisplay}</div></div>
-          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Pace</div><div style="font-size: 18px; font-weight: 900; color: var(--tracker-strong)">${paceIcon} ${paceDisplay}</div></div>
-          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team B Net</div><div style="font-size: 18px; font-weight: 900; color: ${netBColor}">${netBDisplay}</div></div>
+          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team A xG</div><div style="font-size: 18px; font-weight: 900; color: #3a9c35">${xgADisplay}</div></div>
+          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Match Expected Goals</div><div style="font-size: 18px; font-weight: 900; color: var(--tracker-strong)">⚽ ${totalXgDisplay}</div></div>
+          <div><div style="font-size: 9px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase;">Team B xG</div><div style="font-size: 18px; font-weight: 900; color: #3a9c35">${xgBDisplay}</div></div>
         </div>`;
 
         let existingDash = document.getElementById('syndicateDashboard');
