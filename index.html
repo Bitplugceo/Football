@@ -1,3 +1,4 @@
+Q
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -340,6 +341,7 @@
       <div style="display:flex;gap:6px;margin-bottom:4px;">
         <input id="ssTeamAName" placeholder="e.g. Manchester United" style="margin-bottom:0;flex:1;" />
         <input id="ssPasteA" placeholder="Paste JSON A" oninput="parseSofascoreTeam('A')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
+        <button type="button" onclick="searchSofascoreTeam('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Open raw SofaScore search (manual ID only)">🔍</button>
         <button type="button" onclick="clearPasteJSON('A')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
@@ -352,6 +354,7 @@
       <div style="display:flex;gap:6px;margin-bottom:4px;">
         <input id="ssTeamBName" placeholder="e.g. Liverpool" style="margin-bottom:0;flex:1;" />
         <input id="ssPasteB" placeholder="Paste JSON B" oninput="parseSofascoreTeam('B')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
+        <button type="button" onclick="searchSofascoreTeam('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Open raw SofaScore search (manual ID only)">🔍</button>
         <button type="button" onclick="clearPasteJSON('B')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -1383,6 +1386,22 @@
     window.clearPasteJSON = function(side){
       const el = document.getElementById(side==='A'?'ssPasteA':'ssPasteB');
       if(el) el.value='';
+    };
+    // Manual search only — no auto-resolve, no fetch, no proxy.
+    // Opens the raw SofaScore search JSON so the user can find the football
+    // entry and paste its numerical ID themselves.
+    window.searchSofascoreTeam = function(side){
+      const nameEl = document.getElementById(side==='A'?'ssTeamAName':'ssTeamBName');
+      const rawName = (nameEl?.value||"").trim();
+      if(!rawName){ alert("Enter a team name first."); return; }
+      const searchName = rawName.replace(/\s+/g, " ").trim();
+      const url = "https://api.sofascore.com/api/v1/search/all?q=" + encodeURIComponent(searchName);
+      window.open(url, "_blank");
+      const st = document.getElementById("ssFetchStatus");
+      if (st) {
+        st.style.color = "#d98a00";
+        st.textContent = "🔍 Opened raw search for " + side + ". Find the football entry and paste its ID manually.";
+      }
     };
     // ---- H2H auto-fill: raw event cache + opponent-match extraction ----
     window.__ssRawEvents = window.__ssRawEvents || { A: null, B: null };
