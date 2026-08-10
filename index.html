@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1458,7 +1459,6 @@
       // block if that's not acceptable.
       const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
       const st = document.getElementById("ssFetchStatus");
-      if (st) { st.style.color = "#d98a00"; st.textContent = "🔎 Resolving " + side + ": " + rawName + "…"; }
       engineDebug("[TEAM RESOLVER] Requested", { side: side, requested: rawName, normalized: requestedNorm, sport: "football" });
       let data = null;
       try {
