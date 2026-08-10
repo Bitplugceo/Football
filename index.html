@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -341,7 +340,6 @@ S
       <div style="display:flex;gap:6px;margin-bottom:4px;">
         <input id="ssTeamAName" placeholder="e.g. Manchester United" style="margin-bottom:0;flex:1;" />
         <input id="ssPasteA" placeholder="Paste JSON A" oninput="parseSofascoreTeam('A')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-        <button type="button" onclick="searchSofascoreTeam('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search team">🔍</button>
         <button type="button" onclick="clearPasteJSON('A')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
@@ -354,7 +352,6 @@ S
       <div style="display:flex;gap:6px;margin-bottom:4px;">
         <input id="ssTeamBName" placeholder="e.g. Liverpool" style="margin-bottom:0;flex:1;" />
         <input id="ssPasteB" placeholder="Paste JSON B" oninput="parseSofascoreTeam('B')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-        <button type="button" onclick="searchSofascoreTeam('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search team">🔍</button>
         <button type="button" onclick="clearPasteJSON('B')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -1386,122 +1383,6 @@ S
     window.clearPasteJSON = function(side){
       const el = document.getElementById(side==='A'?'ssPasteA':'ssPasteB');
       if(el) el.value='';
-    };
-    // ---- Team Lookup resolver: name normalization + candidate ranking ----
-    // Football clubs aren't named "Surname, First" the way individual
-    // athletes are, so this is a plain normalize-and-compare on the whole
-    // club name — lowercase, strip punctuation, collapse whitespace —
-    // rather than the surname/given-name split the original player
-    // resolver needed. Parenthetical suffixes (e.g. "(W)" for a women's
-    // side or a country code) are display formatting and are stripped
-    // before compare.
-    function ssNormalizeTeamName(rawName) {
-      return String(rawName || "")
-        .replace(/\([^)]*\)/g, "")
-        .replace(/["']/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9 ]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-    function ssIsTeamResult(r) {
-      // Reject players, tournaments, and other non-club entities — we want
-      // the actual football club/national team, not a person or a
-      // competition record. The real safety check — sport + full-name
-      // match — happens downstream in ssScoreCandidate.
-      const t = String(r?.type || r?.entity?.type || "").toLowerCase();
-      const REJECT_TYPES = ["player", "tournament", "uniquetournament", "category", "stage", "season", "manager", "venue"];
-      if (!t) return true;
-      return REJECT_TYPES.indexOf(t) === -1;
-    }
-    function ssGetCandidateSportSlug(candidate) {
-      const entity = candidate?.entity || candidate || {};
-      return String(entity?.sport?.slug || entity?.team?.sport?.slug || entity?.category?.sport?.slug || "").toLowerCase();
-    }
-    // Ranking, highest tier wins. 4/3 = safe full-name match (auto-select).
-    // 2 = partial name + sport agree but not an exact match (shown as
-    // fuzzy, needs verification). 1 = partial name only, no sport
-    // confirmation (never auto-selected — this is exactly the unsafe case
-    // the resolver exists to stop).
-    function ssScoreCandidate(candidate, requestedNorm) {
-      const rawName = candidate?.entity?.name || candidate?.name || "";
-      const candNorm = ssNormalizeTeamName(rawName);
-      const sportSlug = ssGetCandidateSportSlug(candidate);
-      const sportMatch = sportSlug === "football";
-      const exact = !!candNorm && !!requestedNorm && candNorm === requestedNorm;
-      const contains = !!candNorm && !!requestedNorm && (candNorm.indexOf(requestedNorm) !== -1 || requestedNorm.indexOf(candNorm) !== -1);
-      let tier = 0, label = "NONE";
-      if (exact && sportMatch) { tier = 4; label = "EXACT_NAME_SPORT"; }
-      else if (exact) { tier = 3; label = "EXACT_NAME"; }
-      else if (contains && sportMatch) { tier = 2; label = "PARTIAL_NAME_SPORT"; }
-      else if (contains) { tier = 1; label = "PARTIAL_NAME_UNSAFE"; }
-      const id = candidate?.entity?.id || candidate?.id;
-      return { tier: tier, label: label, sportMatch: sportMatch, rawName: rawName, sportSlug: sportSlug, id: id };
-    }
-    window.searchSofascoreTeam = async function(side){
-      const nameEl = document.getElementById(side==='A'?'ssTeamAName':'ssTeamBName');
-      const rawName = (nameEl?.value||"").trim();
-      if(!rawName){ alert("Enter a team name first."); return; }
-      const requestedNorm = ssNormalizeTeamName(rawName);
-      const searchName = rawName.replace(/\s+/g, " ").trim();
-      // Paste-only workflow: open SofaScore search JSON so the user can copy events.
-      // NOTE: "search/teams" with a "sport" filter is not a real SofaScore endpoint —
-      // it silently returns {"results":[]}. "search/all" is the real endpoint; it
-      // returns mixed sports, so the user has to pick the entry whose sport.slug is
-      // "football" out of the list.
-      const url = "https://api.sofascore.com/api/v1/search/all?q=" + encodeURIComponent(searchName);
-      // Third-party CORS relay, used ONLY if a direct browser fetch is
-      // blocked. This project has no real backend/proxy of its own — the
-      // only trace of one is an unused window._proxyFetchCache reference in
-      // militaryRaid() that is never defined anywhere in this file, so it
-      // is not being "restored," it's new. Routing through allorigins.win
-      // means the query leaves this app through a third party; remove this
-      // block if that's not acceptable.
-      const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
-      const st = document.getElementById("ssFetchStatus");
-      engineDebug("[TEAM RESOLVER] Requested", { side: side, requested: rawName, normalized: requestedNorm, sport: "football" });
-      let data = null;
-      try {
-        const resp = await fetch(url, { headers: { "Accept": "application/json" } });
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        data = await resp.json();
-      } catch (directErr) {
-        engineDebug("[TEAM RESOLVER] Direct lookup blocked — trying CORS relay", { error: directErr && directErr.message ? directErr.message : String(directErr) });
-        try {
-          const proxyResp = await fetch(proxyUrl);
-          if (!proxyResp.ok) throw new Error("HTTP " + proxyResp.status);
-          data = await proxyResp.json();
-        } catch (proxyErr) {
-          engineDebug("[TEAM RESOLVER] CORS relay also blocked — falling back to manual tab", { error: proxyErr && proxyErr.message ? proxyErr.message : String(proxyErr) });
-          window.open(url, "_blank");
-          if (st) {
-            st.style.color = "#d98a00";
-            st.textContent = "⚠️ Auto-resolve unavailable (direct + relay both blocked) — opened raw search for " + side + ". Find the football entry and paste its ID manually.";
-          }
-          return;
-        }
-      }
-      const results = Array.isArray(data?.results) ? data.results : [];
-      const scored = results.filter(ssIsTeamResult).map(function(r) { return ssScoreCandidate(r, requestedNorm); }).filter(function(c) { return c.tier > 0 && isFinite(c.id); });
-      scored.sort(function(a, b) { return b.tier - a.tier; });
-      scored.forEach(function(c) {
-        engineDebug("[TEAM RESOLVER] Candidate", { candidate: c.rawName, id: c.id, sport: c.sportSlug || "unknown", nameMatch: c.label, sportMatch: c.sportMatch ? "EXACT" : "NO" });
-      });
-      const best = scored[0];
-      const idEl = document.getElementById(side==='A'?'ssTeamAId':'ssTeamBId');
-      if (best && best.tier >= 3) {
-        if (idEl) { idEl.value = best.id; updateSofascoreLinks(side); }
-        if (st) { st.style.color = "#2f8f4a"; st.textContent = "✅ Resolved " + side + ": " + best.rawName + " (ID " + best.id + ", " + (best.sportSlug || "unknown sport") + ") — " + best.label; }
-        engineDebug("[TEAM RESOLVER] Selected", { requested: rawName, selected: best.rawName, id: best.id, label: best.label, selectedFlag: "YES" });
-      } else if (best && best.tier === 2) {
-        if (idEl) { idEl.value = best.id; updateSofascoreLinks(side); }
-        if (st) { st.style.color = "#d98a00"; st.textContent = "⚠️ Fuzzy match only for " + side + ": " + best.rawName + " (ID " + best.id + ") — partial name + sport agree but full name doesn't. Verify before running."; }
-        engineDebug("[TEAM RESOLVER] Fuzzy fallback selected — verify manually", { requested: rawName, selected: best.rawName, id: best.id, label: best.label, selectedFlag: "FALLBACK" });
-      } else {
-        if (st) { st.style.color = "#d92d2a"; st.textContent = "❌ UNRESOLVED for " + side + " — no safe full-name + sport match among " + results.length + " results. Opening raw search for manual pick."; }
-        engineDebug("[TEAM RESOLVER] UNRESOLVED", { requested: rawName, candidateCount: results.length, selectedFlag: "NO" });
-        window.open(url, "_blank");
-      }
     };
     // ---- H2H auto-fill: raw event cache + opponent-match extraction ----
     window.__ssRawEvents = window.__ssRawEvents || { A: null, B: null };
