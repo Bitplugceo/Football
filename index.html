@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -372,10 +371,6 @@ S
         <span id="ssTournamentName" style="font-size:10px;font-weight:800;color:var(--muted);"></span>
       </div>
     </div>
-    <div style="margin-top:8px;">
-      <label style="font-size:11px;font-weight:800;">Competition / League <span style="color:var(--muted);font-weight:600;">(auto-detected only when unambiguous; otherwise enter it)</span></label>
-      <input id="leagueName" placeholder="e.g. Premier League" value="" style="margin-bottom:0;font-size:11px;padding:4px 6px;width:180px;" />
-    </div>
     <div id="ssFetchStatus" style="font-size:10px;min-height:16px;margin-top:6px;"></div>
   </div>
   <div class="section" id="marketSection">
@@ -386,118 +381,7 @@ S
       <div><label>2nd Half Total Goals</label><input id="h2Market" placeholder="e.g. 1.0 or 1.25" /></div>
     </div>
   </div>
-  <div class="section" id="fixtureContextSection">
-    <h3>Fixture & Competition Context</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-      <div><label>Real Fixture / Event ID</label><input id="fixtureEventId" placeholder="SofaScore event ID" /></div>
-      <div><label>Kickoff (local/ISO)</label><input id="fixtureKickoff" type="datetime-local" /></div>
-      <div><label>Competition / League</label><input id="fixtureCompetition" placeholder="e.g. MLS, EPL, UCL" /></div>
-      <div><label>Season ID / Label</label><input id="fixtureSeason" placeholder="e.g. 2025/26" /></div>
-      <div><label>Venue</label><input id="fixtureVenue" placeholder="Stadium / city" /></div>
-      <div><label>Competition Type</label><input id="fixtureCompetitionType" placeholder="league / cup / friendly / continental" /></div>
-      <div><label>League Avg Home Goals</label><input id="leagueHomeAvg" type="number" min="0.2" step="0.01" value="1.35" /></div>
-      <div><label>League Avg Away Goals</label><input id="leagueAwayAvg" type="number" min="0.2" step="0.01" value="1.10" /></div>
-      <div><label>Season Goal Environment ×</label><input id="seasonGoalFactor" type="number" min="0.75" max="1.25" step="0.01" value="1.00" /></div>
-      <div><label>Competition Strength ×</label><input id="competitionStrength" type="number" min="0.75" max="1.25" step="0.01" value="1.00" /></div>
-    </div>
-    <div id="fixtureContextStatus" style="font-size:10px;color:var(--muted);margin-top:5px;"></div>
-  </div>
-  <div class="section" id="advancedFeaturesSection">
-    <h3>Advanced Football Features <span style="font-size:10px;color:var(--muted);font-weight:600;">optional — only supplied data affects the model</span></h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-      <div><label>Team A xG / match</label><input id="aXG" type="number" min="0" step="0.01" placeholder="e.g. 1.55" /></div>
-      <div><label>Team B xG / match</label><input id="bXG" type="number" min="0" step="0.01" placeholder="e.g. 1.25" /></div>
-      <div><label>Team A xGA / match</label><input id="aXGA" type="number" min="0" step="0.01" placeholder="e.g. 1.10" /></div>
-      <div><label>Team B xGA / match</label><input id="bXGA" type="number" min="0" step="0.01" placeholder="e.g. 1.35" /></div>
-      <div><label>Team A Shots / match</label><input id="aShots" type="number" min="0" step="0.1" placeholder="e.g. 13.2" /></div>
-      <div><label>Team B Shots / match</label><input id="bShots" type="number" min="0" step="0.1" placeholder="e.g. 11.4" /></div>
-      <div><label>Team A Shots on Target</label><input id="aSOT" type="number" min="0" step="0.1" placeholder="e.g. 4.8" /></div>
-      <div><label>Team B Shots on Target</label><input id="bSOT" type="number" min="0" step="0.1" placeholder="e.g. 4.1" /></div>
-      <div><label>Team A Big Chances</label><input id="aBigChances" type="number" min="0" step="0.1" placeholder="e.g. 2.4" /></div>
-      <div><label>Team B Big Chances</label><input id="bBigChances" type="number" min="0" step="0.1" placeholder="e.g. 2.0" /></div>
-      <div><label>Team A Injuries (impact %)</label><input id="aInjuryImpact" type="number" min="-40" max="0" step="0.1" placeholder="0 to -40" /></div>
-      <div><label>Team B Injuries (impact %)</label><input id="bInjuryImpact" type="number" min="-40" max="0" step="0.1" placeholder="0 to -40" /></div>
-      <div><label>Team A Suspensions (impact %)</label><input id="aSuspensionImpact" type="number" min="-30" max="0" step="0.1" placeholder="0 to -30" /></div>
-      <div><label>Team B Suspensions (impact %)</label><input id="bSuspensionImpact" type="number" min="-30" max="0" step="0.1" placeholder="0 to -30" /></div>
-      <div><label>Team A Lineup Strength %</label><input id="aLineupStrength" type="number" min="60" max="110" step="0.1" placeholder="100 = normal" /></div>
-      <div><label>Team B Lineup Strength %</label><input id="bLineupStrength" type="number" min="60" max="110" step="0.1" placeholder="100 = normal" /></div>
-      <div><label>Team A Rotation / Rest Penalty %</label><input id="aRotationPenalty" type="number" min="0" max="30" step="0.1" placeholder="0 = none" /></div>
-      <div><label>Team B Rotation / Rest Penalty %</label><input id="bRotationPenalty" type="number" min="0" max="30" step="0.1" placeholder="0 = none" /></div>
-      <div><label>Team A Rest Days</label><input id="aRestDays" type="number" min="0" max="30" step="0.1" placeholder="e.g. 4" /></div>
-      <div><label>Team B Rest Days</label><input id="bRestDays" type="number" min="0" max="30" step="0.1" placeholder="e.g. 6" /></div>
-      <div><label>Team A Travel km</label><input id="aTravelKm" type="number" min="0" step="1" placeholder="e.g. 500" /></div>
-      <div><label>Team B Travel km</label><input id="bTravelKm" type="number" min="0" step="1" placeholder="e.g. 1200" /></div>
-      <div><label>Team A Manager Change</label><input id="aManagerChange" type="number" min="-10" max="10" step="0.1" placeholder="-10 to +10" /></div>
-      <div><label>Team B Manager Change</label><input id="bManagerChange" type="number" min="-10" max="10" step="0.1" placeholder="-10 to +10" /></div>
-      <div><label>Team A Motivation 0–100</label><input id="aMotivation" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team B Motivation 0–100</label><input id="bMotivation" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team A Set-Piece Attack 0–100</label><input id="aSetPieceAttack" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team B Set-Piece Attack 0–100</label><input id="bSetPieceAttack" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team A Set-Piece Defense 0–100</label><input id="aSetPieceDefense" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team B Set-Piece Defense 0–100</label><input id="bSetPieceDefense" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team A Tactical Attack 0–100</label><input id="aTacticalAttack" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team B Tactical Attack 0–100</label><input id="bTacticalAttack" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team A Tactical Defense 0–100</label><input id="aTacticalDefense" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Team B Tactical Defense 0–100</label><input id="bTacticalDefense" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-      <div><label>Weather Severity 0–100</label><input id="weatherSeverity" type="number" min="0" max="100" step="1" placeholder="0 = normal" /></div>
-      <div><label>Red-Flag Weather Impact %</label><input id="weatherGoalImpact" type="number" min="-30" max="10" step="0.1" placeholder="e.g. -5" /></div>
-    </div>
-    <div style="margin-top:6px;font-size:10px;color:var(--muted);">Neutral defaults are used when optional inputs are blank. No feature is treated as observed merely because its field is empty.</div>
-  </div>
-  <div class="section" id="oddsSection">
-    <h3>Odds & Market Pricing</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-      <div><label>Home Win Odds</label><input id="oddsHome" type="number" min="1" step="0.01" placeholder="e.g. 2.10" /></div>
-      <div><label>Draw Odds</label><input id="oddsDraw" type="number" min="1" step="0.01" placeholder="e.g. 3.30" /></div>
-      <div><label>Away Win Odds</label><input id="oddsAway" type="number" min="1" step="0.01" placeholder="e.g. 3.40" /></div>
-      <div><label>Over FT Odds</label><input id="oddsOverFT" type="number" min="1" step="0.01" placeholder="e.g. 1.90" /></div>
-      <div><label>Under FT Odds</label><input id="oddsUnderFT" type="number" min="1" step="0.01" placeholder="e.g. 1.90" /></div>
-      <div><label>BTTS Yes Odds</label><input id="oddsBttsYes" type="number" min="1" step="0.01" placeholder="e.g. 1.80" /></div>
-      <div><label>BTTS No Odds</label><input id="oddsBttsNo" type="number" min="1" step="0.01" placeholder="e.g. 1.95" /></div>
-      <div><label>Asian Handicap Line</label><input id="ahLine" placeholder="e.g. -0.25 or +0.5" /></div>
-      <div><label>Home AH Odds</label><input id="oddsHomeAH" type="number" min="1" step="0.01" placeholder="e.g. 1.95" /></div>
-      <div><label>Away AH Odds</label><input id="oddsAwayAH" type="number" min="1" step="0.01" placeholder="e.g. 1.85" /></div>
-      <div><label>Team A Total Line</label><input id="teamATotalLine" placeholder="e.g. 1.5" /></div>
-      <div><label>Team B Total Line</label><input id="teamBTotalLine" placeholder="e.g. 1.5" /></div>
-      <div><label>Team A Over Odds</label><input id="oddsTeamAOver" type="number" min="1" step="0.01" placeholder="e.g. 1.90" /></div>
-      <div><label>Team A Under Odds</label><input id="oddsTeamAUnder" type="number" min="1" step="0.01" placeholder="e.g. 1.90" /></div>
-      <div><label>Team B Over Odds</label><input id="oddsTeamBOver" type="number" min="1" step="0.01" placeholder="e.g. 1.90" /></div>
-      <div><label>Team B Under Odds</label><input id="oddsTeamBUnder" type="number" min="1" step="0.01" placeholder="e.g. 1.90" /></div>
-    </div>
-    <div style="margin-top:6px;font-size:10px;color:var(--muted);">EV is shown only when valid decimal odds are supplied. Model probability and bookmaker price remain separate.</div>
-  </div>
-  <div class="section" id="ancillaryMarketsSection">
-    <h3>Ancillary Football Markets <span style="font-size:10px;color:var(--muted);font-weight:600;">optional models</span></h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-      <div><label>Team A Corners / match</label><input id="aCorners" type="number" min="0" step="0.1" placeholder="e.g. 5.2" /></div>
-      <div><label>Team B Corners / match</label><input id="bCorners" type="number" min="0" step="0.1" placeholder="e.g. 4.4" /></div>
-      <div><label>Total Corners Line</label><input id="cornersLine" placeholder="e.g. 9.5" /></div>
-      <div><label>Over Corners Odds</label><input id="oddsCornersOver" type="number" min="1" step="0.01" placeholder="optional" /></div>
-      <div><label>Team A Cards / match</label><input id="aCards" type="number" min="0" step="0.1" placeholder="e.g. 1.8" /></div>
-      <div><label>Team B Cards / match</label><input id="bCards" type="number" min="0" step="0.1" placeholder="e.g. 2.1" /></div>
-      <div><label>Total Cards Line</label><input id="cardsLine" placeholder="e.g. 4.5" /></div>
-      <div><label>Over Cards Odds</label><input id="oddsCardsOver" type="number" min="1" step="0.01" placeholder="optional" /></div>
-      <div><label>Team A Shots / match</label><input id="aShotsMarket" type="number" min="0" step="0.1" placeholder="optional" /></div>
-      <div><label>Team B Shots / match</label><input id="bShotsMarket" type="number" min="0" step="0.1" placeholder="optional" /></div>
-      <div><label>Total Shots Line</label><input id="shotsLine" placeholder="e.g. 24.5" /></div>
-      <div><label>Over Shots Odds</label><input id="oddsShotsOver" type="number" min="1" step="0.01" placeholder="optional" /></div>
-    </div>
-  </div>
-  <div class="section" id="liveSection">
-    <h3>Live / In-Play Scenario</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-      <div><label>Minute</label><input id="liveMinute" type="number" min="0" max="130" step="1" placeholder="0 = pre-match" /></div>
-      <div><label>Current Home Goals</label><input id="liveHomeGoals" type="number" min="0" step="1" value="0" /></div>
-      <div><label>Current Away Goals</label><input id="liveAwayGoals" type="number" min="0" step="1" value="0" /></div>
-      <div><label>Home Red Cards</label><input id="liveHomeReds" type="number" min="0" max="3" step="1" value="0" /></div>
-      <div><label>Away Red Cards</label><input id="liveAwayReds" type="number" min="0" max="3" step="1" value="0" /></div>
-      <div><label>Live Home xG</label><input id="liveHomeXG" type="number" min="0" step="0.01" placeholder="optional" /></div>
-      <div><label>Live Away xG</label><input id="liveAwayXG" type="number" min="0" step="0.01" placeholder="optional" /></div>
-      <div><label>Live Intensity 0–100</label><input id="liveIntensity" type="number" min="0" max="100" step="1" placeholder="50 neutral" /></div>
-    </div>
-    <div style="font-size:10px;color:var(--muted);margin-top:6px;">The live layer is scenario-based; it does not pretend to have live event feeds when none are connected.</div>
-  </div>
-  <div class="section" id="teamASection">
+<div class="section" id="teamASection">
     <h3>Team A — Recent Form <span class="autofill-indicator" id="aAutoTag">✅ Auto-filled</span></h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
       <div>
@@ -2385,7 +2269,7 @@ S
     // ---------- Phase-2 Config Lab (propose only — never auto-write live gates) ----------
     const PRIMARY_LEAGUE_KEY = "football_global";
     function fbCompetitionKey() {
-      const raw = document.getElementById("fixtureCompetition")?.value || document.getElementById("leagueName")?.value || "football_global";
+      const raw = fb2_competitionLabel();
       return String(raw).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"") || "football_global";
     }
     function fbCandidateKey(marketKey) {
@@ -2771,8 +2655,14 @@ S
       [A,B].forEach((t,i)=>{ const p=i===0?"a":"b"; t.xg=fb2_num(p+"XG",null);t.xga=fb2_num(p+"XGA",null);t.shots=fb2_num(p+"Shots",null);t.sot=fb2_num(p+"SOT",null);t.big=fb2_num(p+"BigChances",null);t.injury=fb2_num(p+"InjuryImpact",0)||0;t.susp=fb2_num(p+"SuspensionImpact",0)||0;t.lineup=fb2_num(p+"LineupStrength",100);t.rotation=fb2_num(p+"RotationPenalty",0)||0;t.rest=fb2_num(p+"RestDays",null);t.travel=fb2_num(p+"TravelKm",0)||0;t.manager=fb2_num(p+"ManagerChange",0)||0;t.motivation=fb2_pct(p+"Motivation",50);t.spa=fb2_pct(p+"SetPieceAttack",50);t.spd=fb2_pct(p+"SetPieceDefense",50);t.ta=fb2_pct(p+"TacticalAttack",50);t.td=fb2_pct(p+"TacticalDefense",50);t.load7=fb2_num(p+"FixtureLoad7d",0)||0; });
       return {A,B};
     }
+    function fb2_competitionLabel(){
+      const detected=fb2_text("ssTournamentName");
+      if(detected && !/^Multiple competitions in feed/i.test(detected)) return detected;
+      const tournament=fb2_text("ssTournamentId");
+      return tournament ? ("Tournament "+tournament) : "Unknown competition";
+    }
     function fb2_context(){
-      const comp=fb2_text("fixtureCompetition")||fb2_text("leagueName");
+      const comp=fb2_competitionLabel();
       const tournament=fb2_text("ssTournamentId");
       const kickoffRaw=fb2_text("fixtureKickoff");
       const kickoff=kickoffRaw?new Date(kickoffRaw).toISOString():new Date().toISOString();
@@ -2791,7 +2681,7 @@ S
     }
 
     function fb2_competitionPrior(){
-      const raw=fb2_text("fixtureCompetition")||fb2_text("leagueName")||"football_global";
+      const raw=fb2_competitionLabel();
       const key=String(raw).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
       let stored=null;try{stored=JSON.parse(localStorage.getItem("FOOTBALL_COMPETITION_PROFILE_"+key)||"null");}catch(e){}
       const home=fb2_num("leagueHomeAvg",stored?.homeAvg??1.35), away=fb2_num("leagueAwayAvg",stored?.awayAvg??1.10);
@@ -3186,7 +3076,7 @@ S
         { name: "Full-Time Total Goals", marketKey: "ft", proj: ftProj, edge: ftEdge, line: ftLine, pick: ftPick, conf: ftConf, sampleTier: ftSampleTier, hasH2H: useH2H, trap: ftTrap, vol: ftVol, probOver: ftProbOver, integrityFlag: ftIntegrityFlag, pWinMatchModel: matchMarkov.pWin, eloRatingA: eloResult.ratingA, eloRatingB: eloResult.ratingB, eloWeight: eloResult.weight },
         { name: "1st Half Total Goals", marketKey: "h1", proj: h1Proj, edge: h1Edge, line: h1Line, pick: h1Pick, conf: h1Conf, sampleTier: h1SampleTier, hasH2H: useH2H1, trap: h1Trap, vol: h1Vol, probOver: h1ProbOver, integrityFlag: h1IntegrityFlag, pWinMatchModel: h1Markov.pWin, eloRatingA: eloResult.ratingA, eloRatingB: eloResult.ratingB, eloWeight: eloResult.weight }
       ];
-      const leagueTrust = getLeagueTrustMeta(document.getElementById("leagueName").value || "Unknown competition");
+      const leagueTrust = getLeagueTrustMeta(fb2_competitionLabel());
       // Select lock: highest confidence grade (A>B>C>D>NaN), then highest edge magnitude
       let lockIdx = -1;
       let bestScore = -1;
@@ -3212,7 +3102,7 @@ S
         awayTeamId: document.getElementById("ssTeamBId").value||"",
         eloKeyA: eloKeyA,
         eloKeyB: eloKeyB,
-        league: document.getElementById("leagueName").value || "Unknown competition"
+        league: fb2_competitionLabel()
       };
       const pushRow = (p, isLock) => {
         const name = p.name, marketKey = p.marketKey, proj = p.proj, edge = p.edge, line = p.line, pick = p.pick, conf = p.conf;
@@ -3811,7 +3701,7 @@ S
       // Audit copy button
       document.getElementById("auditCopyBtn").addEventListener("click", function() {
         const state = {
-          league: document.getElementById("leagueName")?.value || "Unknown competition",
+          league: fb2_competitionLabel(),
           timestamp: new Date().toISOString(),
           picks: g_trackerState.activePicks,
           archived: g_trackerState.archivedPicks,
@@ -3964,7 +3854,7 @@ S
 
   /* ---------------- model lineage / verified config ---------------- */
   function getVersion(){ return String(window.ENGINE_MODEL_VERSION||window.APP_BUILD_VERSION||'football_v1'); }
-  function getLiveConfig(){ return {thresholds:window.__fbThresholds||{},modelVersion:getVersion(),core:window.__fbCoreConfig||null,competition:document.getElementById("fixtureCompetition")?.value||document.getElementById("leagueName")?.value||"football_global"}; }
+  function getLiveConfig(){ return {thresholds:window.__fbThresholds||{},modelVersion:getVersion(),core:window.__fbCoreConfig||null,competition:fb2_competitionLabel()}; }
   function snapshot(label){ const cfg=getLiveConfig(); return {label:label||'snapshot',createdAt:now(),modelVersion:getVersion(),config:cfg,configHash:hash(cfg)}; }
 
   /* ---------------- canary / promotion / rollback ---------------- */
