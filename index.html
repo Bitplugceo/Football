@@ -1,4 +1,3 @@
-Q
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3386,5 +3385,242 @@ Q
     });
   })();
 </script>
+
+<script>
+/*
+ * FOOTBALL ENGINE — ADVANCED LIFECYCLE / VALIDATION / PROMOTION LAYER
+ * Ported conceptually from the mature basketball-engine infrastructure.
+ * This layer is deliberately sport-agnostic at the statistical/deployment level;
+ * it does NOT alter the football scoring model or prediction equations.
+ */
+(function(){
+  'use strict';
+  const NS = 'FB_ENGINE_LIFECYCLE_V1';
+  const STORE = {
+    state: NS + ':state',
+    experiments: NS + ':experiments',
+    canary: NS + ':canary',
+    calibration: NS + ':calibration',
+    ledger: NS + ':ledger'
+  };
+  const LIMITS = { experiments: 2000, ledger: 5000, bootstrap: 5000 };
+
+  function now(){ return new Date().toISOString(); }
+  function finite(x){ return Number.isFinite(Number(x)); }
+  function clamp(x,a,b){ return Math.max(a,Math.min(b,x)); }
+  function safeParse(k, fallback){
+    try { const v=JSON.parse(localStorage.getItem(k)||'null'); return v==null?fallback:v; } catch(e){ return fallback; }
+  }
+  function safeSave(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
+  function debug(msg,data){ try{ if(typeof window.engineDebug==='function') window.engineDebug(msg,data); else console.debug('[FB-LIFECYCLE]',msg,data||''); }catch(e){} }
+  function stableStringify(v){
+    if(v===null||typeof v!=='object') return JSON.stringify(v);
+    if(Array.isArray(v)) return '['+v.map(stableStringify).join(',')+']';
+    return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stableStringify(v[k])).join(',')+'}';
+  }
+  function hash(v){
+    const s=typeof v==='string'?v:stableStringify(v); let h=2166136261;
+    for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
+    return ('00000000'+(h>>>0).toString(16)).slice(-8);
+  }
+
+  /* ---------------- deterministic statistics ---------------- */
+  function mean(a){ const x=a.filter(finite).map(Number); return x.length?x.reduce((s,v)=>s+v,0)/x.length:null; }
+  function variance(a){ const x=a.filter(finite).map(Number); if(x.length<2)return 0; const m=mean(x); return x.reduce((s,v)=>s+(v-m)*(v-m),0)/(x.length-1); }
+  function stddev(a){ return Math.sqrt(Math.max(0,variance(a))); }
+  function normalCDF(x){ const z=Number(x); const t=1/(1+0.2316419*Math.abs(z)); const d=0.3989422804014327*Math.exp(-z*z/2); const poly=((((1.330274429*t-1.821255978)*t+1.781477937)*t-0.356563782)*t+0.319381530)*t; const q=d*poly; return z>=0?1-q:q; }
+  function sigmoid(x){ return 1/(1+Math.exp(-clamp(x,-40,40))); }
+  function brier(rows){ const x=rows.filter(r=>finite(r.p)&&finite(r.y)); return x.length?mean(x.map(r=>(Number(r.p)-Number(r.y))**2)):null; }
+  function logLoss(rows){ const x=rows.filter(r=>finite(r.p)&&finite(r.y)); if(!x.length)return null; return mean(x.map(r=>{const p=clamp(Number(r.p),1e-12,1-1e-12),y=Number(r.y);return -(y*Math.log(p)+(1-y)*Math.log(1-p));})); }
+  function accuracy(rows){ const x=rows.filter(r=>finite(r.p)&&finite(r.y)); return x.length?mean(x.map(r=>(Number(r.p)>=0.5?1:0)===Number(r.y)?1:0)):null; }
+  function mae(rows){ const x=rows.filter(r=>finite(r.pred)&&finite(r.actual)); return x.length?mean(x.map(r=>Math.abs(Number(r.pred)-Number(r.actual)))):null; }
+  function rmse(rows){ const x=rows.filter(r=>finite(r.pred)&&finite(r.actual)); return x.length?Math.sqrt(mean(x.map(r=>(Number(r.pred)-Number(r.actual))**2))):null; }
+  function ece(rows,bins){
+    const x=rows.filter(r=>finite(r.p)&&finite(r.y)); const n=bins||10; if(!x.length)return null; let e=0;
+    for(let i=0;i<n;i++){ const lo=i/n,hi=(i+1)/n; const b=x.filter(r=>Number(r.p)>=lo&&(i===n-1?Number(r.p)<=hi:Number(r.p)<hi)); if(!b.length)continue; e+=(b.length/x.length)*Math.abs(mean(b.map(r=>Number(r.p)))-mean(b.map(r=>Number(r.y)))); }
+    return e;
+  }
+  function calibration(rows,iterations,lr){
+    const x=rows.filter(r=>finite(r.p)&&finite(r.y)); if(x.length<20)return null;
+    let a=0,b=1; const it=iterations||800, step=lr||0.05;
+    for(let k=0;k<it;k++){ let ga=0,gb=0; for(const r of x){const z=a+b*Math.log(clamp(Number(r.p),1e-6,1-1e-6)/(1-Number(r.p)));const q=sigmoid(z);const d=q-Number(r.y);ga+=d;gb+=d*Math.log(clamp(Number(r.p),1e-6,1-1e-6)/(1-Number(r.p)));} ga/=x.length;gb/=x.length;a-=step*ga;b-=step*gb; }
+    const calibrated=x.map(r=>({p:sigmoid(a+b*Math.log(clamp(Number(r.p),1e-6,1-1e-6)/(1-Number(r.p)))),y:Number(r.y)}));
+    return {intercept:a,slope:b,brier:brier(calibrated),logLoss:logLoss(calibrated),ece:ece(calibrated),sample:x.length,computedAt:now()};
+  }
+
+  /* ---------------- deterministic bootstrap ---------------- */
+  function rng(seed){ let s=(Number(seed)>>>0)||123456789; return function(){ s^=s<<13;s^=s>>>17;s^=s<<5;return (s>>>0)/4294967296; }; }
+  function bootstrapDelta(a,b,scoreFn,iterations,seed){
+    const n=Math.min(a.length,b.length); if(n<2)return null; const rand=rng(seed||n*2654435761); const it=Math.min(iterations||2000,LIMITS.bootstrap); const observed=scoreFn(a)-scoreFn(b); const deltas=[];
+    for(let k=0;k<it;k++){const aa=[],bb=[];for(let j=0;j<n;j++){const i=Math.floor(rand()*n);aa.push(a[i]);bb.push(b[i]);}deltas.push(scoreFn(aa)-scoreFn(bb));}
+    deltas.sort((x,y)=>x-y); const q=p=>deltas[Math.max(0,Math.min(deltas.length-1,Math.floor(p*(deltas.length-1))))];
+    return {observed,lower:q(0.025),upper:q(0.975),pValue:2*Math.min(deltas.filter(x=>x<=0).length,deltas.filter(x=>x>=0).length)/deltas.length,iterations:it};
+  }
+  function pairedBootstrap(baseline,challenger,scoreFn,opts){
+    const n=Math.min(baseline.length,challenger.length); if(n<10)return {pass:false,reason:'insufficient paired samples',sample:n};
+    const a=baseline.slice(0,n),b=challenger.slice(0,n), s=scoreFn||((r)=>mean(r));
+    const r=bootstrapDelta(b,a,s,(opts&&opts.iterations)||2000,(opts&&opts.seed)||n+17);
+    const minGain=(opts&&opts.minGain)||0; const alpha=(opts&&opts.alpha)||0.05;
+    return Object.assign(r,{pass:r.lower>minGain&&r.pValue<alpha,sample:n,minGain,alpha});
+  }
+
+  /* ---------------- walk-forward validation ---------------- */
+  function walkForward(records,opts){
+    const rows=(records||[]).slice().filter(Boolean).sort((a,b)=>new Date(a.date||a.createdAt||a.eventDate||0)-new Date(b.date||b.createdAt||b.eventDate||0));
+    const o=Object.assign({minTrain:30,testSize:20,step:20},opts||{}); const folds=[];
+    for(let start=o.minTrain;start<rows.length;start+=o.step){ const test=rows.slice(start,start+o.testSize); if(test.length<Math.min(o.testSize,5))break; folds.push({index:folds.length+1,train:rows.slice(0,start),test:test,start,end:start+test.length-1}); }
+    return folds;
+  }
+  function evaluateWalkForward(records,evaluator,opts){
+    const folds=walkForward(records,opts),out=[]; for(const f of folds){ try{out.push(Object.assign({fold:f.index,trainSize:f.train.length,testSize:f.test.length},evaluator(f.train,f.test,f.index)||{}));}catch(e){out.push({fold:f.index,error:String(e&&e.message||e)});} } return {folds:out,count:out.length};
+  }
+
+  /* ---------------- Benjamini-Hochberg ---------------- */
+  function benjaminiHochberg(results,q){
+    const alpha=q||0.05; const rows=(results||[]).map((r,i)=>({r,i,p:clamp(Number(r.pValue),0,1)})).sort((a,b)=>a.p-b.p); let cutoff=-1;
+    for(let i=0;i<rows.length;i++){ if(rows[i].p<=((i+1)/rows.length)*alpha)cutoff=i; }
+    const accepted=new Set(cutoff>=0?rows.slice(0,cutoff+1).map(x=>x.i):[]);
+    return (results||[]).map((r,i)=>Object.assign({},r,{fdrPass:accepted.has(i)}));
+  }
+
+  /* ---------------- candidate experiment ledger ---------------- */
+  function loadList(key,limit){ const x=safeParse(key,[]); return Array.isArray(x)?x.slice(-limit):[]; }
+  function append(key,item,limit){ const x=loadList(key,limit);x.push(item);safeSave(key,x);return item; }
+  function registerExperiment(input){
+    const e=Object.assign({id:NS+'-EXP-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),createdAt:now(),status:'EVALUATED',engineVersion:window.ENGINE_MODEL_VERSION||window.APP_BUILD_VERSION||'football_v1'},input||{});
+    e.configHash=e.configHash||hash(e.config||{}); append(STORE.experiments,e,LIMITS.experiments); return e;
+  }
+  function recordLedger(event){ return append(STORE.ledger,Object.assign({timestamp:now()},event||{}),LIMITS.ledger); }
+
+  /* ---------------- model lineage / verified config ---------------- */
+  function getVersion(){ return String(window.ENGINE_MODEL_VERSION||window.APP_BUILD_VERSION||'football_v1'); }
+  function getLiveConfig(){ return {thresholds:window.__fbThresholds||{},modelVersion:getVersion()}; }
+  function snapshot(label){ const cfg=getLiveConfig(); return {label:label||'snapshot',createdAt:now(),modelVersion:getVersion(),config:cfg,configHash:hash(cfg)}; }
+
+  /* ---------------- canary / promotion / rollback ---------------- */
+  function loadCanary(){ return safeParse(STORE.canary,null); }
+  function saveCanary(c){ safeSave(STORE.canary,c); }
+  function startCanary(candidate,opts){
+    const c={active:true,startedAt:now(),baseline:snapshot('canary-baseline'),candidate:Object.assign({},candidate||{}),minSettled:(opts&&opts.minSettled)||20,maxLossRate:(opts&&opts.maxLossRate)||0.08,observations:[],status:'RUNNING'};
+    saveCanary(c); recordLedger({type:'CANARY_START',candidate:c.candidate,configHash:hash(c.candidate)}); debug('Football canary started',c); return c;
+  }
+  function observeCanary(result){
+    const c=loadCanary(); if(!c||!c.active)return null; c.observations.push(Object.assign({timestamp:now()},result||{}));
+    const settled=c.observations.filter(x=>x.status==='win'||x.status==='loss'||x.status==='push'); const losses=settled.filter(x=>x.status==='loss').length;
+    const lossRate=settled.length?losses/settled.length:0; c.health={settled:settled.length,lossRate};
+    if(lossRate>c.maxLossRate&&settled.length>=Math.min(10,c.minSettled)){ c.status='ROLLBACK_REQUIRED';c.active=false;saveCanary(c);recordLedger({type:'CANARY_ROLLBACK',health:c.health});debug('Football canary rollback required',c); }
+    else if(settled.length>=c.minSettled){ c.status='PASSED';c.active=false;saveCanary(c);recordLedger({type:'CANARY_PASS',health:c.health});debug('Football canary passed',c); }
+    else saveCanary(c); return c;
+  }
+  function rollback(){
+    const c=loadCanary(); if(!c||!c.baseline)return false;
+    const th=c.baseline.config&&c.baseline.config.thresholds; if(th&&finite(th.ft)&&finite(th.h1)){ window.__fbThresholds={ft:Number(th.ft),h1:Number(th.h1)}; safeSave('FOOTBALL_THRESHOLDS_PRIMARY',Object.assign({},window.__fbThresholds,{updatedAt:now(),source:'canary_rollback'})); }
+    c.active=false;c.status='ROLLED_BACK';c.rolledBackAt=now();saveCanary(c);recordLedger({type:'ROLLBACK',baseline:c.baseline});debug('Football config rolled back',c);return true;
+  }
+
+  /* ---------------- engine health / integrity ---------------- */
+  function health(){
+    const issues=[], warnings=[]; const th=window.__fbThresholds||{};
+    if(!finite(th.ft)||!finite(th.h1))issues.push('Live football thresholds are missing/non-finite');
+    const tracker=window.g_trackerState;
+    if(tracker){ const all=[...(tracker.activePicks||[]),...(tracker.archivedPicks||[])]; const sigs=new Set(); let dup=0; for(const p of all){const s=p.signature||((p.eventId||'')+'|'+(p.marketKey||'')+'|'+(p.side||''));if(sigs.has(s))dup++;sigs.add(s);} if(dup)issues.push('Duplicate tracker signatures: '+dup); const settled=all.filter(p=>p.resultStatus&&p.resultStatus!=='pending'); if(settled.length>=20){const w=settled.filter(p=>p.resultStatus==='win').length;const wr=w/settled.length;if(wr<0.45)warnings.push('Rolling settled win rate below 45%');}}
+    if(typeof window.runEngine!=='function')issues.push('runEngine export missing');
+    if(typeof window.proposeFbConfigUpgrades!=='function')warnings.push('Config proposal surface missing');
+    const c=loadCanary(); if(c&&c.status==='ROLLBACK_REQUIRED')issues.push('Canary requires rollback');
+    return {ok:issues.length===0,issues,warnings,timestamp:now(),modelVersion:getVersion(),thresholds:th,canary:c};
+  }
+
+  function auditRecords(records){
+    const rows=Array.isArray(records)?records:[]; const issues=[],seen=new Set(); let leakage=0;
+    rows.forEach((r,i)=>{const id=r.id||r.signature||r.eventId||i;if(seen.has(id))issues.push('Duplicate record '+id);seen.add(id);const pred=new Date(r.predictionTime||r.createdAt||r.date||0).getTime();const src=new Date(r.sourceDate||r.featureDate||r.eventDate||0).getTime();if(pred&&src&&src>pred){leakage++;if(leakage<=10)issues.push('Future-data leakage at record '+id);}});
+    return {ok:issues.length===0,count:rows.length,duplicates:issues.filter(x=>x.startsWith('Duplicate')).length,leakage,issues};
+  }
+
+  /* ---------------- generic candidate search ---------------- */
+  function coordinateAscent(base,candidates,evaluator,opts){
+    let best=Object.assign({},base||{}),bestScore=Number(evaluator(best)); const history=[]; const o=Object.assign({maxRounds:4,minImprovement:0.001},opts||{});
+    for(let round=1;round<=o.maxRounds;round++){
+      let improved=false;
+      for(const key of Object.keys(candidates||{})){
+        for(const value of (candidates[key]||[])){
+          const trial=Object.assign({},best,{[key]:value});
+          let score;
+          try{score=Number(evaluator(trial));}catch(e){continue;}
+          const row={round,key,value,score,baseline:bestScore,accepted:score>bestScore+o.minImprovement};
+          history.push(row);
+          registerExperiment({type:'COORDINATE_ASCENT',round,key,value,score,baseline:bestScore,config:trial,status:row.accepted?'CHALLENGER_BETTER':'REJECTED'});
+          if(row.accepted){best=trial;bestScore=score;improved=true;}
+        }
+      }
+      if(!improved)break;
+    }
+    return {best,bestScore,history};
+  }
+
+  /* ---------------- public API ---------------- */
+  const API={
+    version:NS,
+    stats:{mean,variance,stddev,brier,logLoss,accuracy,mae,rmse,ece,calibration},
+    pairedBootstrap,
+    walkForward,
+    evaluateWalkForward,
+    benjaminiHochberg,
+    registerExperiment,
+    recordLedger,
+    snapshot,
+    startCanary,
+    observeCanary,
+    rollback,
+    health,
+    auditRecords,
+    coordinateAscent,
+    getState:()=>({health:health(),canary:loadCanary(),experiments:loadList(STORE.experiments,LIMITS.experiments).length,ledger:loadList(STORE.ledger,LIMITS.ledger).length}),
+    exportState:()=>({version:NS,exportedAt:now(),health:health(),canary:loadCanary(),experiments:loadList(STORE.experiments,LIMITS.experiments),ledger:loadList(STORE.ledger,LIMITS.ledger),calibration:safeParse(STORE.calibration,{})}),
+    saveCalibration:(market,payload)=>{const x=safeParse(STORE.calibration,{});x[market]=payload;safeSave(STORE.calibration,x);return payload;},
+    getCalibration:market=>safeParse(STORE.calibration,{})[market]||null
+  };
+  window.FB_ENGINE_LIFECYCLE=API;
+  window.runFootballFullAudit=function(records){
+    const result={timestamp:now(),modelVersion:getVersion(),engine:health(),data:records?auditRecords(records):null};
+    recordLedger({type:'FULL_AUDIT',result});debug('Football full engine audit completed',result);return result;
+  };
+  window.runFootballWalkForward=function(records,evaluator,opts){return evaluateWalkForward(records,evaluator,opts);};
+  window.runFootballPairedBootstrap=pairedBootstrap;
+  window.runFootballFDR=benjaminiHochberg;
+  window.startFootballCanary=startCanary;
+  window.observeFootballCanary=observeCanary;
+  window.rollbackFootballConfig=rollback;
+  window.getFootballEngineHealth=health;
+  window.exportFootballLifecycleState=()=>JSON.stringify(API.exportState(),null,2);
+
+  /* Capture model runs without changing their output or prediction math. */
+  try{
+    if(typeof window.runEngine==='function'&&!window.__FB_RUN_ENGINE_WRAPPED){
+      const originalRunEngine=window.runEngine;
+      window.runEngine=function(){
+        const before=(window.g_trackerState&&[...(window.g_trackerState.activePicks||[]),...(window.g_trackerState.archivedPicks||[])].length)||0;
+        const started=performance.now();
+        let out;try{out=originalRunEngine.apply(this,arguments);return out;}finally{
+          const elapsed=performance.now()-started;const after=(window.g_trackerState&&[...(window.g_trackerState.activePicks||[]),...(window.g_trackerState.archivedPicks||[])].length)||before;
+          recordLedger({type:'ENGINE_RUN',elapsedMs:Number(elapsed.toFixed(3)),trackerDelta:after-before,modelVersion:getVersion(),configHash:hash(getLiveConfig())});
+        }
+      };
+      window.__FB_RUN_ENGINE_WRAPPED=true;
+    }
+  }catch(e){debug('Lifecycle runEngine wrapper failed',String(e));}
+
+  /* Periodic non-invasive health sampling. */
+  try{
+    if(!window.__FB_HEALTH_TIMER){
+      window.__FB_HEALTH_TIMER=setInterval(function(){
+        try{const h=health();if(!h.ok)debug('Football engine health warning',h);}catch(e){}
+      },60000);
+    }
+  }catch(e){}
+
+  debug('Football advanced lifecycle layer ready',{version:NS,modelVersion:getVersion()});
+})();
+</script>
+
 </body>
 </html>
