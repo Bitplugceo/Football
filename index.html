@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -126,6 +125,12 @@ S
     .autocomplete-list div:hover, .autocomplete-list div.active { background: #49a443 !important; color: #fff !important; }
     .autocomplete-list div.group-label { color: var(--muted) !important; font-size: 10px; padding: 4px 8px; cursor: default; background: var(--panel-soft) !important; pointer-events: none; }
     .autocomplete-list strong { color: inherit; font-weight: 800; text-decoration: underline; }
+    .fixture-toolbar { display:flex; gap:4px; margin:0 0 8px; }
+    .fixture-day { background:#313744; color:#fff; border:none; padding:6px 12px; font-size:11px; font-weight:800; cursor:pointer; }
+    .fixture-day.active { background:#49a443; }
+    .injury-box { display:none; margin-top:8px; padding:7px 9px; border:1px solid var(--input-border); background:var(--panel-soft); }
+    .inj-title { font-size:11px; font-weight:800; margin-bottom:4px; color:var(--injury-title); }
+    .inj-body { font-size:10px; line-height:1.45; color:var(--muted); }
     .spinner { display: inline-block; width: 10px; height: 8px; border: 2px solid #4aa346; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 4px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .actions { text-align: center; padding-bottom: 20px; }
@@ -334,77 +339,58 @@ S
   </span>
 </header>
   <div class="wrapper">
-  <div class="section" id="espnAutoSection">
-    <h3>📡 ESPN Auto-Fetch <span id="espnLeagueCount" style="font-size:11px;color:#aaa;">(loading soccer competitions…)</span></h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;">
-      <div>
-        <label>League / Competition</label>
-        <select id="espnLeagueSelect" class="league-box"><option value="">Loading ESPN leagues…</option></select>
-      </div>
-      <div>
-        <label>Fixture Date</label>
-        <div style="display:flex;gap:5px;">
-          <button type="button" id="espnPrevDay" style="margin:0;flex:1;">Yesterday</button>
-          <button type="button" id="espnToday" style="margin:0;flex:1;">Today</button>
-          <button type="button" id="espnNextDay" style="margin:0;flex:1;">Tomorrow</button>
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:8px;">
-      <label>Select Match</label>
-      <select id="espnFixtureSelect" class="league-box"><option value="">Select a league first</option></select>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
-      <input id="espnTeamASearch" placeholder="Search home team (optional)" autocomplete="off" />
-      <input id="espnTeamBSearch" placeholder="Search away team (optional)" autocomplete="off" />
-    </div>
-    <div style="display:flex;gap:6px;margin-top:6px;">
-      <button type="button" id="espnFetchBtn" style="background:#3a9c35;color:#fff;font-weight:800;">📡 Fetch Selected Match</button>
-      <button type="button" id="espnRefreshBtn" style="background:#3a404c;color:#fff;">↻ Refresh Leagues</button>
-    </div>
-    <div id="espnFetchStatus" style="font-size:10px;min-height:18px;margin-top:6px;color:var(--muted);"></div>
-    <div id="espnCoverageStatus" style="font-size:10px;min-height:16px;color:var(--muted);"></div>
+<div class="section" id="leagueSection">
+  <h3>League Tier</h3>
+  <label>Select League</label>
+  <select id="leagueSelect" class="league-box">
+    <option value="">Loading ESPN soccer competitions…</option>
+  </select>
+  <div id="leagueCoverage" style="font-size:10px;color:var(--muted);margin-top:2px;"></div>
+</div>
+
+<div class="section" id="espnSection">
+  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(all ESPN soccer competitions)</span></h3>
+
+  <div class="fixture-toolbar">
+    <button type="button" class="fixture-day active" id="fbEspnTodayBtn">Today</button>
+    <button type="button" class="fixture-day" id="fbEspnTomorrowBtn">Tomorrow</button>
   </div>
-  <div class="section" id="sofascoreManualSection" style="display:none;">
-    <h3>🔍 Team Lookup <span style="font-size:11px;color:#aaa;">(SofaScore — manual fallback)</span></h3>
-    <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
-      <label>Team A Name (Home)</label>
-      <div style="display:flex;gap:6px;margin-bottom:4px;">
-        <input id="ssTeamAName" placeholder="e.g. Manchester United" style="margin-bottom:0;flex:1;" />
-        <input id="ssPasteA" placeholder="Paste JSON A" oninput="parseSofascoreTeam('A')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-        <button type="button" onclick="searchSofascoreTeam('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Open raw SofaScore search (manual ID only)">🔍</button>
-        <button type="button" onclick="clearPasteJSON('A')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input id="ssTeamAId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('A')" style="margin-bottom:0;font-size:11px;padding:4px 6px;" />
-        <a id="ssTeamALink" href="#" target="_blank" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON A</a>
-      </div>
-    </div>
-    <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
-      <label>Team B Name (Away)</label>
-      <div style="display:flex;gap:6px;margin-bottom:4px;">
-        <input id="ssTeamBName" placeholder="e.g. Liverpool" style="margin-bottom:0;flex:1;" />
-        <input id="ssPasteB" placeholder="Paste JSON B" oninput="parseSofascoreTeam('B')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" />
-        <button type="button" onclick="searchSofascoreTeam('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Open raw SofaScore search (manual ID only)">🔍</button>
-        <button type="button" onclick="clearPasteJSON('B')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <input id="ssTeamBId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('B')" style="margin-bottom:0;font-size:11px;padding:4px 6px;" />
-        <a id="ssTeamBLink" href="#" target="_blank" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p0</a>
-        <a id="ssTeamBLink1" href="#" target="_blank" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p1</a>
-        <a id="ssTeamBLink2" href="#" target="_blank" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p2</a>
-        <a id="ssTeamBLink3" href="#" target="_blank" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p3</a>
-      </div>
-    </div>
-    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--panel-border);">
-      <label style="font-size:11px;font-weight:800;">Tournament ID <span style="color:var(--muted);font-weight:600;">(auto-detected from paste · enter manually to override)</span></label>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <input id="ssTournamentId" placeholder="e.g. 12345" style="margin-bottom:0;font-size:11px;padding:4px 6px;width:180px;flex-shrink:0;" oninput="onTournamentIdInput()" />
-        <span id="ssTournamentName" style="font-size:10px;font-weight:800;color:var(--muted);"></span>
-      </div>
-    </div>
-    <div id="ssFetchStatus" style="font-size:10px;min-height:16px;margin-top:6px;"></div>
+
+  <label id="fbEspnFixtureLabel" style="font-size:12px;">Select match</label>
+  <select id="fbEspnFixtureSelect" class="league-box" style="max-width:none;">
+    <option value="">- Select match -</option>
+  </select>
+
+  <label style="font-size:12px;">Team A Name (Home)</label>
+  <div class="autocomplete-wrap">
+    <input id="ssTeamAName" placeholder="e.g. Manchester United" autocomplete="off" />
+    <div class="autocomplete-list" id="fbDropA"></div>
   </div>
+  <input id="ssTeamAId" placeholder="ESPN team ID (auto)" readonly style="font-size:10px;padding:4px 6px;color:var(--muted);" />
+
+  <label style="font-size:12px;margin-top:6px;">Team B Name (Away)</label>
+  <div class="autocomplete-wrap">
+    <input id="ssTeamBName" placeholder="e.g. Liverpool" autocomplete="off" />
+    <div class="autocomplete-list" id="fbDropB"></div>
+  </div>
+  <input id="ssTeamBId" placeholder="ESPN team ID (auto)" readonly style="font-size:10px;padding:4px 6px;color:var(--muted);" />
+
+  <button class="fetch-btn" id="fbEspnFetchBtn" type="button">📡 Fetch Stats</button>
+  <div id="fbEspnStatus" style="font-size:10px;min-height:16px;margin-top:6px;"></div>
+
+  <div class="injury-box" id="fbInjuryBoxA">
+    <div class="inj-title">Team A — Injury Report</div>
+    <div class="inj-body" id="fbInjuryContentA"></div>
+  </div>
+  <div class="injury-box" id="fbInjuryBoxB">
+    <div class="inj-title">Team B — Injury Report</div>
+    <div class="inj-body" id="fbInjuryContentB"></div>
+  </div>
+
+  <div id="fbEspnCoverage" style="font-size:10px;color:var(--muted);margin-top:7px;"></div>
+  <input id="ssTournamentId" type="hidden" />
+  <span id="ssTournamentName" style="display:none;"></span>
+</div>
   <div class="section" id="marketSection">
     <h3>Market Lines</h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -1308,6 +1294,444 @@ S
       });
     }
 
+    // ---------- ESPN SOCCER AUTO-FETCH LAYER ----------
+    // ESPN's soccer registry is the single source of truth for the competition list.
+    // It is discovered at runtime rather than hard-coded, so newly added ESPN soccer
+    // competitions become selectable without another engine release.
+    const FB_ESPN = {
+      REGISTRY: "https://sports.core.api.espn.com/v2/sports/soccer/leagues?limit=500&lang=en&region=us",
+      SITE: slug => "https://site.api.espn.com/apis/site/v2/sports/soccer/" + encodeURIComponent(slug),
+      WORKER: "https://thebetceo-engine.ridwantunde636.workers.dev/",
+      registry: [],
+      leagueCache: new Map(),
+      teamCache: new Map(),
+      eventCache: new Map(),
+      summaryCache: new Map(),
+      requestCache: new Map(),
+      controller: null,
+      loaded: false
+    };
+    window.__fbAutoData = window.__fbAutoData || {
+      context: {}, A: {}, B: {}, market: {}, h2h: [], source: "none", coverage: null
+    };
+
+    function fbEspnNormalizeName(v) {
+      return String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+    }
+    function fbEspnSlugFromRef(ref) {
+      const m = String(ref || "").match(/\/leagues\/([^?/#]+)/i);
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+    function fbEspnPrettySlug(slug) {
+      return String(slug || "").replace(/\./g, " · ").replace(/_/g, " ").replace(/-/g, " ")
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+    async function fbEspnFetchJSON(url, timeoutMs = 14000) {
+      const cacheKey=String(url); const cached=FB_ESPN.requestCache.get(cacheKey);
+      if(cached && Date.now()-cached.ts<30*60*1000)return cached.data;
+      async function one(requestUrl,label){
+        const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+        try{const res=await fetch(requestUrl,{method:"GET",headers:{Accept:"application/json"},signal:ctrl.signal,cache:"no-store"});if(!res.ok)throw new Error(label+" HTTP "+res.status);const text=await res.text();try{return JSON.parse(text);}catch(e){throw new Error(label+" returned invalid JSON");}}
+        catch(e){if(e?.name==="AbortError")throw new Error(label+" timeout");throw e;}finally{clearTimeout(timer);}
+      }
+      const attempts=[
+        [FB_ESPN.WORKER+"?url="+encodeURIComponent(url),"ESPN worker"],
+        [url,"ESPN direct"],
+        ["https://corsproxy.io/?url="+encodeURIComponent(url),"ESPN fallback 1"],
+        ["https://api.allorigins.win/raw?url="+encodeURIComponent(url),"ESPN fallback 2"]
+      ];
+      let last=null;
+      for(const [requestUrl,label] of attempts){try{const data=await one(requestUrl,label);FB_ESPN.requestCache.set(cacheKey,{data,ts:Date.now()});return data;}catch(e){last=e;engineDebug(label+" failed",{url,error:e?.message||String(e)});}}
+      throw last||new Error("ESPN fetch failed");
+    }
+    function fbEspnSetStatus(text, kind = "info") {
+      const el = document.getElementById("fbEspnStatus");
+      if (!el) return;
+      el.textContent = text || "";
+      el.style.color = kind === "error" ? "#ff5c61" : kind === "ok" ? "#49d45f" : "var(--muted)";
+    }
+    function fbEspnSetCoverage(text) {
+      const el = document.getElementById("fbEspnCoverage");
+      if (el) el.textContent = text || "";
+    }
+    let fbEspnFixtureOffset = 0;
+    let fbEspnFixtureLoadToken = 0;
+    function fbEspnLocalDateKey(offset = 0) {
+      const d = new Date();
+      d.setDate(d.getDate() + Number(offset || 0));
+      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+      return `${y}${m}${day}`;
+    }
+    function fbEspnSetFixtureDay(offset) {
+      fbEspnFixtureOffset = offset === 1 ? 1 : 0;
+      const t = document.getElementById("fbEspnTodayBtn");
+      const tm = document.getElementById("fbEspnTomorrowBtn");
+      if (t) t.classList.toggle("active", fbEspnFixtureOffset === 0);
+      if (tm) tm.classList.toggle("active", fbEspnFixtureOffset === 1);
+    }
+    function fbEspnGetLeague() {
+      return document.getElementById("leagueSelect")?.value || "";
+    }
+    function fbEspnGetSelectedFixture() {
+      const sel = document.getElementById("fbEspnFixtureSelect");
+      if (!sel || !sel.value) return null;
+      try { return JSON.parse(sel.value); } catch (e) { return null; }
+    }
+    function fbEspnScoreValue(v) {
+      if (v == null) return NaN;
+      if (typeof v === "object") v = v.value ?? v.displayValue ?? v.score;
+      const n = Number(v); return Number.isFinite(n) ? n : NaN;
+    }
+    function fbEspnIsFinished(ev) {
+      const c = ev?.competitions?.[0];
+      const st = c?.status || ev?.status || {};
+      return st?.type?.completed === true || st?.type?.state === "post" || st?.type?.name === "STATUS_FINAL" || st?.completed === true;
+    }
+    function fbEspnCompetitors(ev) { return ev?.competitions?.[0]?.competitors || []; }
+    function fbEspnNormalizeEvent(ev, leagueSlug) {
+      const comp = ev?.competitions?.[0];
+      const cs = fbEspnCompetitors(ev);
+      if (!ev?.id || cs.length < 2) return null;
+      const home = cs.find(c => c.homeAway === "home") || cs[0];
+      const away = cs.find(c => c.homeAway === "away") || cs[1];
+      const score = c => fbEspnScoreValue(c?.score);
+      const lines = c => Array.isArray(c?.linescores) ? c.linescores.map(fbEspnScoreValue).filter(Number.isFinite) : [];
+      const hs = lines(home), as = lines(away);
+      const h = score(home), a = score(away);
+      return {
+        id: String(ev.id), date: ev.date || comp?.date || "", leagueSlug,
+        competitionName: comp?.league?.name || ev?.league?.name || fbEspnPrettySlug(leagueSlug),
+        competitionSlug: String(comp?.league?.slug || ev?.league?.slug || comp?.league?.abbreviation || ""),
+        season: ev?.season?.displayName || ev?.season?.slug || comp?.season?.displayName || "",
+        venue: comp?.venue?.fullName || comp?.venue?.address?.city || "",
+        competitionType: comp?.type?.text || comp?.type?.abbreviation || "",
+        homeId: String(home?.team?.id || home?.id || ""), awayId: String(away?.team?.id || away?.id || ""),
+        homeName: home?.team?.displayName || home?.team?.name || home?.team?.shortDisplayName || "Home",
+        awayName: away?.team?.displayName || away?.team?.name || away?.team?.shortDisplayName || "Away",
+        homeScore: h, awayScore: a, homeLines: hs, awayLines: as, finished: fbEspnIsFinished(ev), raw: ev
+      };
+    }
+    function fbEspnFindOdds(ev) {
+      const comp = ev?.competitions?.[0];
+      const odds = Array.isArray(comp?.odds) ? comp.odds[0] : (comp?.odds || null);
+      if (!odds) return {};
+      const h = odds.homeTeamOdds || odds.homeTeam || {};
+      const a = odds.awayTeamOdds || odds.awayTeam || {};
+      const d = odds.drawOdds || odds.draw || {};
+      const n = v => { const x = Number(v); return Number.isFinite(x) && x > 1 ? x : null; };
+      const line = Number(odds.overUnder ?? odds.total?.overUnder ?? odds.total?.line);
+      const spread = Number(h.spread ?? odds.spread);
+      return {
+        oddsHome: n(h.moneyLine ?? h.moneyline ?? h.ml),
+        oddsAway: n(a.moneyLine ?? a.moneyline ?? a.ml),
+        oddsDraw: n(d.moneyLine ?? d.moneyline ?? d.ml),
+        oddsOverFT: n(odds.overOdds ?? odds.over?.odds),
+        oddsUnderFT: n(odds.underOdds ?? odds.under?.odds),
+        ftLine: Number.isFinite(line) ? line : null,
+        ahLine: Number.isFinite(spread) ? spread : null,
+        details: odds.details || "",
+        provider: odds.provider?.name || odds.provider?.displayName || "ESPN odds"
+      };
+    }
+    async function fbEspnLoadRegistry() {
+      const sel = document.getElementById("leagueSelect");
+      if (!sel) return [];
+      try {
+        let data = await fbEspnFetchJSON(FB_ESPN.REGISTRY + "&page=1");
+        let refs = Array.isArray(data?.items) ? data.items.slice() : [];
+        const pages = Number(data?.pageCount) || 1;
+        if (pages > 1 && refs.length < Number(data?.count || 0)) {
+          const jobs = [];
+          for (let p = 2; p <= pages; p++) jobs.push(fbEspnFetchJSON(FB_ESPN.REGISTRY + "&page=" + p));
+          const rest = await Promise.allSettled(jobs);
+          rest.forEach(r => { if (r.status === "fulfilled" && Array.isArray(r.value?.items)) refs.push(...r.value.items); });
+        }
+        const seen = new Set();
+        FB_ESPN.registry = refs.map(r => fbEspnSlugFromRef(r?.$ref || r?.ref || r?.slug))
+          .filter(Boolean).filter(slug => !seen.has(slug) && seen.add(slug)).map(slug => ({ slug, name: fbEspnPrettySlug(slug) }));
+        FB_ESPN.loaded = true;
+        sel.innerHTML = '<option value="">Select ESPN competition…</option>' + FB_ESPN.registry
+          .sort((a,b) => a.name.localeCompare(b.name))
+          .map(x => `<option value="${String(x.slug).replace(/"/g,"&quot;")}">${String(x.name).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</option>`).join("");
+        const coverageText = FB_ESPN.registry.length + " ESPN soccer competitions discovered";
+        fbEspnSetCoverage(coverageText);
+        const leagueCoverage = document.getElementById("leagueCoverage");
+        if (leagueCoverage) leagueCoverage.textContent = coverageText;
+        engineDebug("ESPN soccer registry loaded", { count: FB_ESPN.registry.length });
+        return FB_ESPN.registry;
+      } catch (e) {
+        fbEspnSetCoverage("ESPN registry unavailable");
+        const leagueCoverage = document.getElementById("leagueCoverage");
+        if (leagueCoverage) leagueCoverage.textContent = "ESPN competition registry unavailable";
+        fbEspnSetStatus("ESPN registry failed: " + (e?.message || e), "error");
+        engineDebug("ESPN registry fetch failed", { error: e?.message || String(e) });
+        return [];
+      }
+    }
+    async function fbEspnLoadLeagueMeta(slug) {
+      if(!slug)return null;
+      const item=FB_ESPN.registry.find(x=>x.slug===slug);
+      if(item?.resolvedName)return item.resolvedName;
+      try{
+        const data=await fbEspnFetchJSON("https://sports.core.api.espn.com/v2/sports/soccer/leagues/"+encodeURIComponent(slug)+"?lang=en&region=us",10000);
+        const name=data?.name||data?.displayName||data?.shortName||data?.abbreviation||null;
+        if(name&&item)item.resolvedName=String(name);
+        if(name){const sel=document.getElementById("leagueSelect");const opt=sel&&Array.from(sel.options).find(o=>o.value===slug);if(opt)opt.textContent=String(name)+" · "+slug;}
+        return name;
+      }catch(e){return null;}
+    }
+    async function fbEspnLoadFixtures(offset = fbEspnFixtureOffset) {
+      const slug = fbEspnGetLeague();
+      if (!slug) { fbEspnSetStatus("Select an ESPN competition first.", "error"); return []; }
+      const token = ++fbEspnFixtureLoadToken;
+      fbEspnSetFixtureDay(offset);
+      const sel = document.getElementById("fbEspnFixtureSelect");
+      if (!sel) return [];
+      sel.innerHTML = '<option value="">Loading matches…</option>';
+      const dateKey = fbEspnLocalDateKey(offset);
+      try {
+        const key = "fixtures:" + slug + ":" + dateKey;
+        let events = FB_ESPN.eventCache.get(key);
+        if (!events) {
+          const url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + dateKey + "&limit=500";
+          const data = await fbEspnFetchJSON(url, 15000);
+          events = Array.isArray(data?.events) ? data.events.map(ev => fbEspnNormalizeEvent(ev, slug)).filter(Boolean) : [];
+          const seen = new Set();
+          events = events.filter(e => !seen.has(e.id) && seen.add(e.id));
+          FB_ESPN.eventCache.set(key, events);
+        }
+        if (token !== fbEspnFixtureLoadToken) return events;
+        events.sort((a,b) => Date.parse(a.date||0)-Date.parse(b.date||0));
+        sel.innerHTML = '<option value="">- Select match -</option>' + events.map(e => {
+          const when = e.date ? new Date(e.date).toLocaleString() : "time unavailable";
+          const label = `${e.homeName} vs ${e.awayName} · ${when}`;
+          return `<option value='${JSON.stringify(e).replace(/'/g,"&#39;")}'>${label.replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</option>`;
+        }).join("");
+        fbEspnSetStatus(events.length ? `${events.length} ESPN matches loaded for ${offset===0?"today":"tomorrow"}.` : `No ESPN matches found for ${offset===0?"today":"tomorrow"}.`, events.length ? "ok" : "info");
+        engineDebug("ESPN football fixtures loaded", {league:slug,date:dateKey,count:events.length});
+        return events;
+      } catch (e) {
+        if (token !== fbEspnFixtureLoadToken) return [];
+        sel.innerHTML = '<option value="">Fixture load failed</option>';
+        fbEspnSetStatus("Fixture fetch failed: " + (e?.message || e), "error");
+        engineDebug("ESPN fixture fetch failed", { league: slug, date: dateKey, error: e?.message || String(e) });
+        return [];
+      }
+    }
+    async function fbEspnSearchTeam(slug, name) {
+      const query = fbEspnNormalizeName(name); if (!query) return null;
+      const key = "teams:" + slug; let teams = FB_ESPN.teamCache.get(key);
+      if (!teams) {
+        const data = await fbEspnFetchJSON(FB_ESPN.SITE(slug)+"/teams?limit=1000");
+        const raw = [];
+        (data?.sports || []).forEach(s => (s?.leagues || []).forEach(l => (l?.teams || []).forEach(t => raw.push(t?.team || t))));
+        if (!raw.length && Array.isArray(data?.teams)) raw.push(...data.teams.map(t => t?.team || t));
+        teams = raw.filter(t => t?.id).map(t => ({ id:String(t.id), name:t.displayName||t.name||t.shortDisplayName||"", short:t.shortDisplayName||"", abbr:t.abbreviation||"" }));
+        FB_ESPN.teamCache.set(key, teams);
+      }
+      let best=null, score=-1; const words=query.split(" ").filter(w=>w.length>2);
+      for (const t of teams) {
+        const n=fbEspnNormalizeName(t.name), sh=fbEspnNormalizeName(t.short), ab=fbEspnNormalizeName(t.abbr);
+        let s=0; if(n===query||sh===query) s=100; else { if(n.includes(query)||query.includes(n)) s+=40; if(sh.includes(query)||query.includes(sh)) s+=30; if(ab===query) s+=20; s+=words.filter(w=>n.includes(w)).length*5; }
+        if(s>score){score=s;best=t;}
+      }
+      return best && score>=10 ? Object.assign({},best,{matchScore:score}) : null;
+    }
+    async function fbEspnFetchTeamEvents(slug, teamId) {
+      const key = "history:" + slug + ":" + teamId;
+      if (FB_ESPN.leagueCache.has(key)) return FB_ESPN.leagueCache.get(key);
+      let events = [];
+      try {
+        const url = FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/schedule?limit=1000";
+        const data = await fbEspnFetchJSON(url, 15000);
+        events = (data?.events || data?.team?.schedule?.events || []).map(ev => fbEspnNormalizeEvent(ev, slug)).filter(Boolean);
+      } catch (scheduleError) {
+        // Some competitions do not expose /teams/{id}/schedule. Use bounded
+        // scoreboard windows instead of one oversized 18-month request.
+        const now = new Date();
+        const windows = [];
+        for (let i=0;i<6;i++) {
+          const end = new Date(now); end.setDate(end.getDate() - i*90);
+          const start = new Date(end); start.setDate(start.getDate() - 89);
+          const keyStart = `${start.getFullYear()}${String(start.getMonth()+1).padStart(2,"0")}${String(start.getDate()).padStart(2,"0")}`;
+          const keyEnd = `${end.getFullYear()}${String(end.getMonth()+1).padStart(2,"0")}${String(end.getDate()).padStart(2,"0")}`;
+          windows.push(`${keyStart}-${keyEnd}`);
+        }
+        const results = await Promise.allSettled(windows.map(range => fbEspnFetchJSON(FB_ESPN.SITE(slug)+"/scoreboard?dates="+range+"&limit=1000", 20000)));
+        results.forEach(r => {
+          if (r.status !== "fulfilled") return;
+          const rows = Array.isArray(r.value?.events) ? r.value.events : [];
+          rows.forEach(ev => {
+            const n = fbEspnNormalizeEvent(ev, slug);
+            if (n && (n.homeId===String(teamId) || n.awayId===String(teamId))) events.push(n);
+          });
+        });
+        engineDebug("ESPN team-schedule scoreboard fallback used", {league:slug,teamId,events:events.length,windows:windows.length,primaryError:scheduleError?.message||String(scheduleError)});
+      }
+      const unique=[]; const seen=new Set();
+      events.forEach(e=>{
+        // Only reject a different competition when ESPN actually supplies a
+        // trustworthy competition slug. Empty/missing slugs remain usable.
+        const sameCompetition=!e.competitionSlug || e.competitionSlug===slug || e.leagueSlug===slug;
+        if(sameCompetition && !seen.has(e.id)){seen.add(e.id);unique.push(e);}
+      });
+      unique.sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
+      FB_ESPN.leagueCache.set(key,unique);
+      return unique;
+    }
+    async function fbEspnFetchSummary(slug,eventId) {
+      const key="summary:"+slug+":"+eventId; if(FB_ESPN.summaryCache.has(key)) return FB_ESPN.summaryCache.get(key);
+      const data=await fbEspnFetchJSON(FB_ESPN.SITE(slug)+"/summary?event="+encodeURIComponent(eventId));
+      FB_ESPN.summaryCache.set(key,data); return data;
+    }
+    function fbEspnExtractAdvanced(summary, teamId) {
+      const out={xg:null,xga:null,shots:null,sot:null,big:null};
+      const box=summary?.boxscore; const teams=Array.isArray(box?.teams)?box.teams:[];
+      const mine=teams.find(t=>String(t?.team?.id||t?.id||"")===String(teamId));
+      const opp=teams.find(t=>String(t?.team?.id||t?.id||"")!==String(teamId));
+      const mapStats=(entry)=>{const m={};(entry?.statistics||[]).forEach(st=>{const name=fbEspnNormalizeName(st?.name||st?.label||st?.abbreviation||"");const val=Number(st?.value??st?.displayValue);if(Number.isFinite(val))m[name]=val;});return m;};
+      const m=mapStats(mine),o=mapStats(opp);
+      const pick=(m,keys)=>{for(const k of keys){if(Number.isFinite(m[k]))return m[k];}return null;};
+      out.xg=pick(m,["expectedgoals","xg"]);out.xga=pick(o,["expectedgoals","xg"]);out.shots=pick(m,["shots","totalshots"]);out.sot=pick(m,["shotsontarget","shotsontargets","sot"]);out.big=pick(m,["bigchances","bigchancescreated"]);
+      return out;
+    }
+    async function fbEspnFetchInjuryMeta(slug, teamId) {
+      const result={outCount:0,dtdCount:0,impact:0,notes:[],available:false};
+      try {
+        const data=await fbEspnFetchJSON(FB_ESPN.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/injuries");
+        const items=Array.isArray(data?.injuries)?data.injuries:(Array.isArray(data?.items)?data.items:[]);
+        result.available=true;
+        items.forEach(inj=>{
+          const status=String(inj?.status||inj?.type?.description||inj?.type?.name||"").toLowerCase();
+          const isOut=status.includes("out")||status.includes("injured reserve")||status.includes("suspended");
+          const isDTD=status.includes("questionable")||status.includes("doubtful")||status.includes("day-to-day");
+          if(!isOut&&!isDTD)return;
+          const athlete=inj?.athlete||inj?.person||{};
+          const name=athlete?.displayName||athlete?.fullName||"Unknown player";
+          if(isOut) result.outCount++; else result.dtdCount++;
+          result.notes.push((isOut?"OUT: ":"DTD: ")+name);
+        });
+        // Conservative football penalty: absence count is a weak signal, capped.
+        // We do not invent player-value data when ESPN does not provide it.
+        result.impact=-Math.min(20,result.outCount*2+result.dtdCount);
+        return result;
+      } catch(e) {
+        engineDebug("ESPN football injury fetch failed",{league:slug,teamId,error:e?.message||String(e)});
+        return result;
+      }
+    }
+    function fbEspnRenderInjury(side, meta, teamName) {
+      const box=document.getElementById(side==="A"?"fbInjuryBoxA":"fbInjuryBoxB");
+      const body=document.getElementById(side==="A"?"fbInjuryContentA":"fbInjuryContentB");
+      if(!box||!body)return;
+      box.style.display="block";
+      if(!meta?.available){body.textContent="ESPN injury report unavailable for this competition.";return;}
+      const summary=`${teamName||"Team"}: ${meta.outCount} OUT · ${meta.dtdCount} questionable/DTD · model impact ${meta.impact}%`;
+      const notes=meta.notes&&meta.notes.length?" — "+meta.notes.slice(0,6).join(" · "):"";
+      body.textContent=summary+notes;
+    }
+
+    async function fbEspnBuildTeamData(slug, team, fixtureDate, venue) {
+      let events=await fbEspnFetchTeamEvents(slug,team.id);
+      const cutoff=fixtureDate?Date.parse(fixtureDate):Date.now();
+      events=events.filter(e=>Number.isFinite(Date.parse(e.date||""))?Date.parse(e.date)<cutoff:e.finished).filter(e=>e.finished&&Number.isFinite(e.homeScore)&&Number.isFinite(e.awayScore));
+      const venueEvents=events.filter(e=>venue?((venue==="home"&&e.homeId===team.id)||(venue==="away"&&e.awayId===team.id)):true);
+      const chosen=venueEvents.slice(0,10); const scored=[],allowed=[],h1s=[],h1a=[]; let lastGameDate="";
+      chosen.forEach(e=>{const mineHome=e.homeId===team.id;const hs=mineHome?e.homeScore:e.awayScore;const as=mineHome?e.awayScore:e.homeScore;scored.push(hs);allowed.push(as);if(e.homeLines.length>=2&&e.awayLines.length>=2){const mh=mineHome?e.homeLines:e.awayLines,ma=mineHome?e.awayLines:e.homeLines;h1s.push(mh[0]);h1a.push(ma[0]);}if(!lastGameDate)lastGameDate=e.date;});
+      const allLast7=events.filter(e=>{const t=Date.parse(e.date||"");return Number.isFinite(t)&&cutoff-t<=7*86400000&&cutoff>=t;}).length;
+      const restDays=lastGameDate?Math.max(0,Math.floor((cutoff-Date.parse(lastGameDate))/86400000)-1):null;
+      let advanced={};
+      const advRefs=chosen.slice(0,5);
+      const advs=await Promise.all(advRefs.map(e=>fbEspnFetchSummary(slug,e.id).then(s=>fbEspnExtractAdvanced(s,team.id)).catch(()=>null)));
+      const finiteAvg=k=>{const vals=advs.map(x=>x&&x[k]).filter(Number.isFinite);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;};
+      advanced={xg:finiteAvg("xg"),xga:finiteAvg("xga"),shots:finiteAvg("shots"),sot:finiteAvg("sot"),big:finiteAvg("big")};
+      const injury=await fbEspnFetchInjuryMeta(slug,team.id);
+      return {id:team.id,name:team.name,scored,allowed,h1Scored:h1s,h1Allowed:h1a,matchesLast7d:allLast7,lastGameDate,restDays,advanced,injury:injury.impact,injuryMeta:injury,events};
+    }
+    function fbEspnFindH2H(eventsA,eventsB,idA,idB,cutoff) {
+      const map=new Map(); [...eventsA,...eventsB].forEach(e=>{if(e.homeId!==idA&&e.awayId!==idA&&e.homeId!==idB&&e.awayId!==idB)return;if(!e.finished||!Number.isFinite(e.homeScore)||!Number.isFinite(e.awayScore))return;const hasA=(e.homeId===idA||e.awayId===idA),hasB=(e.homeId===idB||e.awayId===idB);if(hasA&&hasB)map.set(e.id,e);});
+      return [...map.values()].filter(e=>!cutoff||Date.parse(e.date||0)<cutoff).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0)).slice(0,10);
+    }
+    async function fbEspnFetchCompetitionContext(slug, sampleEvents) {
+      const goals=[]; (sampleEvents||[]).forEach(e=>{if(e.finished&&Number.isFinite(e.homeScore)&&Number.isFinite(e.awayScore)){goals.push([e.homeScore,e.awayScore]);}});
+      const home=goals.length?goals.reduce((s,x)=>s+x[0],0)/goals.length:1.35, away=goals.length?goals.reduce((s,x)=>s+x[1],0)/goals.length:1.10;
+      return {homeAvg:clamp(home,0.4,2.5),awayAvg:clamp(away,0.3,2.3),seasonGoalFactor:1,strength:1,sample:goals.length};
+    }
+    async function fbEspnResolveFixtureEvent(slug, teamAId, teamBId, aroundDate) {
+      const base = Number.isFinite(Date.parse(aroundDate||"")) ? new Date(aroundDate) : new Date();
+      const offsets = [-1,0,1,2,-2];
+      for (const off of offsets) {
+        const d = new Date(base); d.setDate(d.getDate()+off);
+        const key = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+        try {
+          const data = await fbEspnFetchJSON(FB_ESPN.SITE(slug)+"/scoreboard?dates="+key+"&limit=500", 12000);
+          for (const ev of (data?.events||[])) {
+            const n = fbEspnNormalizeEvent(ev,slug); if(!n) continue;
+            if ((n.homeId===String(teamAId)&&n.awayId===String(teamBId)) || (n.homeId===String(teamBId)&&n.awayId===String(teamAId))) return n;
+          }
+        } catch(e) { /* continue to next date */ }
+      }
+      return null;
+    }
+
+    async function fbEspnAutoFetch() {
+      const slug=fbEspnGetLeague(); if(!slug){fbEspnSetStatus("Select an ESPN competition first.","error");return false;}
+      const btn=document.getElementById("fbEspnFetchBtn"); if(btn)btn.disabled=true;
+      try{
+        const selected=fbEspnGetSelectedFixture();
+        let nameA=(document.getElementById("ssTeamAName")?.value||"").trim(),nameB=(document.getElementById("ssTeamBName")?.value||"").trim();
+        if(selected){nameA=selected.homeName;nameB=selected.awayName;document.getElementById("ssTeamAName").value=nameA;document.getElementById("ssTeamBName").value=nameB;}
+        if(!nameA||!nameB)throw new Error("Enter both team names or select a fixture.");
+        fbEspnSetStatus("Resolving ESPN teams…");
+        let teamA = selected ? {id:String(selected.homeId),name:selected.homeName} : null;
+        let teamB = selected ? {id:String(selected.awayId),name:selected.awayName} : null;
+        if (!teamA?.id || !teamB?.id) {
+          [teamA,teamB]=await Promise.all([fbEspnSearchTeam(slug,nameA),fbEspnSearchTeam(slug,nameB)]);
+        }
+        if(!teamA)throw new Error("ESPN could not resolve Team A in this competition.");
+        if(!teamB)throw new Error("ESPN could not resolve Team B in this competition.");
+        if(teamA.id===teamB.id)throw new Error("Team A and Team B resolved to the same ESPN team.");
+        document.getElementById("ssTeamAId").value=teamA.id;document.getElementById("ssTeamBId").value=teamB.id;
+        fbEspnSetStatus("Loading recent form, H2H, fixture context and available ESPN stats…");
+        const fixture=selected||null; const fixtureDate=fixture?.date||""; const cutoff=fixtureDate?Date.parse(fixtureDate):Date.now();
+        const venueA=fixture?(fixture.homeId===teamA.id?"home":fixture.awayId===teamA.id?"away":null):"home";
+        const venueB=fixture?(fixture.homeId===teamB.id?"home":fixture.awayId===teamB.id?"away":null):"away";
+        const [dataA,dataB,eventsA,eventsB]=await Promise.all([fbEspnBuildTeamData(slug,teamA,fixtureDate,venueA),fbEspnBuildTeamData(slug,teamB,fixtureDate,venueB),fbEspnFetchTeamEvents(slug,teamA.id),fbEspnFetchTeamEvents(slug,teamB.id)]);
+        fbEspnRenderInjury("A",dataA.injuryMeta,teamA.name);
+        fbEspnRenderInjury("B",dataB.injuryMeta,teamB.name);
+        const h2h=fbEspnFindH2H(eventsA,eventsB,teamA.id,teamB.id,cutoff);
+        const compEvents=(selected?[selected]:[]).concat(eventsA.slice(0,30),eventsB.slice(0,30));
+        const prior=await fbEspnFetchCompetitionContext(slug,compEvents);
+        let eventMeta=selected;
+        if(!eventMeta){
+          eventMeta=await fbEspnResolveFixtureEvent(slug,teamA.id,teamB.id,document.getElementById("fixtureKickoff")?.value||"");
+          if(!eventMeta){
+            const candidates=eventsA.concat(eventsB).filter(e=>(e.homeId===teamA.id&&e.awayId===teamB.id)||(e.homeId===teamB.id&&e.awayId===teamA.id));
+            eventMeta=candidates.sort((a,b)=>Math.abs(Date.parse(a.date)-cutoff)-Math.abs(Date.parse(b.date)-cutoff))[0]||null;
+          }
+        }
+        let odds={}; if(eventMeta?.raw)odds=fbEspnFindOdds(eventMeta.raw); else if(eventMeta?.id){try{const sum=await fbEspnFetchSummary(slug,eventMeta.id);odds=fbEspnFindOdds(sum?.header?.competitions?.[0] ? {competitions:[sum.header.competitions[0]]}:null);}catch(e){}}
+        window.__fbAutoData={source:"espn",leagueSlug:slug,coverage:{registry:FB_ESPN.registry.length,historyA:dataA.scored.length,historyB:dataB.scored.length,h2h:h2h.length},context:{eventId:eventMeta?.id||"",kickoff:eventMeta?.date||fixtureDate||"",competition:eventMeta?.competitionName||fbEspnPrettySlug(slug),season:eventMeta?.season||"",venue:eventMeta?.venue||"",competitionType:eventMeta?.competitionType||"",tournamentId:slug},A:dataA,B:dataB,h2h,market:odds};
+        document.getElementById("ssTournamentId").value=slug;document.getElementById("ssTournamentName").textContent=window.__fbAutoData.context.competition;
+        document.getElementById("aFTScored").value=dataA.scored.join(",");document.getElementById("aFTAllowed").value=dataA.allowed.join(",");document.getElementById("a1HScored").value=dataA.h1Scored.join(",");document.getElementById("a1HAllowed").value=dataA.h1Allowed.join(",");document.getElementById("aFixtureLoad7d").value=String(dataA.matchesLast7d);
+        document.getElementById("bFTScored").value=dataB.scored.join(",");document.getElementById("bFTAllowed").value=dataB.allowed.join(",");document.getElementById("b1HScored").value=dataB.h1Scored.join(",");document.getElementById("b1HAllowed").value=dataB.h1Allowed.join(",");document.getElementById("bFixtureLoad7d").value=String(dataB.matchesLast7d);
+        if(h2h.length>=2){const ha=[],hb=[],h1a=[],h1b=[];h2h.forEach(e=>{const aHome=e.homeId===teamA.id;ha.push(aHome?e.homeScore:e.awayScore);hb.push(aHome?e.awayScore:e.homeScore);if(e.homeLines.length) {const x=aHome?e.homeLines:e.awayLines,y=aHome?e.awayLines:e.homeLines;if(Number.isFinite(x[0])&&Number.isFinite(y[0])){h1a.push(x[0]);h1b.push(y[0]);}}});document.getElementById("aFTH2H").value=ha.join(",");document.getElementById("bFTH2H").value=hb.join(",");document.getElementById("useFTH2H").checked=true;if(h1a.length>=2){document.getElementById("a1HH2H").value=h1a.join(",");document.getElementById("b1HH2H").value=h1b.join(",");document.getElementById("use1HH2H").checked=true;}document.getElementById("h2hAutoTag").style.display="inline";}
+        if(eventMeta?.date){const d=new Date(eventMeta.date);if(Number.isFinite(d.getTime())){const iso=d.toISOString().slice(0,16);const el=document.getElementById("fixtureKickoff");if(el)el.value=iso;}}
+        const advA=dataA.advanced||{},advB=dataB.advanced||{}; window.__fbAutoData.A=Object.assign(dataA,{...advA});window.__fbAutoData.B=Object.assign(dataB,{...advB});
+        if(Number.isFinite(prior.homeAvg)){window.__fbAutoData.context.homeAvg=prior.homeAvg;window.__fbAutoData.context.awayAvg=prior.awayAvg;}
+        if(Number.isFinite(odds.ftLine)){const el=document.getElementById("ftMarket");if(el&&!el.value)el.value=String(odds.ftLine);}
+        Object.keys(odds).forEach(k=>{if(k.startsWith("odds"))window.__fbAutoData.market[k]=odds[k];});
+        if(Number.isFinite(odds.ahLine))window.__fbAutoData.market.ahLine=odds.ahLine;
+        document.getElementById("aAutoTag").style.display="inline";document.getElementById("bAutoTag").style.display="inline";
+        fbEspnSetStatus(`${dataA.scored.length} ${nameA} matches · ${dataB.scored.length} ${nameB} matches · H2H ${h2h.length} · ESPN auto-fill complete.`,"ok");
+        engineDebug("ESPN football auto-fetch complete",window.__fbAutoData.coverage);
+        return true;
+      }catch(e){fbEspnSetStatus("ESPN auto-fetch failed: "+(e?.message||String(e)),"error");engineDebug("ESPN football auto-fetch failed",{league:slug,error:e?.message||String(e)});return false;}
+      finally{if(btn)btn.disabled=false;}
+    }
+    window.FB_ESPN=FB_ESPN;window.fbEspnAutoFetch=fbEspnAutoFetch;window.fbEspnLoadFixtures=fbEspnLoadFixtures;window.fbEspnLoadRegistry=fbEspnLoadRegistry;
+
     // ---------- SofaScore manual paste helpers ----------
     window.ssIsFootballEvent = function(ev) {
       if (!ev) return false;
@@ -1421,207 +1845,6 @@ S
     // Manual search only — no auto-resolve, no fetch, no proxy.
     // Opens the raw SofaScore search JSON so the user can find the football
     // entry and paste its numerical ID themselves.
-    // =====================================================================
-    // ESPN SOCCER AUTO-FETCH LAYER
-    // Mirrors the basketball engine pattern: dynamic league discovery,
-    // fixture picker, automatic team history/H2H/context/odds hydration.
-    // No backtest is introduced here.
-    // =====================================================================
-    const ESPN_SOCCER_REGISTRY_URL = "https://sports.core.api.espn.com/v2/sports/soccer/leagues?limit=500";
-    const ESPN_SOCCER_SITE_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/";
-    const ESPN_SOCCER_SITE_WEB_BASE = "https://site.web.api.espn.com/apis/site/v2/sports/soccer/";
-    const ESPN_SOCCER_FALLBACK_LEAGUES = {
-      "fifa.world":"FIFA World Cup","fifa.wwc":"FIFA Women's World Cup","fifa.world.u20":"FIFA U20 World Cup","fifa.world.u17":"FIFA U17 World Cup","fifa.cwc":"FIFA Club World Cup","fifa.friendly":"International Friendly","fifa.friendly.w":"Women's International Friendly",
-      "uefa.champions":"UEFA Champions League","uefa.champions_qual":"UEFA Champions League Qualifying","uefa.europa":"UEFA Europa League","uefa.europa_qual":"UEFA Europa League Qualifying","uefa.europa.conf":"UEFA Conference League","uefa.europa.conf_qual":"UEFA Conference League Qualifying","uefa.super_cup":"UEFA Super Cup","uefa.wchampions":"UEFA Women's Champions League","uefa.euro":"UEFA European Championship","uefa.euroq":"UEFA European Championship Qualifying","uefa.weuro":"UEFA Women's European Championship","uefa.nations":"UEFA Nations League","uefa.w.nations":"UEFA Women's Nations League",
-      "eng.1":"English Premier League","eng.2":"English Championship","eng.3":"English League One","eng.4":"English League Two","eng.5":"English National League","eng.fa":"English FA Cup","eng.league_cup":"English Carabao Cup","eng.trophy":"English EFL Trophy","eng.charity":"English FA Community Shield","eng.w.1":"English Women's Super League","eng.w.fa":"English Women's FA Cup",
-      "esp.1":"Spanish LALIGA","esp.2":"Spanish LALIGA 2","esp.copa_del_rey":"Spanish Copa del Rey","esp.super_cup":"Spanish Supercopa","esp.w.1":"Spanish Liga F","esp.copa_de_la_reina":"Spanish Copa de la Reina",
-      "ger.1":"German Bundesliga","ger.2":"German 2. Bundesliga","ger.dfb_pokal":"German Cup","ger.super_cup":"German Supercup",
-      "ita.1":"Italian Serie A","ita.2":"Italian Serie B","ita.coppa_italia":"Coppa Italia","ita.super_cup":"Italian Supercoppa",
-      "fra.1":"French Ligue 1","fra.2":"French Ligue 2","fra.coupe_de_france":"Coupe de France","fra.super_cup":"French Trophee des Champions","fra.w.1":"French Premiere Ligue",
-      "ned.1":"Dutch Eredivisie","ned.2":"Dutch Keuken Kampioen Divisie","ned.3":"Dutch Tweede Divisie","ned.cup":"Dutch KNVB Beker","ned.supercup":"Dutch Johan Cruyff Shield","ned.w.1":"Dutch Vrouwen Eredivisie",
-      "sco.1":"Scottish Premiership","sco.2":"Scottish Championship","sco.3":"Scottish League One","sco.4":"Scottish League Two","sco.cis":"Scottish League Cup","sco.challenge":"Scottish League Challenge Cup",
-      "por.1":"Portuguese Primeira Liga","por.taca.portugal":"Taca de Portugal","bel.1":"Belgian Pro League","aut.1":"Austrian Bundesliga","gre.1":"Greek Super League","tur.1":"Turkish Super Lig","den.1":"Danish Superliga","nor.1":"Norwegian Eliteserien","swe.1":"Swedish Allsvenskan","cyp.1":"Cypriot First Division","irl.1":"Irish Premier Division","rus.1":"Russian Premier League",
-      "usa.1":"MLS","usa.open":"U.S. Open Cup","usa.nwsl":"NWSL","usa.nwsl.cup":"NWSL Challenge Cup","usa.usl.1":"USL Championship","usa.usl.l1":"USL League One","usa.w.usl.1":"USL Super League","usa.ncaa.m.1":"NCAA Men's Soccer","usa.ncaa.w.1":"NCAA Women's Soccer","concacaf.champions":"Concacaf Champions Cup","concacaf.leagues.cup":"Leagues Cup","concacaf.gold":"Concacaf Gold Cup","concacaf.nations.league":"Concacaf Nations League","concacaf.w.gold":"Concacaf W Gold Cup","concacaf.w.champions_cup":"Concacaf W Champions Cup","can.w.nsl":"Northern Super League",
-      "mex.1":"Mexican Liga BBVA MX","mex.2":"Mexican Liga de Expansion MX","mex.campeon":"Mexican Campeon de Campeones","mex.supercopa":"Mexican Supercopa MX",
-      "conmebol.libertadores":"CONMEBOL Libertadores","conmebol.sudamericana":"CONMEBOL Sudamericana","conmebol.recopa":"CONMEBOL Recopa","conmebol.america":"Copa America","conmebol.america_qual":"Copa America Qualifying","conmebol.america.femenina":"Copa America Femenina","global.finalissima":"CONMEBOL-UEFA Cup of Champions","arg.1":"Argentine Liga Profesional","arg.copa":"Copa Argentina","bra.1":"Brazilian Serie A","bra.2":"Brazilian Serie B","bra.copa_do_brazil":"Copa do Brasil","chi.1":"Chilean Primera Division","col.1":"Colombian Primera A","par.1":"Paraguayan Primera Division","per.1":"Peruvian Liga 1","uru.1":"Liga AUF Uruguaya","bol.1":"Bolivian Liga Profesional","ecu.1":"LigaPro Ecuador","ven.1":"Venezuelan Primera Division",
-      "caf.nations":"Africa Cup of Nations","caf.nations_qual":"Africa Cup of Nations Qualifying","caf.champions":"CAF Champions League","caf.confed":"CAF Confederation Cup","rsa.1":"South African Premiership","nga.1":"Nigerian Professional League","gha.1":"Ghanaian Premier League",
-      "afc.champions":"AFC Champions League Elite","afc.cup":"AFC Champions League Two","afc.asian.cup":"AFC Asian Cup","ksa.1":"Saudi Pro League","ksa.kings.cup":"Saudi King's Cup","jpn.1":"Japanese J.League","chn.1":"Chinese Super League","ind.1":"Indian Super League","tha.1":"Thai League 1","mys.1":"Malaysian Super League","idn.1":"Indonesian Super League","sgp.1":"Singaporean Premier League","aus.1":"Australian A-League Men","aus.w.1":"Australian A-League Women",
-      "club.friendly":"Club Friendly","nonfifa":"Non-FIFA Friendly","friendly.emirates_cup":"Emirates Cup","global.champs_cup":"International Champions Cup","generic.ussf":"Misc. U.S. Soccer Games"
-    };
-    window.__espnSoccerLeagues = [];
-    window.__espnAuto = { league:null, dateOffset:0, event:null, rawEvents:[], A:null, B:null, context:null, market:{}, coverage:null };
-
-    function espnNormalizeName(v){ return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," "); }
-    function espnDateKey(offset){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+Number(offset||0)); return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0"); }
-    function espnDateISO(offset){ const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+Number(offset||0)); return d.toISOString(); }
-    async function espnFetchJson(url, timeoutMs=12000){
-      const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
-      try{ const res=await fetch(url,{signal:controller.signal,cache:"no-store"}); if(!res.ok) throw new Error("HTTP "+res.status); return await res.json(); }
-      finally{ clearTimeout(timer); }
-    }
-    function espnArray(payload){
-      if(!payload) return [];
-      if(Array.isArray(payload)) return payload;
-      for(const k of ["leagues","items","events","competitions","entries","results","athletes"]){ if(Array.isArray(payload[k])) return payload[k]; }
-      return [];
-    }
-    function espnLeagueFromItem(x){
-      const slug=String(x?.slug||x?.abbreviation||x?.id||x?.name||"").trim().toLowerCase();
-      const name=String(x?.name||x?.displayName||x?.shortName||x?.slug||slug).trim();
-      return slug?{slug,name}:null;
-    }
-    async function loadEspnSoccerLeagues(){
-      const out=new Map();
-      Object.entries(ESPN_SOCCER_FALLBACK_LEAGUES).forEach(([slug,name])=>out.set(slug,{slug,name,source:"fallback"}));
-      try{
-        const data=await espnFetchJson(ESPN_SOCCER_REGISTRY_URL,15000);
-        espnArray(data).forEach(x=>{
-          const row=espnLeagueFromItem(x); if(row && row.slug) out.set(row.slug,{...row,source:"registry"});
-        });
-        if(data?.items?.length){
-          data.items.slice(0,500).forEach(item=>{
-            const ref=String(item?.$ref||"");
-            const m=ref.match(/\/leagues\/([^/?#]+)/i);
-            if(m){ const slug=decodeURIComponent(m[1]).toLowerCase(); out.set(slug,{slug,name:ESPN_SOCCER_FALLBACK_LEAGUES[slug]||slug,source:"registry-ref"}); }
-          });
-        }
-      }catch(e){ engineDebug("ESPN league registry unavailable; using documented fallback registry",{error:String(e)}); }
-      window.__espnSoccerLeagues=[...out.values()].sort((a,b)=>a.name.localeCompare(b.name));
-      const sel=document.getElementById("espnLeagueSelect");
-      if(sel){ const current=sel.value; sel.innerHTML="<option value=\"\">Select league / competition</option>"+window.__espnSoccerLeagues.map(x=>`<option value="${safeText(x.slug)}">${safeText(x.name)} (${safeText(x.slug)})</option>`).join(""); if(current && out.has(current)) sel.value=current; }
-      const count=document.getElementById("espnLeagueCount"); if(count) count.textContent=`(${window.__espnSoccerLeagues.length} ESPN soccer competitions discovered)`;
-      return window.__espnSoccerLeagues;
-    }
-    function espnLeagueName(slug){ const x=window.__espnSoccerLeagues.find(v=>v.slug===slug); return x?.name||ESPN_SOCCER_FALLBACK_LEAGUES[slug]||slug||"Unknown competition"; }
-    function espnEventCompetitors(ev){ return ev?.competitions?.[0]?.competitors||[]; }
-    function espnEventTeam(ev,homeAway){ return espnEventCompetitors(ev).find(c=>String(c?.homeAway||"").toLowerCase()===homeAway)||null; }
-    function espnEventIsCompleted(ev){ const s=ev?.status; return !!(s?.type?.completed || s?.type?.state==="post" || s?.type?.name==="STATUS_FINAL"); }
-    function espnEventScore(c){ const raw=c?.score?.displayValue ?? c?.score?.value ?? c?.score; const n=Number(raw); return Number.isFinite(n)?n:null; }
-    function espnExtractPeriod1(c){
-      const ls=c?.linescores||c?.lineScores||c?.score?.linescores||[]; if(Array.isArray(ls)&&ls.length){ const x=ls[0]?.value??ls[0]?.displayValue??ls[0]; const n=Number(x); if(Number.isFinite(n)) return n; }
-      const p=c?.score?.period1 ?? c?.period1Score; const n=Number(p); return Number.isFinite(n)?n:null;
-    }
-    function espnEventRecord(ev,teamId){
-      const cs=espnEventCompetitors(ev); if(cs.length<2) return null; const home=espnEventTeam(ev,"home"), away=espnEventTeam(ev,"away");
-      const h=espnEventScore(home),a=espnEventScore(away); if(h==null||a==null) return null;
-      const side=String(teamId)===String(home?.team?.id)?"home":"away"; const mine=side==="home"?h:a, opp=side==="home"?a:h;
-      return {eventId:String(ev.id||""),date:ev.date||"",homeId:String(home?.team?.id||""),awayId:String(away?.team?.id||""),homeName:home?.team?.displayName||home?.team?.name||"",awayName:away?.team?.displayName||away?.team?.name||"",homeGoals:h,awayGoals:a,goalsFor:mine,goalsAgainst:opp,halfFor:side==="home"?espnExtractPeriod1(home):espnExtractPeriod1(away),halfAgainst:side==="home"?espnExtractPeriod1(away):espnExtractPeriod1(home),venue:ev?.competitions?.[0]?.venue?.fullName||ev?.competitions?.[0]?.venue?.address?.city||""};
-    }
-    function espnRecursiveStats(root){
-      const out=[]; const seen=new Set();
-      function walk(x,depth){ if(!x||depth>8||typeof x!=="object"||seen.has(x))return; seen.add(x);
-        if(Array.isArray(x)){x.forEach(v=>walk(v,depth+1));return;}
-        const label=String(x.name||x.displayName||x.label||x.shortDisplayName||"").toLowerCase();
-        const val=x.value??x.displayValue??x.statValue;
-        if(label && val!=null) out.push({label,value:Number(val),raw:val});
-        Object.keys(x).forEach(k=>{ if(k!=="value"&&k!=="displayValue"&&k!=="statValue") walk(x[k],depth+1); });
-      }
-      walk(root,0); return out;
-    }
-    function espnFindStat(root,patterns){
-      const rows=espnRecursiveStats(root); for(const r of rows){ if(!Number.isFinite(r.value)) continue; if(patterns.some(p=>r.label.includes(p))) return r.value; } return null;
-    }
-    function espnTeamSummaryStats(summary,teamId){
-      const roots=[];
-      if(Array.isArray(summary?.boxscore?.teams)) roots.push(...summary.boxscore.teams.filter(t=>String(t?.team?.id||t?.id||"")===String(teamId)));
-      if(Array.isArray(summary?.teams)) roots.push(...summary.teams.filter(t=>String(t?.team?.id||t?.id||"")===String(teamId)));
-      if(!roots.length) roots.push(summary);
-      const root={roots};
-      return {
-        xg:espnFindStat(root,["expected goals","expectedgoals","xg"]),
-        shots:espnFindStat(root,["shots"]),
-        sot:espnFindStat(root,["shots on target","shotsontarget","on target"]),
-        big:espnFindStat(root,["big chances","bigchances"])
-      };
-    }
-    async function espnTeamSchedule(league,teamId){
-      const urls=[ESPN_SOCCER_SITE_BASE+encodeURIComponent(league)+"/teams/"+encodeURIComponent(teamId)+"/schedule?limit=100",ESPN_SOCCER_SITE_WEB_BASE+encodeURIComponent(league)+"/teams/"+encodeURIComponent(teamId)+"/schedule?limit=100"];
-      let last=null; for(const url of urls){ try{ const d=await espnFetchJson(url,12000); const events=Array.isArray(d?.events)?d.events:[]; if(events.length||d) return events; }catch(e){last=e;} } throw last||new Error("Team schedule unavailable");
-    }
-    async function espnScoreboard(league,offset){
-      const date=espnDateKey(offset); const urls=[ESPN_SOCCER_SITE_BASE+encodeURIComponent(league)+"/scoreboard?dates="+date+"&limit=200",ESPN_SOCCER_SITE_WEB_BASE+encodeURIComponent(league)+"/scoreboard?dates="+date+"&limit=200"];
-      let last=null; for(const url of urls){ try{const d=await espnFetchJson(url,12000); if(Array.isArray(d?.events)) return d; }catch(e){last=e;} } throw last||new Error("Scoreboard unavailable");
-    }
-    async function espnSummary(league,eventId){
-      const urls=[ESPN_SOCCER_SITE_BASE+encodeURIComponent(league)+"/summary?event="+encodeURIComponent(eventId),ESPN_SOCCER_SITE_WEB_BASE+encodeURIComponent(league)+"/summary?event="+encodeURIComponent(eventId)];
-      for(const url of urls){ try{return await espnFetchJson(url,10000);}catch(e){} } return null;
-    }
-    function espnExtractOdds(ev){
-      const comp=ev?.competitions?.[0]||{}; const odds=Array.isArray(comp.odds)?comp.odds[0]:comp.odds||{}; const home=espnEventTeam(ev,"home"),away=espnEventTeam(ev,"away");
-      const money=odds?.moneyline||odds?.moneyLine||{};
-      const homeOdds=Number(money?.home?.odds??odds?.homeTeamOdds?.moneyLine??odds?.homeOdds); const awayOdds=Number(money?.away?.odds??odds?.awayTeamOdds?.moneyLine??odds?.awayOdds); const drawOdds=Number(money?.draw?.odds??odds?.drawOdds??odds?.draw?.price);
-      const overUnder=Number(odds?.overUnder??odds?.total?.overUnder??odds?.total?.line); const over=Number(odds?.overOdds??odds?.total?.overOdds??odds?.over?.odds); const under=Number(odds?.underOdds??odds?.total?.underOdds??odds?.under?.odds);
-      const spread=Number(odds?.spread??odds?.pointSpread??odds?.handicap); const hSpreadOdds=Number(odds?.homeTeamOdds?.spreadOdds??odds?.homeSpreadOdds); const aSpreadOdds=Number(odds?.awayTeamOdds?.spreadOdds??odds?.awaySpreadOdds);
-      return {home:Number.isFinite(homeOdds)&&homeOdds>1?homeOdds:null,draw:Number.isFinite(drawOdds)&&drawOdds>1?drawOdds:null,away:Number.isFinite(awayOdds)&&awayOdds>1?awayOdds:null,over:Number.isFinite(over)&&over>1?over:null,under:Number.isFinite(under)&&under>1?under:null,totalLine:Number.isFinite(overUnder)?overUnder:null,spread:Number.isFinite(spread)?spread:null,homeAH:Number.isFinite(hSpreadOdds)&&hSpreadOdds>1?hSpreadOdds:null,awayAH:Number.isFinite(aSpreadOdds)&&aSpreadOdds>1?aSpreadOdds:null,provider:odds?.provider?.name||odds?.provider||"ESPN"};
-    }
-    async function espnBuildTeamFeatures(league,teamId,teamName,venueSide,fixtureDate){
-      const events=await espnTeamSchedule(league,teamId); const cutoff=new Date(fixtureDate||Date.now()).getTime();
-      const completed=events.filter(e=>espnEventIsCompleted(e)&&new Date(e.date||0).getTime()<cutoff).sort((a,b)=>new Date(b.date)-new Date(a.date));
-      const records=[]; for(const ev of completed.slice(0,12)){ const r=espnEventRecord(ev,teamId); if(r)records.push(r); }
-      const gf=records.slice(0,10).map(r=>r.goalsFor),ga=records.slice(0,10).map(r=>r.goalsAgainst),hgf=records.map(r=>r.halfFor).filter(Number.isFinite).slice(0,10),hga=records.map(r=>r.halfAgainst).filter(Number.isFinite).slice(0,10);
-      const restDays=records.length?Math.max(0,(cutoff-new Date(records[0].date).getTime())/86400000):null; const load7=records.filter(r=>cutoff-new Date(r.date).getTime()<=7*86400000).length;
-      let xg=[],xga=[],shots=[],sot=[],big=[]; for(const r of records.slice(0,8)){ const sm=await espnSummary(league,r.eventId); if(!sm)continue; const mine=espnTeamSummaryStats(sm,teamId); const oppId=String(r.homeId)===String(teamId)?r.awayId:r.homeId; const opp=espnTeamSummaryStats(sm,oppId); if(Number.isFinite(mine.xg))xg.push(mine.xg); if(Number.isFinite(opp.xg))xga.push(opp.xg); if(Number.isFinite(mine.shots))shots.push(mine.shots); if(Number.isFinite(mine.sot))sot.push(mine.sot); if(Number.isFinite(mine.big))big.push(mine.big); }
-      const injury=await espnFetchJson(ESPN_SOCCER_SITE_BASE+encodeURIComponent(league)+"/teams/"+encodeURIComponent(teamId)+"/injuries",8000).catch(()=>null); const injuryCount=Array.isArray(injury?.injuries)?injury.injuries.length:0;
-      const venueRecords=records.filter(r=>venueSide==="home"?String(r.homeId)===String(teamId):String(r.awayId)===String(teamId));
-      return {id:String(teamId),name:teamName,gf,ga,h1gf:hgf,h1ga:hga,xg:xg.length?xg.reduce((a,b)=>a+b,0)/xg.length:null,xga:xga.length?xga.reduce((a,b)=>a+b,0)/xga.length:null,shots:shots.length?shots.reduce((a,b)=>a+b,0)/shots.length:null,sot:sot.length?sot.reduce((a,b)=>a+b,0)/sot.length:null,big:big.length?big.reduce((a,b)=>a+b,0)/big.length:null,injury:Math.min(40,injuryCount*4)*-1,susp:0,lineup:100,rotation:0,rest:restDays,travel:0,manager:0,motivation:50,spa:50,spd:50,ta:50,td:50,load7,venueSample:venueRecords.length};
-    }
-    async function espnLeagueRecentAverage(league,fixtureDate){
-      try{
-        const center=new Date(fixtureDate||Date.now()); const start=new Date(center.getTime()-45*86400000); const end=new Date(center.getTime()+1*86400000); const q=start.getFullYear()+String(start.getMonth()+1).padStart(2,"0")+String(start.getDate()).padStart(2,"0")+"-"+end.getFullYear()+String(end.getMonth()+1).padStart(2,"0")+String(end.getDate()).padStart(2,"0");
-        const url=ESPN_SOCCER_SITE_BASE+encodeURIComponent(league)+"/scoreboard?dates="+q+"&limit=200"; const d=await espnFetchJson(url,12000); let hg=0,ag=0,n=0; (d.events||[]).forEach(ev=>{if(!espnEventIsCompleted(ev))return;const h=espnEventScore(espnEventTeam(ev,"home")),a=espnEventScore(espnEventTeam(ev,"away"));if(h!=null&&a!=null){hg+=h;ag+=a;n++;}}); if(n>=5)return {home:hg/n,away:ag/n,sample:n};
-      }catch(e){} return null;
-    }
-    function espnSetInput(id,val){const el=document.getElementById(id);if(el&&val!=null&&val!=="")el.value=val;}
-    function espnSetSeries(id,arr){if(Array.isArray(arr)&&arr.length)espnSetInput(id,arr.slice(0,10).join(","));}
-    function espnApplyAutoState(){
-      const a=window.__espnAuto.A,b=window.__espnAuto.B,c=window.__espnAuto.context||{},m=window.__espnAuto.market||{}; if(!a||!b)return;
-      espnSetInput("ssTeamAName",a.name);espnSetInput("ssTeamAId",a.id);espnSetInput("ssTeamBName",b.name);espnSetInput("ssTeamBId",b.id);
-      espnSetSeries("aFTScored",a.gf);espnSetSeries("aFTAllowed",a.ga);espnSetSeries("a1HScored",a.h1gf);espnSetSeries("a1HAllowed",a.h1ga);espnSetSeries("bFTScored",b.gf);espnSetSeries("bFTAllowed",b.ga);espnSetSeries("b1HScored",b.h1gf);espnSetSeries("b1HAllowed",b.h1ga);
-      espnSetInput("aFixtureLoad7d",a.load7);espnSetInput("bFixtureLoad7d",b.load7);espnSetInput("ssTournamentId",c.tournamentId||""); const tn=document.getElementById("ssTournamentName");if(tn)tn.textContent=c.competition||"";
-      const autoTag=document.getElementById("aAutoTag");const autoTagB=document.getElementById("bAutoTag");if(autoTag)autoTag.style.display="inline";if(autoTagB)autoTagB.style.display="inline";
-      if(Number.isFinite(m.totalLine))espnSetInput("ftMarket",m.totalLine); if(Number.isFinite(m.h1Line))espnSetInput("h1Market",m.h1Line); if(Number.isFinite(m.h2Line))espnSetInput("h2Market",m.h2Line);
-      window.__fbAutoFeatures={A:a,B:b}; window.__fbAutoContext=c; window.__fbAutoMarket=m;
-    }
-    function espnPopulateFixtureSelect(events){
-      const sel=document.getElementById("espnFixtureSelect"); if(!sel)return; const usable=(events||[]).filter(e=>espnEventCompetitors(e).length>=2); window.__espnAuto.rawEvents=usable;
-      if(!usable.length){sel.innerHTML='<option value="">No ESPN fixtures on this date</option>';return;}
-      sel.innerHTML='<option value="">Select match</option>'+usable.map(ev=>{const h=espnEventTeam(ev,"home"),a=espnEventTeam(ev,"away");return `<option value="${safeText(String(ev.id||""))}">${safeText(h?.team?.displayName||h?.team?.name||"Home")} vs ${safeText(a?.team?.displayName||a?.team?.name||"Away")} · ${safeText(new Date(ev.date||Date.now()).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}))}</option>`;}).join("");
-    }
-    async function espnLoadFixtures(){
-      const league=document.getElementById("espnLeagueSelect")?.value||""; const status=document.getElementById("espnFetchStatus"); if(!league)return; if(status)status.textContent="Loading ESPN fixtures…";
-      try{const d=await espnScoreboard(league,window.__espnAuto.dateOffset||0);espnPopulateFixtureSelect(d.events||[]);if(status)status.textContent=`${espnLeagueName(league)} · ${(d.events||[]).length} fixture(s) found.`;}
-      catch(e){if(status)status.textContent="ESPN fixture feed unavailable for this competition/date.";engineDebug("ESPN scoreboard fetch failed",{league,error:String(e)});}
-    }
-    function espnFindEventByNames(){
-      const a=espnNormalizeName(document.getElementById("espnTeamASearch")?.value),b=espnNormalizeName(document.getElementById("espnTeamBSearch")?.value); if(!a&&!b)return null;
-      return window.__espnAuto.rawEvents.find(ev=>{const h=espnNormalizeName(espnEventTeam(ev,"home")?.team?.displayName||""), aw=espnNormalizeName(espnEventTeam(ev,"away")?.team?.displayName||"");return (!a||h.includes(a)||a.includes(h))&&(!b||aw.includes(b)||b.includes(aw));})||null;
-    }
-    async function espnHydrateSelectedEvent(){
-      const league=document.getElementById("espnLeagueSelect")?.value||""; let eventId=document.getElementById("espnFixtureSelect")?.value||""; let ev=window.__espnAuto.rawEvents.find(x=>String(x.id)===String(eventId))||null; if(!ev)ev=espnFindEventByNames(); if(!league||!ev){alert("Select an ESPN league and fixture first.");return false;}
-      const status=document.getElementById("espnFetchStatus");if(status)status.textContent="Fetching fixture + recent form + H2H + odds…";
-      const home=espnEventTeam(ev,"home"),away=espnEventTeam(ev,"away"); const homeId=String(home?.team?.id||""),awayId=String(away?.team?.id||""); if(!homeId||!awayId)throw new Error("ESPN fixture is missing team IDs.");
-      const fixtureDate=ev.date||new Date().toISOString(); const [A,B,leagueAvg]=await Promise.all([espnBuildTeamFeatures(league,homeId,home?.team?.displayName||home?.team?.name||"Home","home",fixtureDate),espnBuildTeamFeatures(league,awayId,away?.team?.displayName||away?.team?.name||"Away","away",fixtureDate),espnLeagueRecentAverage(league,fixtureDate)]);
-      const [schA,schB]=await Promise.all([espnTeamSchedule(league,homeId),espnTeamSchedule(league,awayId)]); const h2h=[]; const byId=new Map(schA.map(x=>[String(x.id),x])); schB.forEach(x=>{if(byId.has(String(x.id)))h2h.push(x);}); const h2hRows=h2h.filter(espnEventIsCompleted).map(x=>espnEventRecord(x,homeId)).filter(Boolean).sort((x,y)=>new Date(y.date)-new Date(x.date)).slice(0,10);
-      const h2hA=h2hRows.map(r=>r.goalsFor),h2hB=h2hRows.map(r=>r.goalsAgainst),h2hH1A=h2hRows.map(r=>r.halfFor).filter(Number.isFinite),h2hH1B=h2hRows.map(r=>r.halfAgainst).filter(Number.isFinite); const odds=espnExtractOdds(ev);
-      const tournamentId=String(ev?.competitions?.[0]?.type?.id||ev?.season?.slug||league); const competitionType=String(ev?.competitions?.[0]?.type?.text||ev?.competitions?.[0]?.type?.abbreviation||"");
-      window.__espnAuto={league,dateOffset:window.__espnAuto.dateOffset||0,event:ev,rawEvents:window.__espnAuto.rawEvents,A,B,context:{eventId:String(ev.id||""),kickoff:fixtureDate,competition:espnLeagueName(league),season:String(ev?.season?.displayName||ev?.season?.year||""),venue:ev?.competitions?.[0]?.venue?.fullName||ev?.competitions?.[0]?.venue?.address?.city||"",competitionType,tournamentId},market:odds,coverage:null};
-      window.__espnAuto.context.leagueAvg=leagueAvg; window.__espnAuto.context.h2h={a:h2hA,b:h2hB,h1a:h2hH1A,h1b:h2hH1B};
-      if(leagueAvg){ try{saveFootballCompetitionProfile(espnLeagueName(league),leagueAvg.home,leagueAvg.away,1,1);}catch(e){} }
-      espnApplyAutoState();
-      if(h2hA.length>=2){espnSetSeries("aFTH2H",h2hA);espnSetSeries("bFTH2H",h2hB);const cb=document.getElementById("useFTH2H");if(cb)cb.checked=true;}
-      if(h2hH1A.length>=2){espnSetSeries("a1HH2H",h2hH1A);espnSetSeries("b1HH2H",h2hH1B);const cb=document.getElementById("use1HH2H");if(cb)cb.checked=true;}
-      const status2=document.getElementById("espnFetchStatus");if(status2)status2.textContent=`✅ ${A.name} vs ${B.name} · ${espnLeagueName(league)} · ${A.gf.length}/${B.gf.length} recent matches · H2H ${h2hA.length} · ESPN auto-fetch complete.`;
-      engineDebug("ESPN football auto-fetch complete",{league,eventId:ev.id,home:A.name,away:B.name,homeSamples:A.gf.length,awaySamples:B.gf.length,h2h:h2hA.length,odds});
-      return true;
-    }
-    async function espnInitAutoFetch(){
-      try{await loadEspnSoccerLeagues();}
-      catch(e){engineDebug("ESPN auto-fetch initialization failed",{error:String(e)});}
-    }
-    window.espnReloadLeagues=loadEspnSoccerLeagues;
-    window.espnLoadFixtures=espnLoadFixtures;
-    window.espnHydrateSelectedEvent=espnHydrateSelectedEvent;
-
     window.searchSofascoreTeam = function(side){
       const nameEl = document.getElementById(side==='A'?'ssTeamAName':'ssTeamBName');
       const rawName = (nameEl?.value||"").trim();
@@ -2750,9 +2973,10 @@ S
       document.getElementById("results").innerHTML="<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>";
       document.querySelectorAll(".autofill-indicator").forEach(el=>el.style.display="none");
       window.__ssRawEvents = { A: null, B: null };
-      window.__fbAutoFeatures = null; window.__fbAutoContext = null; window.__fbAutoMarket = null;
-      window.__espnAuto = { league:null, dateOffset:0, event:null, rawEvents:[], A:null, B:null, context:null, market:{}, coverage:null };
-      const fs=document.getElementById("espnFetchStatus"); if(fs) fs.textContent="";
+      window.__fbAutoData = { source:"none", context:{}, A:{}, B:{}, h2h:[], market:{}, coverage:null };
+      const fbLeagueSelect=document.getElementById("leagueSelect"); if(fbLeagueSelect)fbLeagueSelect.value="";
+      const fbFixtureSelect=document.getElementById("fbEspnFixtureSelect"); if(fbFixtureSelect)fbFixtureSelect.innerHTML='<option value="">- Select match -</option>';
+      ["fbInjuryBoxA","fbInjuryBoxB"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none";});
       // Collapse every section after clear — same as cold load
       document.querySelectorAll(".section").forEach(s=>s.classList.add("collapsed"));
     }
@@ -2773,11 +2997,34 @@ S
     };
 
     function fb2_num(id, fallback=null) {
-      const el=document.getElementById(id); if(!el) return fallback;
-      const n=Number(el.value); return Number.isFinite(n)?n:fallback;
+      const el=document.getElementById(id);
+      if(el){ const n=Number(el.value); if(Number.isFinite(n)) return n; }
+      const auto=window.__fbAutoData||{};
+      const map={
+        aXG:auto.A?.xg,aXGA:auto.A?.xga,aShots:auto.A?.shots,aSOT:auto.A?.sot,aBigChances:auto.A?.big,
+        bXG:auto.B?.xg,bXGA:auto.B?.xga,bShots:auto.B?.shots,bSOT:auto.B?.sot,bBigChances:auto.B?.big,
+        aInjuryImpact:auto.A?.injury,aSuspensionImpact:auto.A?.susp,bInjuryImpact:auto.B?.injury,bSuspensionImpact:auto.B?.susp,
+        aLineupStrength:auto.A?.lineup,bLineupStrength:auto.B?.lineup,aRotationPenalty:auto.A?.rotation,bRotationPenalty:auto.B?.rotation,
+        aRestDays:auto.A?.restDays,bRestDays:auto.B?.restDays,aTravelKm:auto.A?.travel,bTravelKm:auto.B?.travel,
+        aManagerChange:auto.A?.manager,bManagerChange:auto.B?.manager,aMotivation:auto.A?.motivation,bMotivation:auto.B?.motivation,
+        aSetPieceAttack:auto.A?.spa,bSetPieceAttack:auto.B?.spa,aSetPieceDefense:auto.A?.spd,bSetPieceDefense:auto.B?.spd,
+        aTacticalAttack:auto.A?.ta,bTacticalAttack:auto.B?.ta,aTacticalDefense:auto.A?.td,bTacticalDefense:auto.B?.td,
+        aFixtureLoad7d:auto.A?.matchesLast7d,bFixtureLoad7d:auto.B?.matchesLast7d,
+        leagueHomeAvg:auto.context?.homeAvg,leagueAwayAvg:auto.context?.awayAvg,
+        seasonGoalFactor:auto.context?.seasonGoalFactor,competitionStrength:auto.context?.strength,
+        fixtureKickoff:auto.context?.kickoff
+      };
+      const v=map[id]; return Number.isFinite(Number(v))?Number(v):fallback;
     }
     function fb2_text(id, fallback="") {
-      const el=document.getElementById(id); return el ? String(el.value||fallback).trim() : fallback;
+      const el=document.getElementById(id); if(el && String(el.value||"").trim()) return String(el.value).trim();
+      const auto=window.__fbAutoData||{}; const map={
+        ssTeamAName:auto.A?.name,ssTeamAId:auto.A?.id,ssTeamBName:auto.B?.name,ssTeamBId:auto.B?.id,
+        ssTournamentId:auto.context?.tournamentId,ssTournamentName:auto.context?.competition,
+        fixtureEventId:auto.context?.eventId,fixtureKickoff:auto.context?.kickoff,fixtureSeason:auto.context?.season,
+        fixtureVenue:auto.context?.venue,fixtureCompetitionType:auto.context?.competitionType
+      };
+      return String(map[id]??fallback).trim();
     }
     function fb2_series(id) {
       const el=document.getElementById(id); if(!el) return [];
@@ -2884,28 +3131,27 @@ S
       if(Number.isFinite(ev) && ev < threshold) return {pick:"NO PLAY",ev};
       return {pick:side,ev};
     }
-    function fb2_parseOdds(id){ const n=fb2_num(id,null); return n!=null&&n>1?n:null; }
+    function fb2_parseOdds(id){ const n=fb2_num(id,null); if(n!=null&&n>1)return n; const v=Number(window.__fbAutoData?.market?.[id]); return Number.isFinite(v)&&v>1?v:null; }
     function fb2_inputFeatures(){
-      const auto=window.__fbAutoFeatures||{};
-      const baseA=auto.A||{},baseB=auto.B||{};
-      const A={name:fb2_text("ssTeamAName",baseA.name||"Home"),id:fb2_text("ssTeamAId",baseA.id||""),gf:fb2_series("aFTScored").length?fb2_series("aFTScored"):(baseA.gf||[]),ga:fb2_series("aFTAllowed").length?fb2_series("aFTAllowed"):(baseA.ga||[]),h1gf:fb2_series("a1HScored").length?fb2_series("a1HScored"):(baseA.h1gf||[]),h1ga:fb2_series("a1HAllowed").length?fb2_series("a1HAllowed"):(baseA.h1ga||[])};
-      const B={name:fb2_text("ssTeamBName",baseB.name||"Away"),id:fb2_text("ssTeamBId",baseB.id||""),gf:fb2_series("bFTScored").length?fb2_series("bFTScored"):(baseB.gf||[]),ga:fb2_series("bFTAllowed").length?fb2_series("bFTAllowed"):(baseB.ga||[]),h1gf:fb2_series("b1HScored").length?fb2_series("b1HScored"):(baseB.h1gf||[]),h1ga:fb2_series("b1HAllowed").length?fb2_series("b1HAllowed"):(baseB.h1ga||[])};
-      [A,B].forEach((t,i)=>{ const p=i===0?"a":"b",src=i===0?baseA:baseB; t.xg=fb2_num(p+"XG",src.xg??null);t.xga=fb2_num(p+"XGA",src.xga??null);t.shots=fb2_num(p+"Shots",src.shots??null);t.sot=fb2_num(p+"SOT",src.sot??null);t.big=fb2_num(p+"BigChances",src.big??null);t.injury=fb2_num(p+"InjuryImpact",src.injury??0)||0;t.susp=fb2_num(p+"SuspensionImpact",src.susp??0)||0;t.lineup=fb2_num(p+"LineupStrength",src.lineup??100);t.rotation=fb2_num(p+"RotationPenalty",src.rotation??0)||0;t.rest=fb2_num(p+"RestDays",src.rest??null);t.travel=fb2_num(p+"TravelKm",src.travel??0)||0;t.manager=fb2_num(p+"ManagerChange",src.manager??0)||0;t.motivation=fb2_pct(p+"Motivation",src.motivation??50);t.spa=fb2_pct(p+"SetPieceAttack",src.spa??50);t.spd=fb2_pct(p+"SetPieceDefense",src.spd??50);t.ta=fb2_pct(p+"TacticalAttack",src.ta??50);t.td=fb2_pct(p+"TacticalDefense",src.td??50);t.load7=fb2_num(p+"FixtureLoad7d",src.load7??0)||0; });
+      const auto=window.__fbAutoData||{};
+      const A={name:fb2_text("ssTeamAName","Home"),id:fb2_text("ssTeamAId"),gf:fb2_series("aFTScored"),ga:fb2_series("aFTAllowed"),h1gf:fb2_series("a1HScored"),h1ga:fb2_series("a1HAllowed")};
+      const B={name:fb2_text("ssTeamBName","Away"),id:fb2_text("ssTeamBId"),gf:fb2_series("bFTScored"),ga:fb2_series("bFTAllowed"),h1gf:fb2_series("b1HScored"),h1ga:fb2_series("b1HAllowed")};
+      [A,B].forEach((t,i)=>{ const p=i===0?"a":"b",src=i===0?(auto.A||{}):(auto.B||{}); t.xg=Number.isFinite(src.xg)?src.xg:fb2_num(p+"XG",null);t.xga=Number.isFinite(src.xga)?src.xga:fb2_num(p+"XGA",null);t.shots=Number.isFinite(src.shots)?src.shots:fb2_num(p+"Shots",null);t.sot=Number.isFinite(src.sot)?src.sot:fb2_num(p+"SOT",null);t.big=Number.isFinite(src.big)?src.big:fb2_num(p+"BigChances",null);t.injury=Number.isFinite(src.injury)?src.injury:(fb2_num(p+"InjuryImpact",0)||0);t.susp=Number.isFinite(src.susp)?src.susp:(fb2_num(p+"SuspensionImpact",0)||0);t.lineup=Number.isFinite(src.lineup)?src.lineup:fb2_num(p+"LineupStrength",100);t.rotation=Number.isFinite(src.rotation)?src.rotation:(fb2_num(p+"RotationPenalty",0)||0);t.rest=Number.isFinite(src.restDays)?src.restDays:fb2_num(p+"RestDays",null);t.travel=Number.isFinite(src.travel)?src.travel:(fb2_num(p+"TravelKm",0)||0);t.manager=Number.isFinite(src.manager)?src.manager:(fb2_num(p+"ManagerChange",0)||0);t.motivation=Number.isFinite(src.motivation)?src.motivation:fb2_pct(p+"Motivation",50);t.spa=Number.isFinite(src.spa)?src.spa:fb2_pct(p+"SetPieceAttack",50);t.spd=Number.isFinite(src.spd)?src.spd:fb2_pct(p+"SetPieceDefense",50);t.ta=Number.isFinite(src.ta)?src.ta:fb2_pct(p+"TacticalAttack",50);t.td=Number.isFinite(src.td)?src.td:fb2_pct(p+"TacticalDefense",50);t.load7=Number.isFinite(src.matchesLast7d)?src.matchesLast7d:(fb2_num(p+"FixtureLoad7d",0)||0); });
       return {A,B};
     }
     function fb2_competitionLabel(){
-      const detected=fb2_text("ssTournamentName");
+      const auto=window.__fbAutoData||{};
+      const detected=String(auto.context?.competition||fb2_text("ssTournamentName")||"").trim();
       if(detected && !/^Multiple competitions in feed/i.test(detected)) return detected;
-      const tournament=fb2_text("ssTournamentId");
-      return tournament ? ("Tournament "+tournament) : "Unknown competition";
+      const tournament=String(auto.context?.tournamentId||fb2_text("ssTournamentId")||"").trim();
+      return tournament ? tournament : "Unknown competition";
     }
     function fb2_context(){
-      const ac=window.__fbAutoContext||{};
-      const comp=ac.competition||fb2_competitionLabel();
-      const tournament=ac.tournamentId||fb2_text("ssTournamentId");
-      const kickoffRaw=ac.kickoff||fb2_text("fixtureKickoff");
-      const kickoff=kickoffRaw?new Date(kickoffRaw).toISOString():new Date().toISOString();
-      return {eventId:ac.eventId||fb2_text("fixtureEventId")||"",kickoff,competition:comp||"Unknown competition",season:ac.season||fb2_text("fixtureSeason"),venue:ac.venue||fb2_text("fixtureVenue"),competitionType:ac.competitionType||fb2_text("fixtureCompetitionType"),tournamentId:tournament};
+      const auto=window.__fbAutoData||{}; const comp=fb2_competitionLabel();
+      const tournament=String(auto.context?.tournamentId||fb2_text("ssTournamentId")||"").trim();
+      const kickoffRaw=String(auto.context?.kickoff||fb2_text("fixtureKickoff")||"").trim();
+      const parsed=kickoffRaw?new Date(kickoffRaw):null; const kickoff=parsed&&Number.isFinite(parsed.getTime())?parsed.toISOString():new Date().toISOString();
+      return {eventId:String(auto.context?.eventId||fb2_text("fixtureEventId")||""),kickoff,competition:comp||"Unknown competition",season:String(auto.context?.season||fb2_text("fixtureSeason")||""),venue:String(auto.context?.venue||fb2_text("fixtureVenue")||""),competitionType:String(auto.context?.competitionType||fb2_text("fixtureCompetitionType")||""),tournamentId:tournament};
     }
     function fb2_eloEntry(key){
       const ratings=loadEloRatings();const e=ratings[key]||{};let rating=Number.isFinite(Number(e.rating))?Number(e.rating):FOOTBALL_ELO_DEFAULT_RATING;const matches=Number(e.matches)||0;
@@ -2923,10 +3169,10 @@ S
       const raw=fb2_competitionLabel();
       const key=String(raw).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
       let stored=null;try{stored=JSON.parse(localStorage.getItem("FOOTBALL_COMPETITION_PROFILE_"+key)||"null");}catch(e){}
-      const auto=window.__fbAutoContext||{};
-      const home=fb2_num("leagueHomeAvg",auto.leagueAvg?.home??stored?.homeAvg??1.35), away=fb2_num("leagueAwayAvg",auto.leagueAvg?.away??stored?.awayAvg??1.10);
-      const season=clamp(fb2_num("seasonGoalFactor",stored?.seasonGoalFactor??1)||1,0.75,1.25);
-      const strength=clamp(fb2_num("competitionStrength",stored?.strength??1)||1,0.75,1.25);
+      const auto=window.__fbAutoData||{};
+      const home=fb2_num("leagueHomeAvg",auto.context?.homeAvg??stored?.homeAvg??1.35), away=fb2_num("leagueAwayAvg",auto.context?.awayAvg??stored?.awayAvg??1.10);
+      const season=clamp(fb2_num("seasonGoalFactor",auto.context?.seasonGoalFactor??stored?.seasonGoalFactor??1)||1,0.75,1.25);
+      const strength=clamp(fb2_num("competitionStrength",auto.context?.strength??stored?.strength??1)||1,0.75,1.25);
       return {home:clamp(home*season*strength,0.4,2.5),away:clamp(away*season*strength,0.3,2.3),key,seasonGoalFactor:season,strength};
     }
     window.saveFootballCompetitionProfile=function(name,homeAvg,awayAvg,seasonGoalFactor=1,strength=1){
@@ -2967,7 +3213,7 @@ S
       const load=team.load7||0;
       attack*=1-0.025*clamp(Math.max(0,load-2),0,4);
       if(home) attack*=1+0.035; else attack*=1-0.015;
-      const weather=fb2_num("weatherGoalImpact",0)||0;
+      const weather=Number(window.__fbAutoData?.context?.weatherGoalImpact ?? fb2_num("weatherGoalImpact",0))||0;
       attack*=1+clamp(weather/200,-0.15,0.05);
       return {attack:clamp(attack,0.55,1.15),defense:clamp(defense,0.75,1.15)};
     }
@@ -3098,17 +3344,17 @@ S
     window.observeFootballCanary=function(result){return typeof observeCanary==="function"?observeCanary(result):null;};
 
     function fb2_marketRows(data,ctx,lambdas,fhLambdas,ftM,h1M,integrity,sample){
-      const rows=[];const am=window.__fbAutoMarket||{};const readOdd=(id,key)=>{const manual=fb2_parseOdds(id);return manual!=null?manual:(Number.isFinite(Number(am[key]))?Number(am[key]):null);};const odds={home:readOdd("oddsHome","home"),draw:readOdd("oddsDraw","draw"),away:readOdd("oddsAway","away"),over:readOdd("oddsOverFT","over"),under:readOdd("oddsUnderFT","under"),bttsYes:readOdd("oddsBttsYes","bttsYes"),bttsNo:readOdd("oddsBttsNo","bttsNo"),homeAH:readOdd("oddsHomeAH","homeAH"),awayAH:readOdd("oddsAwayAH","awayAH"),aOver:readOdd("oddsTeamAOver","aOver"),aUnder:readOdd("oddsTeamAUnder","aUnder"),bOver:readOdd("oddsTeamBOver","bOver"),bUnder:readOdd("oddsTeamBUnder","bUnder")};
+      const rows=[];const odds={home:fb2_parseOdds("oddsHome"),draw:fb2_parseOdds("oddsDraw"),away:fb2_parseOdds("oddsAway"),over:fb2_parseOdds("oddsOverFT"),under:fb2_parseOdds("oddsUnderFT"),bttsYes:fb2_parseOdds("oddsBttsYes"),bttsNo:fb2_parseOdds("oddsBttsNo"),homeAH:fb2_parseOdds("oddsHomeAH"),awayAH:fb2_parseOdds("oddsAwayAH"),aOver:fb2_parseOdds("oddsTeamAOver"),aUnder:fb2_parseOdds("oddsTeamAUnder"),bOver:fb2_parseOdds("oddsTeamBOver"),bUnder:fb2_parseOdds("oddsTeamBUnder")};
       let x12=fb2_1x2(ftM); const elo=lambdas.elo||{home:x12.home,draw:x12.draw,away:x12.away,weight:0}; const ew=elo.weight||0; x12={home:x12.home*(1-ew)+elo.home*ew,draw:x12.draw*(1-ew)+elo.draw*ew,away:x12.away*(1-ew)+elo.away*ew}; const xs=x12.home+x12.draw+x12.away; x12.home/=xs;x12.draw/=xs;x12.away/=xs; const btts=fb2_btts(ftM); const calH=fb2_calibrateBinary("1x2_home",x12.home).p,calD=fb2_calibrateBinary("1x2_draw",x12.draw).p,calA=fb2_calibrateBinary("1x2_away",x12.away).p;
       const add=(key,name,prob,pickSide,oddsVal,line,projection)=>{const cal=key.startsWith("1x2")?(key.endsWith("home")?calH:key.endsWith("draw")?calD:calA):fb2_calibrateBinary(key,prob).p;const ev=fb2_ev(cal,oddsVal);const g=fb2_grade(cal,ev,sample,integrity);let pick="NO PLAY";if(Number.isFinite(oddsVal)){const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);pick=q.pick;}else if(/^1x2_/.test(key)){pick=cal>=0.50?pickSide:"NO PLAY";}else if(/^double_|^dnb_|^btts_/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";}else if(/^ft_|^h1_|^h2_|^ah_|^team/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";} rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});};
-      const ftLine=parseMarketLine(fb2_text("ftMarket"))??(Number.isFinite(Number(am.totalLine))?Number(am.totalLine):null);const h1Line=parseMarketLine(fb2_text("h1Market"))??(Number.isFinite(Number(am.h1Line))?Number(am.h1Line):null);
+      const ftLine=parseMarketLine(fb2_text("ftMarket"));const h1Line=parseMarketLine(fb2_text("h1Market"));
       add("1x2_home","1X2 — Home",x12.home,"HOME",odds.home,null,x12.home);add("1x2_draw","1X2 — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);add("1x2_away","1X2 — Away",x12.away,"AWAY",odds.away,null,x12.away);
       add("double_1x","Double Chance 1X",x12.home+x12.draw,"1X",null,null,x12.home+x12.draw);add("double_x2","Double Chance X2",x12.draw+x12.away,"X2",null,null,x12.draw+x12.away);add("double_12","Double Chance 12",x12.home+x12.away,"12",null,null,x12.home+x12.away);
       add("dnb_home","Draw No Bet Home",x12.home/(x12.home+x12.away),"DNB HOME",null,null,x12.home/(x12.home+x12.away));add("dnb_away","Draw No Bet Away",x12.away/(x12.home+x12.away),"DNB AWAY",null,null,x12.away/(x12.home+x12.away));
       add("btts_yes","BTTS — Yes",btts,"BTTS YES",odds.bttsYes,null,btts);add("btts_no","BTTS — No",1-btts,"BTTS NO",odds.bttsNo,null,1-btts);
       if(Number.isFinite(ftLine)){const po=fb2_probTotalOver(ftM,ftLine),pu=1-po;add("ft_over","FT Over "+displayLine(ftLine),po,"OVER "+displayLine(ftLine),odds.over,ftLine,lambdas.home+lambdas.away);add("ft_under","FT Under "+displayLine(ftLine),pu,"UNDER "+displayLine(ftLine),odds.under,ftLine,lambdas.home+lambdas.away);}
       if(Number.isFinite(h1Line)){const po=fb2_probTotalOver(h1M,h1Line),pu=1-po;add("h1_over","1H Over "+displayLine(h1Line),po,"OVER "+displayLine(h1Line),null,h1Line,fhLambdas.home+fhLambdas.away);add("h1_under","1H Under "+displayLine(h1Line),pu,"UNDER "+displayLine(h1Line),null,h1Line,fhLambdas.home+fhLambdas.away);}
-      const h2L={home:Math.max(0.05,lambdas.home-fhLambdas.home),away:Math.max(0.05,lambdas.away-fhLambdas.away)}; const h2M=fb2_scoreMatrix(h2L.home,h2L.away); const h2Line=parseMarketLine(fb2_text("h2Market"))??(Number.isFinite(Number(am.h2Line))?Number(am.h2Line):null);
+      const h2L={home:Math.max(0.05,lambdas.home-fhLambdas.home),away:Math.max(0.05,lambdas.away-fhLambdas.away)}; const h2M=fb2_scoreMatrix(h2L.home,h2L.away); const h2Line=parseMarketLine(fb2_text("h2Market"));
       if(Number.isFinite(h2Line)){const po=fb2_probTotalOver(h2M,h2Line),pu=1-po;add("h2_over","2H Over "+displayLine(h2Line),po,"OVER "+displayLine(h2Line),null,h2Line,h2L.home+h2L.away);add("h2_under","2H Under "+displayLine(h2Line),pu,"UNDER "+displayLine(h2Line),null,h2Line,h2L.home+h2L.away);}
       const topScores=[];for(let hh=0;hh<=5;hh++)for(let aa=0;aa<=5;aa++)topScores.push({h:hh,a:aa,p:ftM[hh][aa]});topScores.sort((u,v)=>v.p-u.p);topScores.slice(0,5).forEach(sc=>{ const p=fb2_calibrateBinary("correct_score",sc.p).p; rows.push({marketKey:"correct_"+sc.h+"_"+sc.a,name:"Correct Score "+sc.h+"-"+sc.a,prob:p,rawProb:sc.p,odds:null,ev:null,line:null,projection:p,grade:fb2_grade(p,null,sample,integrity),pick:"NO PLAY",side:sc.h+"-"+sc.a,integrity}); });
       const ah=parseMarketLine(fb2_text("ahLine"));if(Number.isFinite(ah)){const ha=fb2_asianHandicap(ftM,ah,true),aa=fb2_asianHandicap(ftM,-ah,false);add("ah_home","Asian Handicap Home "+displayLine(ah),ha.win,"AH HOME "+displayLine(ah),odds.homeAH,ah,null);add("ah_away","Asian Handicap Away "+displayLine(-ah),aa.win,"AH AWAY "+displayLine(-ah),odds.awayAH,-ah,null);}
@@ -3603,7 +3849,7 @@ S
       suite("league trust skeleton", function() {
         expectTrue("getLeagueTrustMeta export", typeof getLeagueTrustMeta === "function");
         expect("Premier League advisory until verified", getLeagueTrustMeta("Premier League").level, "advisory");
-        expect("Unknown league remains advisory", getLeagueTrustMeta("unknown_league").mode, "advisory");
+        expect("Premier League advisory mode", getLeagueTrustMeta("premier_league").mode, "advisory");
         expect("unknown advisory", getLeagueTrustMeta("unknown").level, "advisory");
         expect("empty advisory", getLeagueTrustMeta("").level, "advisory");
       });
@@ -3854,7 +4100,6 @@ S
       makeSectionsCollapsible();
       // ALL sections start collapsed — user opens what they need
       document.querySelectorAll(".section").forEach(s => s.classList.add("collapsed"));
-      const espnSection=document.getElementById("espnAutoSection"); if(espnSection) espnSection.classList.remove("collapsed");
 
       // Hide all auto-fill indicators initially (CSS also defaults them to none)
       document.querySelectorAll(".autofill-indicator").forEach(el => el.style.display = "none");
@@ -3939,15 +4184,73 @@ S
       document.getElementById("runBtn").addEventListener("click", runEngine);
       document.getElementById("clearBtn").addEventListener("click", clearAll);
 
-      // ESPN football auto-fetch: dynamic league registry + fixture hydration.
-      const espnLeagueSelect=document.getElementById("espnLeagueSelect");
-      const espnFixtureSelect=document.getElementById("espnFixtureSelect");
-      if(espnLeagueSelect) espnLeagueSelect.addEventListener("change", function(){ window.__espnAuto.dateOffset=0; espnLoadFixtures(); });
-      if(espnFixtureSelect) espnFixtureSelect.addEventListener("change", function(){ if(this.value) espnHydrateSelectedEvent().catch(e=>{const st=document.getElementById("espnFetchStatus");if(st)st.textContent="ESPN match hydration failed: "+String(e.message||e);engineDebug("ESPN hydration failed",{error:String(e)});}); });
-      ["espnPrevDay","espnToday","espnNextDay"].forEach(function(id){const el=document.getElementById(id);if(!el)return;el.addEventListener("click",function(){window.__espnAuto.dateOffset=id==="espnPrevDay"?-1:id==="espnNextDay"?1:0;espnLoadFixtures();});});
-      const espnFetchBtn=document.getElementById("espnFetchBtn");if(espnFetchBtn)espnFetchBtn.addEventListener("click",function(){espnHydrateSelectedEvent().catch(e=>{const st=document.getElementById("espnFetchStatus");if(st)st.textContent="ESPN fetch failed: "+String(e.message||e);engineDebug("ESPN fetch failed",{error:String(e)});});});
-      const espnRefreshBtn=document.getElementById("espnRefreshBtn");if(espnRefreshBtn)espnRefreshBtn.addEventListener("click",function(){espnInitAutoFetch();});
-      espnInitAutoFetch();
+      // ESPN football auto-fetch is the primary data path. The registry is loaded
+      // dynamically, so every competition currently exposed by ESPN is available
+      // without maintaining a brittle hand-written league list.
+      const fbLeagueSelect=document.getElementById("leagueSelect");
+      const fbFixtureSelect=document.getElementById("fbEspnFixtureSelect");
+      const fbFetchBtn=document.getElementById("fbEspnFetchBtn");
+      const fbTodayBtn=document.getElementById("fbEspnTodayBtn");
+      const fbTomorrowBtn=document.getElementById("fbEspnTomorrowBtn");
+      if(fbLeagueSelect){
+        fbLeagueSelect.addEventListener("change",async function(){
+          const slug=this.value;
+          const fixtureSel=document.getElementById("fbEspnFixtureSelect");
+          if(fixtureSel)fixtureSel.innerHTML='<option value="">- Select match -</option>';
+          ["fbInjuryBoxA","fbInjuryBoxB"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none";});
+          document.getElementById("ssTeamAName").value="";document.getElementById("ssTeamBName").value="";
+          document.getElementById("ssTeamAId").value="";document.getElementById("ssTeamBId").value="";
+          if(!slug){fbEspnSetStatus("");return;}
+          fbEspnSetStatus("Competition selected. Loading ESPN fixtures…");
+          const name=await fbEspnLoadLeagueMeta(slug);
+          await fbEspnLoadFixtures(fbEspnFixtureOffset);
+          fbEspnSetStatus(name ? name+" selected. Choose a match or enter both team names." : "Competition selected. Choose a match or enter both team names.");
+        });
+      }
+      if(fbTodayBtn)fbTodayBtn.addEventListener("click",()=>fbEspnLoadFixtures(0));
+      if(fbTomorrowBtn)fbTomorrowBtn.addEventListener("click",()=>fbEspnLoadFixtures(1));
+      if(fbFetchBtn)fbFetchBtn.addEventListener("click",fbEspnAutoFetch);
+      async function fbEspnShowTeamSuggestions(side){
+        const input=document.getElementById(side==="A"?"ssTeamAName":"ssTeamBName");
+        const drop=document.getElementById(side==="A"?"fbDropA":"fbDropB");
+        const slug=fbEspnGetLeague();
+        if(!input||!drop||!slug){if(drop)drop.style.display="none";return;}
+        const q=fbEspnNormalizeName(input.value);
+        if(q.length<2){drop.style.display="none";return;}
+        try{
+          const key="teams:"+slug; let teams=FB_ESPN.teamCache.get(key);
+          if(!teams){await fbEspnSearchTeam(slug,q);teams=FB_ESPN.teamCache.get(key)||[];}
+          const hits=teams.map(t=>{const n=fbEspnNormalizeName(t.name),sh=fbEspnNormalizeName(t.short),ab=fbEspnNormalizeName(t.abbr);let score=0;if(n===q)score=100;else{if(n.includes(q)||q.includes(n))score+=40;if(sh.includes(q)||q.includes(sh))score+=30;if(ab===q)score+=20;score+=q.split(" ").filter(w=>w.length>2&&n.includes(w)).length*5;}return {t,score};}).filter(x=>x.score>=10).sort((a,b)=>b.score-a.score).slice(0,8);
+          drop.innerHTML=hits.map(x=>`<div data-id="${String(x.t.id).replace(/"/g,"&quot;")}">${String(x.t.name).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</div>`).join("");
+          drop.style.display=hits.length?"block":"none";
+          Array.from(drop.children).forEach(el=>el.addEventListener("mousedown",ev=>{ev.preventDefault();const t=hits.find(x=>String(x.t.id)===String(el.dataset.id))?.t;if(!t)return;input.value=t.name;document.getElementById(side==="A"?"ssTeamAId":"ssTeamBId").value=t.id;drop.style.display="none";}));
+        }catch(e){drop.style.display="none";}
+      }
+      ["A","B"].forEach(side=>{const input=document.getElementById(side==="A"?"ssTeamAName":"ssTeamBName");if(input){input.addEventListener("input",()=>fbEspnShowTeamSuggestions(side));input.addEventListener("focus",()=>fbEspnShowTeamSuggestions(side));input.addEventListener("blur",()=>setTimeout(()=>{const d=document.getElementById(side==="A"?"fbDropA":"fbDropB");if(d)d.style.display="none";},120));}});
+
+      if(fbFixtureSelect)fbFixtureSelect.addEventListener("change",function(){
+        const f=fbEspnGetSelectedFixture(); if(!f)return;
+        document.getElementById("ssTeamAName").value=f.homeName||"";document.getElementById("ssTeamBName").value=f.awayName||"";
+        document.getElementById("ssTeamAId").value=f.homeId||"";document.getElementById("ssTeamBId").value=f.awayId||"";
+      });
+      async function fbBindTeamAutocomplete(inputId,dropId,side){
+        const input=document.getElementById(inputId),drop=document.getElementById(dropId); if(!input||!drop)return;
+        let timer=null;
+        input.addEventListener("input",()=>{
+          clearTimeout(timer); const q=input.value.trim(); const slug=fbEspnGetLeague(); if(!slug||q.length<2){drop.style.display="none";return;}
+          timer=setTimeout(async()=>{
+            try{const data=await fbEspnSearchTeam(slug,q); if(!data){drop.style.display="none";return;}
+              drop.innerHTML=`<div class="active" data-id="${String(data.id).replace(/"/g,"&quot;")}" data-name="${String(data.name).replace(/"/g,"&quot;")}">${String(data.name).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</div>`;
+              drop.style.display="block";
+              const row=drop.firstElementChild; row.onclick=()=>{input.value=data.name;document.getElementById(side==="A"?"ssTeamAId":"ssTeamBId").value=data.id;drop.style.display="none";};
+            }catch(e){drop.style.display="none";}
+          },250);
+        });
+        document.addEventListener("click",e=>{if(e.target!==input&&!drop.contains(e.target))drop.style.display="none";});
+      }
+      fbBindTeamAutocomplete("ssTeamAName","fbDropA","A");
+      fbBindTeamAutocomplete("ssTeamBName","fbDropB","B");
+      fbEspnLoadRegistry().then(()=>{ if(fbLeagueSelect?.value) fbEspnLoadFixtures(0); });
 
       // Audit copy button
       document.getElementById("auditCopyBtn").addEventListener("click", function() {
