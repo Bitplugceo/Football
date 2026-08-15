@@ -1,3 +1,4 @@
+Z
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2560,22 +2561,25 @@
     // ---------- Tracker Analytics ----------
     function renderTrackerAnalytics() {
       const panel = document.getElementById("trackerAnalyticsPanel");
-      if (!panel) return;
-      // Force visibility regardless of stylesheet specificity races
+      if (!panel) {
+        if (typeof engineDebug === "function") engineDebug("renderTrackerAnalytics: panel missing");
+        return;
+      }
+      if (typeof engineDebug === "function") engineDebug("renderTrackerAnalytics: start", { view: typeof g_trackerModalView !== "undefined" ? g_trackerModalView : "?" });
+      // Nuclear visibility — beat every CSS rule including .tracker-hidden and analytics-view toggles
       panel.classList.remove("tracker-hidden");
-      panel.style.setProperty("display", "block", "important");
-      panel.style.setProperty("visibility", "visible", "important");
-      panel.style.setProperty("min-height", "120px", "important");
+      panel.removeAttribute("hidden");
+      panel.style.cssText = "display:block!important;visibility:visible!important;opacity:1!important;min-height:180px!important;background:var(--panel)!important;color:var(--text)!important;padding:12px!important;";
       try {
       const state = (typeof g_trackerState !== "undefined" && g_trackerState) ? g_trackerState : { activePicks: [], archivedPicks: [], stats: {} };
       const stats = state.stats || {};
       const active = Array.isArray(state.activePicks) ? state.activePicks : [];
-      const all = [...active, ...(Array.isArray(state.archivedPicks) ? state.archivedPicks : [])];
-      const settled = all.filter(p=>p && p.resultStatus && p.resultStatus!=="pending");
-      const wins = settled.filter(p=>p.resultStatus==="win").length;
-      const losses = settled.filter(p=>p.resultStatus==="loss").length;
-      const pushes = settled.filter(p=>p.resultStatus==="push").length;
-      const winRate = settled.length ? ((wins + pushes*0.5)/settled.length*100).toFixed(1) : "—";
+      const all = active.concat(Array.isArray(state.archivedPicks) ? state.archivedPicks : []);
+      const settled = all.filter(function(p){ return p && p.resultStatus && p.resultStatus !== "pending"; });
+      const wins = settled.filter(function(p){ return p.resultStatus === "win"; }).length;
+      const losses = settled.filter(function(p){ return p.resultStatus === "loss"; }).length;
+      const pushes = settled.filter(function(p){ return p.resultStatus === "push"; }).length;
+      const winRate = settled.length ? ((wins + pushes * 0.5) / settled.length * 100).toFixed(1) : "—";
 
       // Per-market breakdown
       const ft = all.filter(p=>p.marketKey==="ft");
@@ -2864,17 +2868,16 @@
           })()}
         </div>
       `;
-      panel.style.setProperty("display", "block", "important");
-      panel.style.setProperty("visibility", "visible", "important");
+      // Re-assert visibility after innerHTML (some mobile WebViews reset inline styles on content replace)
+      panel.style.cssText = "display:block!important;visibility:visible!important;opacity:1!important;min-height:180px!important;background:var(--panel)!important;color:var(--text)!important;padding:12px!important;";
+      if (typeof engineDebug === "function") engineDebug("renderTrackerAnalytics: done", { settled: settled.length, wins: wins, active: active.length, htmlLen: (panel.innerHTML || "").length });
       } catch (err) {
         panel.classList.remove("tracker-hidden");
-        panel.style.setProperty("display", "block", "important");
-        panel.style.setProperty("visibility", "visible", "important");
-        panel.style.setProperty("min-height", "120px", "important");
-        panel.innerHTML = '<div style="padding:16px;color:#c91920;font-weight:800;font-size:12px;background:#fff0f0;border:1px solid #c91920;">Engine Report failed to render:<br>' +
+        panel.style.cssText = "display:block!important;visibility:visible!important;opacity:1!important;min-height:120px!important;background:#fff0f0!important;color:#c91920!important;padding:16px!important;";
+        panel.innerHTML = '<div style="font-weight:800;font-size:13px;">Engine Report failed to render:<br>' +
           String(err && err.message ? err.message : err) +
-          '<br><span style="font-size:10px;font-weight:600;color:#666;">Open 🔬 AFDB for the full stack.</span></div>';
-        if (typeof engineDebug === "function") engineDebug("renderTrackerAnalytics crashed", err);
+          '<br><span style="font-size:10px;color:#666;">Open 🔬 AFDB for the full stack.</span></div>';
+        if (typeof engineDebug === "function") engineDebug("renderTrackerAnalytics crashed", String(err && err.message ? err.message : err));
         try { console.error("[FB] renderTrackerAnalytics", err); } catch (_) {}
       }
     }
@@ -3192,8 +3195,19 @@
       const next = (view === "report") ? "report" : "picks";
       g_trackerModalView = next;
       syncTrackerModalView();
-      if (isTrackerReportView()) renderTrackerAnalytics();
-      else renderTrackedPicks();
+      if (isTrackerReportView()) {
+        try { renderTrackerAnalytics(); }
+        catch (e) {
+          const panel = document.getElementById("trackerAnalyticsPanel");
+          if (panel) {
+            panel.style.setProperty("display", "block", "important");
+            panel.innerHTML = '<div style="padding:16px;color:#c91920;font-weight:800;">Report crash: ' + String(e && e.message ? e.message : e) + '</div>';
+          }
+          if (typeof engineDebug === "function") engineDebug("setTrackerModalView report crash", e);
+        }
+      } else {
+        renderTrackedPicks();
+      }
     }
     function openTrackerModal(){
       engineDebug("Opening tracker modal", { timestamp: new Date().toISOString() });
@@ -3202,8 +3216,18 @@
       modal.classList.add("open");
       document.body.classList.add("tracker-open");
       syncTrackerModalView();
-      if (isTrackerReportView()) renderTrackerAnalytics();
-      else renderTrackedPicks();
+      if (isTrackerReportView()) {
+        try { renderTrackerAnalytics(); }
+        catch (e) {
+          const panel = document.getElementById("trackerAnalyticsPanel");
+          if (panel) {
+            panel.style.setProperty("display", "block", "important");
+            panel.innerHTML = '<div style="padding:16px;color:#c91920;font-weight:800;">Report crash: ' + String(e && e.message ? e.message : e) + '</div>';
+          }
+        }
+      } else {
+        renderTrackedPicks();
+      }
     }
     function closeTrackerModal(){
       const modal = document.getElementById("trackerModal");
