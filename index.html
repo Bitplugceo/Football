@@ -1,4 +1,3 @@
-Q
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1404,8 +1403,8 @@ Q
         catch(e){if(e?.name==="AbortError")throw new Error(label+" timeout");throw e;}finally{clearTimeout(timer);}
       }
       const attempts=[
-        [FB_ESPN.WORKER+"?url="+encodeURIComponent(url),"ESPN worker"],
         [url,"ESPN direct"],
+        [FB_ESPN.WORKER+"?url="+encodeURIComponent(url),"ESPN worker"],
         ["https://corsproxy.io/?url="+encodeURIComponent(url),"ESPN fallback 1"],
         ["https://api.allorigins.win/raw?url="+encodeURIComponent(url),"ESPN fallback 2"]
       ];
@@ -1772,13 +1771,20 @@ Q
       const key = "history:" + slug + ":" + teamId;
       if (FB_ESPN.leagueCache.has(key)) return FB_ESPN.leagueCache.get(key);
       let events = [];
+      let scheduleError = null;
       try {
         const url = FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/schedule?limit=1000";
         const data = await fbEspnFetchJSON(url, 15000);
         events = (data?.events || data?.team?.schedule?.events || []).map(ev => fbEspnNormalizeEvent(ev, slug)).filter(Boolean);
-      } catch (scheduleError) {
-        // Some competitions do not expose /teams/{id}/schedule. Use bounded
-        // scoreboard windows instead of one oversized 18-month request.
+      } catch (e) {
+        scheduleError = e;
+      }
+      if (!events.length) {
+        // Some competitions do not expose /teams/{id}/schedule, and even when
+        // they do, it only covers the *current* season — empty right at a
+        // season's start (e.g. matchday 1, before this team has a played
+        // fixture yet). Use bounded scoreboard windows reaching back across
+        // the season boundary instead of one oversized 18-month request.
         const now = new Date();
         const windows = [];
         for (let i=0;i<6;i++) {
@@ -1797,7 +1803,7 @@ Q
             if (n && (n.homeId===String(teamId) || n.awayId===String(teamId))) events.push(n);
           });
         });
-        engineDebug("ESPN team-schedule scoreboard fallback used", {league:slug,teamId,events:events.length,windows:windows.length,primaryError:scheduleError?.message||String(scheduleError)});
+        engineDebug("ESPN team-schedule scoreboard fallback used", {league:slug,teamId,events:events.length,windows:windows.length,primaryError:scheduleError?(scheduleError.message||String(scheduleError)):"schedule endpoint returned 0 events (likely season boundary)"});
       }
       const unique=[]; const seen=new Set();
       events.forEach(e=>{
@@ -1936,7 +1942,8 @@ Q
         const fixture=selected||null; const fixtureDate=fixture?.date||""; const cutoff=fixtureDate?Date.parse(fixtureDate):Date.now();
         const venueA=fixture?(fixture.homeId===teamA.id?"home":fixture.awayId===teamA.id?"away":null):"home";
         const venueB=fixture?(fixture.homeId===teamB.id?"home":fixture.awayId===teamB.id?"away":null):"away";
-        const [dataA,dataB,eventsA,eventsB]=await Promise.all([fbEspnBuildTeamData(slug,teamA,fixtureDate,venueA),fbEspnBuildTeamData(slug,teamB,fixtureDate,venueB),fbEspnFetchTeamEvents(slug,teamA.id),fbEspnFetchTeamEvents(slug,teamB.id)]);
+        const [dataA,dataB]=await Promise.all([fbEspnBuildTeamData(slug,teamA,fixtureDate,venueA),fbEspnBuildTeamData(slug,teamB,fixtureDate,venueB)]);
+        const eventsA=dataA.events||[], eventsB=dataB.events||[];
         fbEspnRenderInjury("A",dataA.injuryMeta,teamA.name);
         fbEspnRenderInjury("B",dataB.injuryMeta,teamB.name);
         const h2h=fbEspnFindH2H(eventsA,eventsB,teamA.id,teamB.id,cutoff);
