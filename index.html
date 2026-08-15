@@ -1,3 +1,4 @@
+H
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3639,12 +3640,81 @@
     function fb2_marketRows(data,ctx,lambdas,fhLambdas,ftM,h1M,integrity,sample){
       const rows=[];const odds={home:fb2_parseOdds("oddsHome"),draw:fb2_parseOdds("oddsDraw"),away:fb2_parseOdds("oddsAway"),over:fb2_parseOdds("oddsOverFT"),under:fb2_parseOdds("oddsUnderFT"),bttsYes:fb2_parseOdds("oddsBttsYes"),bttsNo:fb2_parseOdds("oddsBttsNo"),homeAH:fb2_parseOdds("oddsHomeAH"),awayAH:fb2_parseOdds("oddsAwayAH"),aOver:fb2_parseOdds("oddsTeamAOver"),aUnder:fb2_parseOdds("oddsTeamAUnder"),bOver:fb2_parseOdds("oddsTeamBOver"),bUnder:fb2_parseOdds("oddsTeamBUnder")};
       let x12=fb2_1x2(ftM); const elo=lambdas.elo||{home:x12.home,draw:x12.draw,away:x12.away,weight:0}; const ew=elo.weight||0; x12={home:x12.home*(1-ew)+elo.home*ew,draw:x12.draw*(1-ew)+elo.draw*ew,away:x12.away*(1-ew)+elo.away*ew}; const xs=x12.home+x12.draw+x12.away; x12.home/=xs;x12.draw/=xs;x12.away/=xs; const btts=fb2_btts(ftM); const calH=fb2_calibrateBinary("1x2_home",x12.home).p,calD=fb2_calibrateBinary("1x2_draw",x12.draw).p,calA=fb2_calibrateBinary("1x2_away",x12.away).p;
-      const add=(key,name,prob,pickSide,oddsVal,line,projection)=>{const cal=key.startsWith("1x2")?(key.endsWith("home")?calH:key.endsWith("draw")?calD:calA):fb2_calibrateBinary(key,prob).p;const ev=fb2_ev(cal,oddsVal);const g=fb2_grade(cal,ev,sample,integrity);let pick="NO PLAY";if(Number.isFinite(oddsVal)){const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);pick=q.pick;}else if(/^1x2_/.test(key)){pick=cal>=0.50?pickSide:"NO PLAY";}else if(/^double_|^dnb_|^btts_/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";}else if(/^ft_|^h1_|^h2_|^ah_|^team/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";} rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});};
+      const add=(key,name,prob,pickSide,oddsVal,line,projection)=>{const cal=key.startsWith("1x2")?(key.endsWith("home")?calH:key.endsWith("draw")?calD:calA):fb2_calibrateBinary(key,prob).p;const ev=fb2_ev(cal,oddsVal);const g=fb2_grade(cal,ev,sample,integrity);let pick="NO PLAY";if(Number.isFinite(oddsVal)){const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);pick=q.pick;}else if(/^1x2_|^h1_1x2_|^htft_|^home_1up|^away_1up|^wm_|^gb_|^mg_|^high_|^h1_cs_|^h1_home|^h1_away|^h1_draw|^teamA_2p|^teamB_2p|^any_2p/.test(key)){pick=cal>=0.52?pickSide:"NO PLAY";}else if(/^double_|^dnb_|^btts_/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";}else if(/^ft_|^h1_|^h2_|^ah_|^team/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";} rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});};
       const ftLine=parseMarketLine(fb2_text("ftMarket"));const h1Line=parseMarketLine(fb2_text("h1Market"));
       add("1x2_home","1X2 — Home",x12.home,"HOME",odds.home,null,x12.home);add("1x2_draw","1X2 — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);add("1x2_away","1X2 — Away",x12.away,"AWAY",odds.away,null,x12.away);
       add("double_1x","Double Chance 1X",x12.home+x12.draw,"1X",null,null,x12.home+x12.draw);add("double_x2","Double Chance X2",x12.draw+x12.away,"X2",null,null,x12.draw+x12.away);add("double_12","Double Chance 12",x12.home+x12.away,"12",null,null,x12.home+x12.away);
       add("dnb_home","Draw No Bet Home",x12.home/(x12.home+x12.away),"DNB HOME",null,null,x12.home/(x12.home+x12.away));add("dnb_away","Draw No Bet Away",x12.away/(x12.home+x12.away),"DNB AWAY",null,null,x12.away/(x12.home+x12.away));
-      add("btts_yes","BTTS — Yes",btts,"BTTS YES",odds.bttsYes,null,btts);add("btts_no","BTTS — No",1-btts,"BTTS NO",odds.bttsNo,null,1-btts);
+      add("btts_yes","GG (BTTS Yes)",btts,"GG",odds.bttsYes,null,btts);add("btts_no","NG (BTTS No)",1-btts,"NG",odds.bttsNo,null,1-btts);
+      // 1H 1X2 + 1H draw emphasis
+      const x12h1=fb2_1x2(h1M);
+      add("h1_1x2_home","1H — Home",x12h1.home,"1H HOME",null,null,x12h1.home);
+      add("h1_1x2_draw","1H — Draw",x12h1.draw,"1H DRAW",null,null,x12h1.draw);
+      add("h1_1x2_away","1H — Away",x12h1.away,"1H AWAY",null,null,x12h1.away);
+      // Home / Away 1 Up = win by exactly 1 goal
+      const home1Up=fb2_fromMatrix(ftM,(h,a)=>h===a+1);
+      const away1Up=fb2_fromMatrix(ftM,(h,a)=>a===h+1);
+      add("home_1up","Home 1 Up (win by 1)",home1Up,"HOME 1 UP",null,null,home1Up);
+      add("away_1up","Away 1 Up (win by 1)",away1Up,"AWAY 1 UP",null,null,away1Up);
+      // Winning margin (home perspective absolute)
+      const wm1=fb2_fromMatrix(ftM,(h,a)=>Math.abs(h-a)===1);
+      const wm2=fb2_fromMatrix(ftM,(h,a)=>Math.abs(h-a)===2);
+      const wm3p=fb2_fromMatrix(ftM,(h,a)=>Math.abs(h-a)>=3);
+      add("wm_1","Winning Margin 1",wm1,"MARGIN 1",null,null,wm1);
+      add("wm_2","Winning Margin 2",wm2,"MARGIN 2",null,null,wm2);
+      add("wm_3p","Winning Margin 3+",wm3p,"MARGIN 3+",null,null,wm3p);
+      // Goal bounds (exact total goals bands) — no line needed
+      const totDist=fb2_goalDistribution(ftM);
+      const gb0=totDist[0]||0, gb1=totDist[1]||0, gb2=totDist[2]||0, gb3=totDist[3]||0, gb4=totDist[4]||0;
+      let gb5p=0; for(let t=5;t<totDist.length;t++) gb5p+=(totDist[t]||0);
+      add("gb_0","Goals 0",gb0,"0 GOALS",null,null,gb0);
+      add("gb_1","Goals 1",gb1,"1 GOAL",null,null,gb1);
+      add("gb_2","Goals 2",gb2,"2 GOALS",null,null,gb2);
+      add("gb_3","Goals 3",gb3,"3 GOALS",null,null,gb3);
+      add("gb_4","Goals 4",gb4,"4 GOALS",null,null,gb4);
+      add("gb_5p","Goals 5+",gb5p,"5+ GOALS",null,null,gb5p);
+      // Multi goals — fixed bands
+      const mg12=(totDist[1]||0)+(totDist[2]||0);
+      const mg23=(totDist[2]||0)+(totDist[3]||0);
+      const mg34=(totDist[3]||0)+(totDist[4]||0);
+      const mg45=(totDist[4]||0)+(totDist[5]||0);
+      const mg56=(totDist[5]||0)+(totDist[6]||0);
+      add("mg_1_2","Multi Goals 1-2",mg12,"MG 1-2",null,null,mg12);
+      add("mg_2_3","Multi Goals 2-3",mg23,"MG 2-3",null,null,mg23);
+      add("mg_3_4","Multi Goals 3-4",mg34,"MG 3-4",null,null,mg34);
+      add("mg_4_5","Multi Goals 4-5",mg45,"MG 4-5",null,null,mg45);
+      add("mg_5_6","Multi Goals 5-6",mg56,"MG 5-6",null,null,mg56);
+      // Highest scoring half
+      const h1Tot=fhLambdas.home+fhLambdas.away;
+      const h2Tot=Math.max(0.05,(lambdas.home+lambdas.away)-h1Tot);
+      const p1HHigh=h1Tot/(h1Tot+h2Tot), p2HHigh=1-p1HHigh;
+      add("high_1h","Highest Scoring Half — 1H",p1HHigh,"1H HIGHEST",null,null,p1HHigh);
+      add("high_2h","Highest Scoring Half — 2H",p2HHigh,"2H HIGHEST",null,null,p2HHigh);
+      // HT/FT (9-way) using independent half approximation
+      const h2Mtmp=fb2_scoreMatrix(Math.max(0.05,lambdas.home-fhLambdas.home),Math.max(0.05,lambdas.away-fhLambdas.away));
+      const x12h2=fb2_1x2(h2Mtmp);
+      const htftMap=[["HH",x12h1.home*x12.home],["HD",x12h1.home*x12.draw],["HA",x12h1.home*x12.away],["DH",x12h1.draw*x12.home],["DD",x12h1.draw*x12.draw],["DA",x12h1.draw*x12.away],["AH",x12h1.away*x12.home],["AD",x12h1.away*x12.draw],["AA",x12h1.away*x12.away]];
+      let htftSum=htftMap.reduce((s,x)=>s+x[1],0)||1;
+      htftMap.forEach(function(pair){ const p=pair[1]/htftSum; add("htft_"+pair[0],"HT/FT "+pair[0],p,"HT/FT "+pair[0],null,null,p); });
+      // 1H correct scores (top 5)
+      const topH1=[]; for(let hh=0;hh<=3;hh++) for(let aa=0;aa<=3;aa++) topH1.push({h:hh,a:aa,p:h1M[hh]?h1M[hh][aa]:0});
+      topH1.sort(function(u,v){return v.p-u.p;});
+      topH1.slice(0,5).forEach(function(sc){ add("h1_cs_"+sc.h+"_"+sc.a,"1H CS "+sc.h+"-"+sc.a,sc.p,sc.h+"-"+sc.a+" (1H)",null,null,sc.p); });
+      // 1H Winner + GG/NG
+      const h1Btts=fb2_btts(h1M);
+      add("h1_home_gg","1H Home & GG",x12h1.home*h1Btts,"1H HOME + GG",null,null,x12h1.home*h1Btts);
+      add("h1_home_ng","1H Home & NG",x12h1.home*(1-h1Btts),"1H HOME + NG",null,null,x12h1.home*(1-h1Btts));
+      add("h1_away_gg","1H Away & GG",x12h1.away*h1Btts,"1H AWAY + GG",null,null,x12h1.away*h1Btts);
+      add("h1_away_ng","1H Away & NG",x12h1.away*(1-h1Btts),"1H AWAY + NG",null,null,x12h1.away*(1-h1Btts));
+      add("h1_draw_gg","1H Draw & GG",x12h1.draw*h1Btts,"1H DRAW + GG",null,null,x12h1.draw*h1Btts);
+      add("h1_draw_ng","1H Draw & NG",x12h1.draw*(1-h1Btts),"1H DRAW + NG",null,null,x12h1.draw*(1-h1Btts));
+      // Team to score 2+ (approximation for "2 or more" — not sequential)
+      const a2p=fb2_fromMatrix(ftM,function(h){return h>=2;});
+      const b2p=fb2_fromMatrix(ftM,function(h,a){return a>=2;});
+      const any2p=fb2_fromMatrix(ftM,function(h,a){return h>=2||a>=2;});
+      add("teamA_2p","Home scores 2+",a2p,"HOME 2+",null,null,a2p);
+      add("teamB_2p","Away scores 2+",b2p,"AWAY 2+",null,null,b2p);
+      add("any_2p","Any team scores 2+",any2p,"ANY 2+",null,null,any2p);
       if(Number.isFinite(ftLine)){const po=fb2_probTotalOver(ftM,ftLine),pu=1-po;add("ft_over","FT Over "+displayLine(ftLine),po,"OVER "+displayLine(ftLine),odds.over,ftLine,lambdas.home+lambdas.away);add("ft_under","FT Under "+displayLine(ftLine),pu,"UNDER "+displayLine(ftLine),odds.under,ftLine,lambdas.home+lambdas.away);}
       if(Number.isFinite(h1Line)){const po=fb2_probTotalOver(h1M,h1Line),pu=1-po;add("h1_over","1H Over "+displayLine(h1Line),po,"OVER "+displayLine(h1Line),null,h1Line,fhLambdas.home+fhLambdas.away);add("h1_under","1H Under "+displayLine(h1Line),pu,"UNDER "+displayLine(h1Line),null,h1Line,fhLambdas.home+fhLambdas.away);}
       const h2L={home:Math.max(0.05,lambdas.home-fhLambdas.home),away:Math.max(0.05,lambdas.away-fhLambdas.away)}; const h2M=fb2_scoreMatrix(h2L.home,h2L.away); const h2Line=parseMarketLine(fb2_text("h2Market"));
@@ -3657,7 +3727,8 @@
       return rows;
     }
     function fb2_renderRows(rows,ctx,lambdas,integrity){
-      const table=document.getElementById("results");table.innerHTML="<tr><th>Market</th><th>Projection / Probability</th><th>Edge / EV</th><th>Grade</th><th>Prediction</th></tr>";
+      const table=document.getElementById("results");
+      if(table){ table.style.display="table"; table.innerHTML="<tr><th>Market</th><th>Projection / Probability</th><th>Edge / EV</th><th>Grade</th><th>Prediction</th></tr>"; }
       const actionable=[];let best=-Infinity,bestIdx=-1;
       rows.forEach((p,idx)=>{
         const tr=document.createElement("tr"),c1=document.createElement("td"),c2=document.createElement("td"),c3=document.createElement("td"),c4=document.createElement("td"),c5=document.createElement("td");
