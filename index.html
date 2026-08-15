@@ -1,3 +1,4 @@
+A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3458,10 +3459,10 @@
       if(!Number.isFinite(lambda)||lambda<0||k<0) return 0;
       let p=Math.exp(-lambda); for(let i=1;i<=k;i++) p*=lambda/i; return p;
     }
-    function fb2_dcTau(h,a,rho=FB2.DIXON_COLES_RHO) {
-      if(h===0&&a===0) return 1-(rho);
-      if(h===0&&a===1) return 1+rho;
-      if(h===1&&a===0) return 1+rho;
+    function fb2_dcTau(h,a,lambdaHome,lambdaAway,rho=FB2.DIXON_COLES_RHO) {
+      if(h===0&&a===0) return 1-(lambdaHome*lambdaAway*rho);
+      if(h===0&&a===1) return 1+lambdaHome*rho;
+      if(h===1&&a===0) return 1+lambdaAway*rho;
       if(h===1&&a===1) return 1-rho;
       return 1;
     }
@@ -3470,7 +3471,7 @@
       const m=Array.from({length:H+1},()=>Array(A+1).fill(0));
       const rho=Number.isFinite(Number(window.__fbCoreOverrides?.dixonColesRho))?Number(window.__fbCoreOverrides.dixonColesRho):FB2.DIXON_COLES_RHO;
       let total=0;
-      for(let h=0;h<=H;h++) for(let a=0;a<=A;a++){ const p=fb2_scorePmf(lambdaHome,h)*fb2_scorePmf(lambdaAway,a)*fb2_dcTau(h,a,rho); m[h][a]=p; total+=p; }
+      for(let h=0;h<=H;h++) for(let a=0;a<=A;a++){ const p=fb2_scorePmf(lambdaHome,h)*fb2_scorePmf(lambdaAway,a)*fb2_dcTau(h,a,lambdaHome,lambdaAway,rho); m[h][a]=p; total+=p; }
       if(total<=0) return m;
       for(let h=0;h<=H;h++) for(let a=0;a<=A;a++) m[h][a]/=total;
       return m;
@@ -3591,41 +3592,20 @@
       const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||1.35,0.4,2.5),awayAvg:clamp(Number(awayAvg)||1.10,0.3,2.3),seasonGoalFactor:clamp(Number(seasonGoalFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
       localStorage.setItem("FOOTBALL_COMPETITION_PROFILE_"+key,JSON.stringify(profile));return profile;
     };
-    function fb2_strength(team,opponent,venue,prior){
-      const gf=fb2_weighted(team.gf),ga=fb2_weighted(team.ga),n=Math.min(team.gf.length,team.ga.length);
-      const venueGF=gf==null?prior:gf, venueGA=ga==null?prior:ga;
-      let attack=fb2_shrink(venueGF,n,venue?prior:prior), defense=fb2_shrink(venueGA,n,prior);
-      const xg=team.xg, xga=team.xga;
-      if(Number.isFinite(xg)) attack=0.65*attack+0.35*xg;
-      if(Number.isFinite(xga)) defense=0.65*defense+0.35*xga;
-      if(Number.isFinite(team.shots)) attack*=1+clamp((team.shots-12)/12,-0.12,0.12);
-      if(Number.isFinite(team.sot)) attack*=1+clamp((team.sot-4.5)/20,-0.10,0.10);
-      if(Number.isFinite(team.big)) attack*=1+clamp((team.big-2.2)/18,-0.08,0.08);
-      attack*=fb2_factorFromPct(venue?"aTacticalAttack":"bTacticalAttack",50,0); // no-op; actual modifiers below
-      return {attack:Math.max(0.15,attack),defense:Math.max(0.15,defense),n};
-    }
     function fb2_modifier(team,opponent,home,context){
+      // Only injury, rest days, fixture load, and home/away are ever populated
+      // (auto-fetched or otherwise); lineup/susp/rotation/manager/motivation/
+      // set-piece/tactical/travel/weather have no UI input or auto-fetch source
+      // anywhere in this file, so they always evaluated as neutral no-ops.
+      // Removed rather than left silently inert.
       let attack=1, defense=1;
-      attack*=clamp((team.lineup==null?100:team.lineup)/100,0.65,1.1);
       attack*=1+clamp((team.injury||0)/100,-0.40,0);
-      attack*=1+clamp((team.susp||0)/100,-0.30,0);
-      attack*=1-clamp((team.rotation||0)/100,0,0.30);
-      attack*=1+clamp((team.manager||0)/100,-0.10,0.10);
-      attack*=1+((team.motivation-50)/50)*0.035;
-      attack*=1+((team.spa-50)/50)*0.025;
-      attack*=1+((team.ta-50)/50)*0.035;
-      defense*=1+((team.spd-50)/50)*0.025;
-      defense*=1+((team.td-50)/50)*0.035;
       const rest=team.rest==null?3:team.rest;
       if(rest<3) attack*=1-0.035*(3-rest);
       if(rest>6) attack*=1+0.01*Math.min(3,rest-6);
-      const travel=(team.travel||0)/1000;
-      attack*=1-0.012*clamp(travel,0,2);
       const load=team.load7||0;
       attack*=1-0.025*clamp(Math.max(0,load-2),0,4);
       if(home) attack*=1+0.035; else attack*=1-0.015;
-      const weather=Number(window.__fbAutoData?.context?.weatherGoalImpact ?? fb2_num("weatherGoalImpact",0))||0;
-      attack*=1+clamp(weather/200,-0.15,0.05);
       return {attack:clamp(attack,0.55,1.15),defense:clamp(defense,0.75,1.15)};
     }
     function fb2_lambdas(data,context){
@@ -3708,7 +3688,7 @@
       return {home:hw/n,draw:dr/n,away:aw/n,btts:btts/n,expectedTotal:tot/n,sims:n};
     }
     function fb2_calibrateBinary(marketKey,p){
-      const rows=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])].filter(x=>x.marketKey===marketKey&&Number.isFinite(Number(x.modelProbability))&&Number.isFinite(Number(x.outcomeBinary)));
+      const rows=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])].filter(x=>x.marketKey===marketKey&&Number.isFinite(Number(x.modelProbability))&&(x.outcomeBinary===0||x.outcomeBinary===1));
       if(rows.length<FB2.CALIBRATION_MIN)return {p,calibrated:false,sample:rows.length};
       const cal=calibration(rows.map(x=>({p:Number(x.modelProbability),y:Number(x.outcomeBinary)})),80,0.05);
       if(!cal||!Number.isFinite(cal.intercept)||!Number.isFinite(cal.slope))return {p,calibrated:false,sample:rows.length};
@@ -3719,41 +3699,94 @@
       const calibrated=Number.isFinite(prob)?prob:0.5; const grade=fb2_grade(calibrated,ev,sample,integrity); const margin=Math.abs(calibrated-0.5);
       return {grade,score:clamp(0.5+margin*1.5+(Number.isFinite(ev)?clamp(ev,-0.1,0.1):0),0,1)};
     }
-    function fb2_resultForMarket(marketKey,home,away,line){
-      const hs=Number(home),as=Number(away),t=hs+as;
-      if(marketKey==="1x2_home")return hs>as?"win":"loss";
-      if(marketKey==="1x2_draw")return hs===as?"win":"loss";
-      if(marketKey==="1x2_away")return hs<as?"win":"loss";
-      if(marketKey==="btts_yes")return hs>0&&as>0?"win":"loss";
-      if(marketKey==="btts_no")return hs===0||as===0?"win":"loss";
-      if(marketKey==="ft_over"||marketKey==="ft_under"){const x=fb2_asianTotal(fb2_scoreMatrix(1,1),Number(line),marketKey==="ft_over");return t>Number(line)?"win":"loss";}
-      return null;
+    function fb2_settleTotal(v,line){
+      if(!Number.isFinite(v)||!Number.isFinite(line))return null;
+      const isQuarter=(Math.round(line*4)%2)!==0;
+      if(isQuarter){
+        const lower=Math.floor(line*2)/2, upper=lower+0.5;
+        const r1=v>lower?"win":v===lower?"push":"loss";
+        const r2=v>upper?"win":v===upper?"push":"loss";
+        return (r1==="win"&&r2==="win")?"win":(r1==="loss"&&r2==="loss")?"loss":"push";
+      }
+      return v>line?"win":v===line?"push":"loss";
     }
+    function fb2_flipResult(r){ return r==="win"?"loss":r==="loss"?"win":r; }
     function fb2_settlePickFromScore(p,homeGoals,awayGoals,h1HomeGoals=null,h1AwayGoals=null){
       const h=Number(homeGoals),a=Number(awayGoals);if(!Number.isFinite(h)||!Number.isFinite(a)||h<0||a<0)return false;
-      const total=h+a, h1Total=(Number(h1HomeGoals)+Number(h1AwayGoals)), side=String(p.side||"").toLowerCase(), line=Number(p.line);let status="loss";
-      if(p.marketKey==="1x2_home") status=h>a?"win":"loss";
-      else if(p.marketKey==="1x2_draw") status=h===a?"win":"loss";
-      else if(p.marketKey==="1x2_away") status=h<a?"win":"loss";
-      else if(p.marketKey==="btts_yes") status=h>0&&a>0?"win":"loss";
-      else if(p.marketKey==="btts_no") status=h===0||a===0?"win":"loss";
-      else if(p.marketKey==="ft_over"||p.marketKey==="ft_under"||p.marketKey==="h1_over"||p.marketKey==="h1_under"||p.marketKey==="teamA_over"||p.marketKey==="teamB_over"){
-        const v=p.marketKey.startsWith("teamA")?h:p.marketKey.startsWith("teamB")?a:(p.marketKey.startsWith("h1_")?h1Total:total);const over=p.marketKey.endsWith("_over");
-        const isQuarter=(Math.round(line*4)%2)!==0;
-        if(isQuarter){
-          const lower=Math.floor(line*2)/2;
-          const upper=lower+0.5;
-          const r1=over?(v>lower?"win":v===lower?"push":"loss"):(v<lower?"win":v===lower?"push":"loss");
-          const r2=over?(v>upper?"win":v===upper?"push":"loss"):(v<upper?"win":v===upper?"push":"loss");
-          status=(r1==="win"&&r2==="win")?"win":(r1==="loss"&&r2==="loss")?"loss":"push";
-        } else status=over?(v>line?"win":v===line?"push":"loss"):(v<line?"win":v===line?"push":"loss");
-      } else if(p.marketKey==="ah_home"||p.marketKey==="ah_away"){
-        const homeSide=p.marketKey==="ah_home", q=line; const margin=homeSide?(h-a)+q:(a-h)+q; const frac=Math.round(q*4)%2!==0;
-        if(frac){ const l=Math.floor(q*2)/2; const m1=homeSide?(h-a)+l:(a-h)+l; const m2=homeSide?(h-a)+(l+0.5):(a-h)+(l+0.5); const vals=[m1,m2]; const wins=vals.filter(x=>x>0).length,losses=vals.filter(x=>x<0).length; status=wins===2?"win":losses===2?"loss":"push"; }
+      const total=h+a;
+      const haveH1=h1HomeGoals!=null&&h1AwayGoals!=null&&Number.isFinite(Number(h1HomeGoals))&&Number.isFinite(Number(h1AwayGoals))&&Number(h1HomeGoals)>=0&&Number(h1AwayGoals)>=0;
+      const h1h=haveH1?Number(h1HomeGoals):NaN, h1a=haveH1?Number(h1AwayGoals):NaN;
+      const h1Total=haveH1?h1h+h1a:NaN, h2h=haveH1?h-h1h:NaN, h2a=haveH1?a-h1a:NaN;
+      const haveH2=haveH1&&Number.isFinite(h2h)&&Number.isFinite(h2a)&&h2h>=0&&h2a>=0;
+      const h2Total=haveH2?h2h+h2a:NaN;
+      const line=Number(p.line); const mk=String(p.marketKey||"");
+      // Every market fb2_marketRows can generate is enumerated below; anything
+      // this function still can't resolve (e.g. corners/cards/shots, which need
+      // actual match stats, not just goals) is left "pending" rather than
+      // defaulting to a fake loss.
+      let status="pending";
+      if(mk==="1x2_home") status=h>a?"win":"loss";
+      else if(mk==="1x2_draw"||mk==="draw_only") status=h===a?"win":"loss";
+      else if(mk==="1x2_away") status=h<a?"win":"loss";
+      else if(mk==="double_1x") status=h>=a?"win":"loss";
+      else if(mk==="double_x2") status=a>=h?"win":"loss";
+      else if(mk==="double_12") status=h!==a?"win":"loss";
+      else if(mk==="dnb_home") status=h===a?"push":(h>a?"win":"loss");
+      else if(mk==="dnb_away") status=h===a?"push":(a>h?"win":"loss");
+      else if(mk==="btts_yes") status=h>0&&a>0?"win":"loss";
+      else if(mk==="btts_no") status=h===0||a===0?"win":"loss";
+      else if(mk==="home_1up") status=h===a+1?"win":"loss";
+      else if(mk==="away_1up") status=a===h+1?"win":"loss";
+      else if(mk==="wm_1") status=Math.abs(h-a)===1?"win":"loss";
+      else if(mk==="wm_2") status=Math.abs(h-a)===2?"win":"loss";
+      else if(mk==="wm_3p") status=Math.abs(h-a)>=3?"win":"loss";
+      else if(mk==="gb_0") status=total===0?"win":"loss";
+      else if(mk==="gb_1") status=total===1?"win":"loss";
+      else if(mk==="gb_2") status=total===2?"win":"loss";
+      else if(mk==="gb_3") status=total===3?"win":"loss";
+      else if(mk==="gb_4") status=total===4?"win":"loss";
+      else if(mk==="gb_5p") status=total>=5?"win":"loss";
+      else if(mk==="mg_1_2") status=(total===1||total===2)?"win":"loss";
+      else if(mk==="mg_2_3") status=(total===2||total===3)?"win":"loss";
+      else if(mk==="mg_3_4") status=(total===3||total===4)?"win":"loss";
+      else if(mk==="mg_4_5") status=(total===4||total===5)?"win":"loss";
+      else if(mk==="mg_5_6") status=(total===5||total===6)?"win":"loss";
+      else if(mk==="teamA_2p") status=h>=2?"win":"loss";
+      else if(mk==="teamB_2p") status=a>=2?"win":"loss";
+      else if(mk==="any_2p") status=(h>=2||a>=2)?"win":"loss";
+      else if(/^correct_(\d+)_(\d+)$/.test(mk)){ const mm=mk.match(/^correct_(\d+)_(\d+)$/); status=(h===Number(mm[1])&&a===Number(mm[2]))?"win":"loss"; }
+      else if(haveH1&&mk==="h1_1x2_home") status=h1h>h1a?"win":"loss";
+      else if(haveH1&&mk==="h1_1x2_draw") status=h1h===h1a?"win":"loss";
+      else if(haveH1&&mk==="h1_1x2_away") status=h1h<h1a?"win":"loss";
+      else if(haveH1&&mk==="h1_home_gg") status=(h1h>h1a&&h1h>0&&h1a>0)?"win":"loss";
+      else if(haveH1&&mk==="h1_home_ng") status=(h1h>h1a&&(h1h===0||h1a===0))?"win":"loss";
+      else if(haveH1&&mk==="h1_away_gg") status=(h1h<h1a&&h1h>0&&h1a>0)?"win":"loss";
+      else if(haveH1&&mk==="h1_away_ng") status=(h1h<h1a&&(h1h===0||h1a===0))?"win":"loss";
+      else if(haveH1&&mk==="h1_draw_gg") status=(h1h===h1a&&h1h>0&&h1a>0)?"win":"loss";
+      else if(haveH1&&mk==="h1_draw_ng") status=(h1h===h1a&&(h1h===0||h1a===0))?"win":"loss";
+      else if(haveH1&&/^htft_[HDA][HDA]$/.test(mk)){ const h1r=h1h>h1a?"H":h1h===h1a?"D":"A", ftr=h>a?"H":h===a?"D":"A"; status=mk==="htft_"+h1r+ftr?"win":"loss"; }
+      else if(haveH1&&/^h1_cs_(\d+)_(\d+)$/.test(mk)){ const mm=mk.match(/^h1_cs_(\d+)_(\d+)$/); status=(h1h===Number(mm[1])&&h1a===Number(mm[2]))?"win":"loss"; }
+      else if(haveH1&&haveH2&&mk==="high_1h") status=h1Total===h2Total?"push":(h1Total>h2Total?"win":"loss");
+      else if(haveH1&&haveH2&&mk==="high_2h") status=h1Total===h2Total?"push":(h2Total>h1Total?"win":"loss");
+      else if(mk==="ft_over"||mk==="ft_under"){ const r=fb2_settleTotal(total,line); if(r) status=mk==="ft_over"?r:fb2_flipResult(r); }
+      else if(haveH1&&(mk==="h1_over"||mk==="h1_under")){ const r=fb2_settleTotal(h1Total,line); if(r) status=mk==="h1_over"?r:fb2_flipResult(r); }
+      else if(haveH2&&(mk==="h2_over"||mk==="h2_under")){ const r=fb2_settleTotal(h2Total,line); if(r) status=mk==="h2_over"?r:fb2_flipResult(r); }
+      else if(mk==="teamA_over"||mk==="teamA_under"){ const r=fb2_settleTotal(h,line); if(r) status=mk==="teamA_over"?r:fb2_flipResult(r); }
+      else if(mk==="teamB_over"||mk==="teamB_under"){ const r=fb2_settleTotal(a,line); if(r) status=mk==="teamB_over"?r:fb2_flipResult(r); }
+      else if(mk==="ah_home"||mk==="ah_away"){
+        const homeSide=mk==="ah_home"; const margin=homeSide?(h-a)+line:(a-h)+line; const frac=Math.round(line*4)%2!==0;
+        if(frac){ const l=Math.floor(line*2)/2; const m1=homeSide?(h-a)+l:(a-h)+l; const m2=homeSide?(h-a)+(l+0.5):(a-h)+(l+0.5); const vals=[m1,m2]; const wins=vals.filter(x=>x>0).length,losses=vals.filter(x=>x<0).length; status=wins===2?"win":losses===2?"loss":"push"; }
         else status=margin>0?"win":Math.abs(margin)<1e-9?"push":"loss";
       }
-      p.actualHomeGoals=h;p.actualAwayGoals=a;p.actualScore=h+"-"+a;p.resultStatus=status;p.outcomeBinary=status==="win"?1:status==="loss"?0:null;p.settledAt=new Date().toISOString();
-      if(p.eloKeyA&&p.eloKeyB&&!p.eloUpdated){ const outcome=h>a?"home":h<a?"away":"draw"; fb2_updateElo3Way(p.eloKeyA,p.eloKeyB,outcome); p.eloUpdated=true; }
+      p.actualHomeGoals=h;p.actualAwayGoals=a;p.actualScore=h+"-"+a;
+      if(haveH1){p.actualH1HomeGoals=h1h;p.actualH1AwayGoals=h1a;}
+      p.resultStatus=status;p.outcomeBinary=status==="win"?1:status==="loss"?0:null;
+      if(status!=="pending")p.settledAt=new Date().toISOString();
+      if(status!=="pending"&&p.eloKeyA&&p.eloKeyB&&!p.eloUpdated){
+        const alreadyUpdatedForThisMatch=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])].some(x=>x!==p&&String(x.eventId)===String(p.eventId)&&x.eloUpdated);
+        if(!alreadyUpdatedForThisMatch){ const outcome=h>a?"home":h<a?"away":"draw"; fb2_updateElo3Way(p.eloKeyA,p.eloKeyB,outcome); }
+        p.eloUpdated=true;
+      }
       return true;
     }
     window.settleTrackedPickFromScore=function(signature,homeGoals,awayGoals,h1HomeGoals=null,h1AwayGoals=null){
@@ -3767,7 +3800,10 @@
       let n=0;const all=[...(g_trackerState.activePicks||[])];all.filter(p=>String(p.eventId)===String(event.id)).forEach(p=>{if(fb2_settlePickFromScore(p,h,a,h1h,h1a)){n++;}});if(n){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>String(p.eventId)!==String(event.id));const settled=all.filter(p=>String(p.eventId)===String(event.id));g_trackerState.archivedPicks=[...settled,...(g_trackerState.archivedPicks||[])].slice(0,TRACKER_ARCHIVED_LIMIT);rebuildTrackerStats();saveTrackerState();renderTrackedPicks();renderTrackerAnalytics();}return n;
     };
     function fb2_countOver(mean,line,dispersion=1.15){
-      if(!Number.isFinite(mean)||!Number.isFinite(line))return null;const variance=Math.max(0.1,mean*dispersion);const sd=Math.sqrt(variance);return 1-normalCdf((line-mean)/sd);
+      if(!Number.isFinite(mean)||!Number.isFinite(line))return null;const variance=Math.max(0.1,mean*dispersion);const sd=Math.sqrt(variance);
+      const isWhole=Math.abs(line-Math.round(line))<1e-9;
+      const adjLine=isWhole?line+0.5:line; // half-integer lines already sit at the natural gap between counts; whole-number lines need the +0.5 continuity correction
+      return 1-normalCdf((adjLine-mean)/sd);
     }
     function fb2_reconcileSources(sourceA,sourceB){
       const a=Array.isArray(sourceA)?sourceA:[],b=Array.isArray(sourceB)?sourceB:[];const byId=new Map();const conflicts=[];
@@ -3792,7 +3828,6 @@
       const ftLine=parseMarketLine(fb2_text("ftMarket"));const h1Line=parseMarketLine(fb2_text("h1Market"));
       add("1x2_home","1X2 — Home",x12.home,"HOME",odds.home,null,x12.home);
       add("1x2_draw","1X2 — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);
-      add("draw_only","Draw (FT)",x12.draw,"DRAW",odds.draw,null,x12.draw);
       add("1x2_away","1X2 — Away",x12.away,"AWAY",odds.away,null,x12.away);
       add("double_1x","Double Chance 1X",x12.home+x12.draw,"1X",null,null,x12.home+x12.draw);add("double_x2","Double Chance X2",x12.draw+x12.away,"X2",null,null,x12.draw+x12.away);add("double_12","Double Chance 12",x12.home+x12.away,"12",null,null,x12.home+x12.away);
       add("dnb_home","Draw No Bet Home",x12.home/(x12.home+x12.away),"DNB HOME",null,null,x12.home/(x12.home+x12.away));add("dnb_away","Draw No Bet Away",x12.away/(x12.home+x12.away),"DNB AWAY",null,null,x12.away/(x12.home+x12.away));
@@ -3835,16 +3870,35 @@
       add("mg_3_4","Multi Goals 3-4",mg34,"MG 3-4",null,null,mg34);
       add("mg_4_5","Multi Goals 4-5",mg45,"MG 4-5",null,null,mg45);
       add("mg_5_6","Multi Goals 5-6",mg56,"MG 5-6",null,null,mg56);
-      // Highest scoring half
-      const h1Tot=fhLambdas.home+fhLambdas.away;
-      const h2Tot=Math.max(0.05,(lambdas.home+lambdas.away)-h1Tot);
-      const p1HHigh=h1Tot/(h1Tot+h2Tot), p2HHigh=1-p1HHigh;
-      add("high_1h","Highest Scoring Half — 1H",p1HHigh,"1H HIGHEST",null,null,p1HHigh);
-      add("high_2h","Highest Scoring Half — 2H",p2HHigh,"2H HIGHEST",null,null,p2HHigh);
-      // HT/FT (9-way) using independent half approximation
+      // Highest scoring half + HT/FT both need the actual 2nd-half score
+      // matrix, built once here from the (home,away) lambdas net of the
+      // 1st-half lambdas already baked into h1M.
       const h2Mtmp=fb2_scoreMatrix(Math.max(0.05,lambdas.home-fhLambdas.home),Math.max(0.05,lambdas.away-fhLambdas.away));
       const x12h2=fb2_1x2(h2Mtmp);
-      const htftMap=[["HH",x12h1.home*x12.home],["HD",x12h1.home*x12.draw],["HA",x12h1.home*x12.away],["DH",x12h1.draw*x12.home],["DD",x12h1.draw*x12.draw],["DA",x12h1.draw*x12.away],["AH",x12h1.away*x12.home],["AD",x12h1.away*x12.draw],["AA",x12h1.away*x12.away]];
+      // Highest scoring half — exact P(1H goals > 2H goals) from the two half
+      // score distributions, instead of a raw expected-goals ratio (which
+      // silently ignored the common case of a tied half-vs-half goal count).
+      const halfDist1=fb2_goalDistribution(h1M), halfDist2=fb2_goalDistribution(h2Mtmp);
+      let p1hRaw=0,p2hRaw=0;
+      for(let i=0;i<halfDist1.length;i++) for(let j=0;j<halfDist2.length;j++){ const w=(halfDist1[i]||0)*(halfDist2[j]||0); if(i>j) p1hRaw+=w; else if(i<j) p2hRaw+=w; }
+      const halfSum=(p1hRaw+p2hRaw)||1;
+      const p1HHigh=p1hRaw/halfSum, p2HHigh=p2hRaw/halfSum;
+      add("high_1h","Highest Scoring Half — 1H",p1HHigh,"1H HIGHEST",null,null,p1HHigh);
+      add("high_2h","Highest Scoring Half — 2H",p2HHigh,"2H HIGHEST",null,null,p2HHigh);
+      // HT/FT (9-way) — true joint distribution from the two half score
+      // matrices. FT necessarily contains the 1H goals, so 1H result and FT
+      // result are NOT independent events; multiplying x12h1*x12 (as before)
+      // overstated reversal outcomes like HA/AH and understated HH/DD/AA.
+      const htftJoint={HH:0,HD:0,HA:0,DH:0,DD:0,DA:0,AH:0,AD:0,AA:0};
+      for(let h1h=0;h1h<h1M.length;h1h++) for(let h1a=0;h1a<h1M[h1h].length;h1a++){
+        const jp1=h1M[h1h][h1a]; if(!jp1) continue; const r1=h1h>h1a?"H":h1h===h1a?"D":"A";
+        for(let h2h=0;h2h<h2Mtmp.length;h2h++) for(let h2a=0;h2a<h2Mtmp[h2h].length;h2a++){
+          const jp2=h2Mtmp[h2h][h2a]; if(!jp2) continue;
+          const rf=(h1h+h2h)>(h1a+h2a)?"H":(h1h+h2h)===(h1a+h2a)?"D":"A";
+          htftJoint[r1+rf]+=jp1*jp2;
+        }
+      }
+      const htftMap=[["HH",htftJoint.HH],["HD",htftJoint.HD],["HA",htftJoint.HA],["DH",htftJoint.DH],["DD",htftJoint.DD],["DA",htftJoint.DA],["AH",htftJoint.AH],["AD",htftJoint.AD],["AA",htftJoint.AA]];
       let htftSum=htftMap.reduce((s,x)=>s+x[1],0)||1;
       htftMap.forEach(function(pair){ const p=pair[1]/htftSum; add("htft_"+pair[0],"HT/FT "+pair[0],p,"HT/FT "+pair[0],null,null,p); });
       // 1H correct scores (top 5)
@@ -3873,8 +3927,8 @@
       const topScores=[];for(let hh=0;hh<=5;hh++)for(let aa=0;aa<=5;aa++)topScores.push({h:hh,a:aa,p:ftM[hh][aa]});topScores.sort((u,v)=>v.p-u.p);topScores.slice(0,5).forEach(sc=>{ const p=fb2_calibrateBinary("correct_score",sc.p).p; rows.push({marketKey:"correct_"+sc.h+"_"+sc.a,name:"Correct Score "+sc.h+"-"+sc.a,prob:p,rawProb:sc.p,odds:null,ev:null,line:null,projection:p,grade:fb2_grade(p,null,sample,integrity),pick:"NO PLAY",side:sc.h+"-"+sc.a,integrity}); });
       const ah=parseMarketLine(fb2_text("ahLine"));if(Number.isFinite(ah)){const ha=fb2_asianHandicap(ftM,ah,true),aa=fb2_asianHandicap(ftM,-ah,false);add("ah_home","Asian Handicap Home "+displayLine(ah),ha.win,"AH HOME "+displayLine(ah),odds.homeAH,ah,null);add("ah_away","Asian Handicap Away "+displayLine(-ah),aa.win,"AH AWAY "+displayLine(-ah),odds.awayAH,-ah,null);}
       const ta=parseMarketLine(fb2_text("teamATotalLine")),tb=parseMarketLine(fb2_text("teamBTotalLine"));if(Number.isFinite(ta)){const p=fb2_fromMatrix(ftM,(h)=>h>ta),u=1-fb2_fromMatrix(ftM,(h)=>h>ta);add("teamA_over","Team A Over "+displayLine(ta),p,"TEAM A OVER "+displayLine(ta),odds.aOver,ta,lambdas.home);add("teamA_under","Team A Under "+displayLine(ta),u,"TEAM A UNDER "+displayLine(ta),odds.aUnder,ta,lambdas.home);}if(Number.isFinite(tb)){const p=fb2_fromMatrix(ftM,(h,a)=>a>tb),u=1-p;add("teamB_over","Team B Over "+displayLine(tb),p,"TEAM B OVER "+displayLine(tb),odds.bOver,tb,lambdas.away);add("teamB_under","Team B Under "+displayLine(tb),u,"TEAM B UNDER "+displayLine(tb),odds.bUnder,tb,lambdas.away);}
-      const ancillary=[{prefix:"corners",a:fb2_num("aCorners",null),b:fb2_num("bCorners",null),line:parseMarketLine(fb2_text("cornersLine")),odds:fb2_parseOdds("oddsCornersOver"),label:"Corners",dispersion:1.10},{prefix:"cards",a:fb2_num("aCards",null),b:fb2_num("bCards",null),line:parseMarketLine(fb2_text("cardsLine")),odds:fb2_parseOdds("oddsCardsOver"),label:"Cards",dispersion:1.20},{prefix:"shots",a:fb2_num("aShotsMarket",null),b:fb2_num("bShotsMarket",null),line:parseMarketLine(fb2_text("shotsLine")),odds:fb2_parseOdds("oddsShotsOver"),label:"Shots",dispersion:1.35}];
-      ancillary.forEach(z=>{if(Number.isFinite(z.a)&&Number.isFinite(z.b)&&Number.isFinite(z.line)){const mean=z.a+z.b,p=fb2_countOver(mean,z.line,z.dispersion);const ev=fb2_ev(p,z.odds),g=fb2_grade(p,ev,sample,integrity);rows.push({marketKey:z.prefix+"_over",name:z.label+" Over "+displayLine(z.line),prob:p,rawProb:p,odds:z.odds,ev,line:z.line,projection:mean,grade:g,pick:(Number.isFinite(z.odds)?(ev!=null&&ev>=0.025?"OVER "+displayLine(z.line):"NO PLAY"):(p>=0.56?"OVER "+displayLine(z.line):"NO PLAY")),side:"OVER "+displayLine(z.line),integrity});}});
+      const ancillary=[{prefix:"corners",a:fb2_num("aCorners",null),b:fb2_num("bCorners",null),line:parseMarketLine(fb2_text("cornersLine")),odds:fb2_parseOdds("oddsCornersOver"),underOdds:fb2_parseOdds("oddsCornersUnder"),label:"Corners",dispersion:1.10},{prefix:"cards",a:fb2_num("aCards",null),b:fb2_num("bCards",null),line:parseMarketLine(fb2_text("cardsLine")),odds:fb2_parseOdds("oddsCardsOver"),underOdds:fb2_parseOdds("oddsCardsUnder"),label:"Cards",dispersion:1.20},{prefix:"shots",a:fb2_num("aShotsMarket",null),b:fb2_num("bShotsMarket",null),line:parseMarketLine(fb2_text("shotsLine")),odds:fb2_parseOdds("oddsShotsOver"),underOdds:fb2_parseOdds("oddsShotsUnder"),label:"Shots",dispersion:1.35}];
+      ancillary.forEach(z=>{if(Number.isFinite(z.a)&&Number.isFinite(z.b)&&Number.isFinite(z.line)){const mean=z.a+z.b,p=fb2_countOver(mean,z.line,z.dispersion);if(p==null)return;const pu=1-p;const ev=fb2_ev(p,z.odds),g=fb2_grade(p,ev,sample,integrity);rows.push({marketKey:z.prefix+"_over",name:z.label+" Over "+displayLine(z.line),prob:p,rawProb:p,odds:z.odds,ev,line:z.line,projection:mean,grade:g,pick:(Number.isFinite(z.odds)?(ev!=null&&ev>=0.025?"OVER "+displayLine(z.line):"NO PLAY"):(p>=0.56?"OVER "+displayLine(z.line):"NO PLAY")),side:"OVER "+displayLine(z.line),integrity});const evU=fb2_ev(pu,z.underOdds),gU=fb2_grade(pu,evU,sample,integrity);rows.push({marketKey:z.prefix+"_under",name:z.label+" Under "+displayLine(z.line),prob:pu,rawProb:pu,odds:z.underOdds,ev:evU,line:z.line,projection:mean,grade:gU,pick:(Number.isFinite(z.underOdds)?(evU!=null&&evU>=0.025?"UNDER "+displayLine(z.line):"NO PLAY"):(pu>=0.56?"UNDER "+displayLine(z.line):"NO PLAY")),side:"UNDER "+displayLine(z.line),integrity});}});
       return rows;
     }
     function fb2_renderRows(rows,ctx,lambdas,integrity){
