@@ -1,4 +1,3 @@
-Z
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -396,14 +395,14 @@ Z
     <input id="ssTeamAName" placeholder="e.g. Manchester United" autocomplete="off" />
     <div class="autocomplete-list" id="fbDropA"></div>
   </div>
-  <input id="ssTeamAId" placeholder="ESPN team ID (auto)" readonly style="font-size:10px;padding:4px 6px;color:var(--muted);" />
+  <input id="ssTeamAId" type="hidden" />
 
   <label style="font-size:12px;margin-top:6px;">Team B Name (Away)</label>
   <div class="autocomplete-wrap">
     <input id="ssTeamBName" placeholder="e.g. Liverpool" autocomplete="off" />
     <div class="autocomplete-list" id="fbDropB"></div>
   </div>
-  <input id="ssTeamBId" placeholder="ESPN team ID (auto)" readonly style="font-size:10px;padding:4px 6px;color:var(--muted);" />
+  <input id="ssTeamBId" type="hidden" />
 
   <button class="fetch-btn" id="fbEspnFetchBtn" type="button">📡 Fetch Stats</button>
   <div id="fbEspnStatus" style="font-size:10px;min-height:16px;margin-top:6px;"></div>
@@ -1614,6 +1613,7 @@ Z
       }catch(e){return null;}
     }
     async function fbEspnLoadFixtures(offset = fbEspnFixtureOffset) {
+      if (typeof engineDebug === "function") engineDebug("fbEspnLoadFixtures start", { offset: offset, league: fbEspnGetLeague() });
       const token = ++fbEspnFixtureLoadToken;
       fbEspnSetFixtureDay(offset);
       const leagueSel = document.getElementById("leagueSelect");
@@ -1905,6 +1905,15 @@ Z
     }
 
     async function fbEspnAutoFetch() {
+      if (typeof engineDebug === "function") {
+        engineDebug("fbEspnAutoFetch start", {
+          league: fbEspnGetLeague(),
+          teamA: document.getElementById("ssTeamAName")?.value || "",
+          teamB: document.getElementById("ssTeamBName")?.value || "",
+          idA: document.getElementById("ssTeamAId")?.value || "",
+          idB: document.getElementById("ssTeamBId")?.value || ""
+        });
+      }
       const slug=fbEspnGetLeague(); if(!slug){fbEspnSetStatus("Select an ESPN competition first.","error");return false;}
       const btn=document.getElementById("fbEspnFetchBtn"); if(btn)btn.disabled=true;
       try{
@@ -4508,6 +4517,11 @@ Z
         const f=fbEspnGetSelectedFixture(); if(!f)return;
         document.getElementById("ssTeamAName").value=f.homeName||"";document.getElementById("ssTeamBName").value=f.awayName||"";
         document.getElementById("ssTeamAId").value=f.homeId||"";document.getElementById("ssTeamBId").value=f.awayId||"";
+        // Auto-fetch on match select (Fetch Stats button remains as manual fallback)
+        if (typeof engineDebug === "function") engineDebug("Fixture selected — auto-fetch starting", { home: f.homeName, away: f.awayName, homeId: f.homeId, awayId: f.awayId });
+        if (typeof fbEspnAutoFetch === "function") {
+          setTimeout(function(){ try { fbEspnAutoFetch(); } catch (e) { if (typeof engineDebug === "function") engineDebug("Auto-fetch on select failed", String(e && e.message ? e.message : e)); } }, 50);
+        }
       });
       async function fbBindTeamAutocomplete(inputId,dropId,side){
         const input=document.getElementById(inputId),drop=document.getElementById(dropId); if(!input||!drop)return;
