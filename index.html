@@ -1,3 +1,4 @@
+Q
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1394,51 +1395,22 @@
       return s.replace(/\./g, " ").replace(/_/g, " ").replace(/-/g, " ")
         .replace(/\b\w/g, c => c.toUpperCase());
     }
-    async function fbEspnFetchJSON(url, timeoutMs = 16000) {
+    async function fbEspnFetchJSON(url, timeoutMs = 14000) {
       const cacheKey=String(url); const cached=FB_ESPN.requestCache.get(cacheKey);
       if(cached && Date.now()-cached.ts<30*60*1000)return cached.data;
       async function one(requestUrl,label){
         const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
-        try{
-          const res=await fetch(requestUrl,{method:"GET",headers:{Accept:"application/json, text/plain, */*"},signal:ctrl.signal,cache:"no-store"});
-          if(!res.ok)throw new Error(label+" HTTP "+res.status);
-          const text=await res.text();
-          if(!text || text.length < 2) throw new Error(label+" empty body");
-          try{return JSON.parse(text);}catch(e){throw new Error(label+" returned invalid JSON");}
-        }catch(e){
-          if(e&&e.name==="AbortError")throw new Error(label+" timeout");
-          throw e;
-        }finally{clearTimeout(timer);}
+        try{const res=await fetch(requestUrl,{method:"GET",headers:{Accept:"application/json"},signal:ctrl.signal,cache:"no-store"});if(!res.ok)throw new Error(label+" HTTP "+res.status);const text=await res.text();try{return JSON.parse(text);}catch(e){throw new Error(label+" returned invalid JSON");}}
+        catch(e){if(e?.name==="AbortError")throw new Error(label+" timeout");throw e;}finally{clearTimeout(timer);}
       }
-      if(typeof window.__fbEspnWorkerDead === "undefined") window.__fbEspnWorkerDead = false;
-      const enc = encodeURIComponent(url);
-      const attempts = [];
-      // Worker last for soccer — currently 403 from ESPN on CF egress
-      attempts.push(
-        ["https://api.allorigins.win/raw?url="+enc,"allorigins"],
-        ["https://corsproxy.io/?"+enc,"corsproxy-io"],
-        ["https://api.codetabs.com/v1/proxy?quest="+enc,"codetabs"],
-        ["https://thingproxy.freeboard.io/fetch/"+url,"thingproxy"],
-        ["https://corsproxy.org/?"+enc,"corsproxy-org"]
-      );
-      if(!window.__fbEspnWorkerDead){
-        attempts.push([FB_ESPN.WORKER+"?url="+enc,"ESPN worker"]);
-      }
-      attempts.push([url,"ESPN direct"]);
+      const attempts=[
+        [FB_ESPN.WORKER+"?url="+encodeURIComponent(url),"ESPN worker"],
+        [url,"ESPN direct"],
+        ["https://corsproxy.io/?url="+encodeURIComponent(url),"ESPN fallback 1"],
+        ["https://api.allorigins.win/raw?url="+encodeURIComponent(url),"ESPN fallback 2"]
+      ];
       let last=null;
-      for(const [requestUrl,label] of attempts){
-        try{
-          const data=await one(requestUrl,label);
-          FB_ESPN.requestCache.set(cacheKey,{data,ts:Date.now()});
-          if(typeof engineDebug==="function") engineDebug(label+" OK",{url:String(url).slice(0,100)});
-          return data;
-        }catch(e){
-          last=e;
-          const msg=e&&e.message?e.message:String(e);
-          if(label==="ESPN worker" && /403/.test(msg)) window.__fbEspnWorkerDead = true;
-          if(typeof engineDebug==="function") engineDebug(label+" failed",{url:String(url).slice(0,100),error:msg});
-        }
-      }
+      for(const [requestUrl,label] of attempts){try{const data=await one(requestUrl,label);FB_ESPN.requestCache.set(cacheKey,{data,ts:Date.now()});return data;}catch(e){last=e;engineDebug(label+" failed",{url,error:e?.message||String(e)});}}
       throw last||new Error("ESPN fetch failed");
     }
     function fbEspnSetStatus(text, kind = "info") {
