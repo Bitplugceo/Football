@@ -1767,6 +1767,28 @@
       }
       return best && score>=10 ? Object.assign({},best,{matchScore:score}) : null;
     }
+    // Shared everywhere raw ESPN events get folded into the pipeline (recent
+    // form AND head-to-head). A goal-projection model should only be
+    // conditioned on matches from the SAME competition it's predicting:
+    // domestic cup / continental fixtures are against a completely different
+    // pool of opposition strength (weak early-round cup draws, or elite
+    // continental sides) and are often played with rotated squads, and
+    // pre-season/exhibition friendlies carry ~zero predictive signal
+    // (weakened lineups, no real stakes, draws settled by shootouts). ESPN
+    // frequently leaves friendlies untagged (no competitionSlug), which is
+    // how they were leaking through the old, more permissive filter — so the
+    // name/type text is checked as a fallback even when the slug is blank.
+    function fbEspnIsUsableLeagueMatch(e, slug) {
+      if (!e) return false;
+      const name = (e.competitionName || "").toLowerCase();
+      const type = (e.competitionType || "").toLowerCase();
+      const noise = ["friendly", "pre-season", "preseason", "exhibition", "testimonial"];
+      if (noise.some(kw => name.includes(kw) || type.includes(kw))) return false;
+      if (e.competitionSlug) return e.competitionSlug === slug;
+      // No slug supplied and nothing reads like a friendly — treat as usable
+      // rather than silently dropping a sparsely-tagged league match.
+      return true;
+    }
     async function fbEspnFetchTeamEvents(slug, teamId) {
       const key = "history:" + slug + ":" + teamId;
       if (FB_ESPN.leagueCache.has(key)) return FB_ESPN.leagueCache.get(key);
@@ -1807,10 +1829,7 @@
       }
       const unique=[]; const seen=new Set();
       events.forEach(e=>{
-        // Only reject a different competition when ESPN actually supplies a
-        // trustworthy competition slug. Empty/missing slugs remain usable.
-        const sameCompetition=!e.competitionSlug || e.competitionSlug===slug || e.leagueSlug===slug;
-        if(sameCompetition && !seen.has(e.id)){seen.add(e.id);unique.push(e);}
+        if(fbEspnIsUsableLeagueMatch(e,slug) && !seen.has(e.id)){seen.add(e.id);unique.push(e);}
       });
       unique.sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
       FB_ESPN.leagueCache.set(key,unique);
@@ -1906,7 +1925,7 @@
       try {
         const url = FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/schedule?season=" + encodeURIComponent(season) + "&limit=1000";
         const data = await fbEspnFetchJSON(url, 15000);
-        events = (data?.events || data?.team?.schedule?.events || []).map(ev => fbEspnNormalizeEvent(ev, slug)).filter(Boolean);
+        events = (data?.events || data?.team?.schedule?.events || []).map(ev => fbEspnNormalizeEvent(ev, slug)).filter(Boolean).filter(e => fbEspnIsUsableLeagueMatch(e, slug));
       } catch (e) {
         engineDebug("ESPN season schedule fetch failed", { league: slug, teamId, season, error: e?.message || String(e) });
       }
