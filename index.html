@@ -1876,6 +1876,25 @@
         return result;
       }
     }
+    // The /teams/{id}/schedule and /scoreboard listings ESPN uses for soccer
+    // generally omit `linescores` on their competitor entries (that field is
+    // only reliably populated on the single-event summary/boxscore payload).
+    // fbEspnBuildTeamData's e.homeLines/awayLines therefore come back empty
+    // almost every time, which is why 1st-half inputs were never auto-filled.
+    // This pulls the same linescores field from the summary endpoint instead,
+    // which mirrors the standard competition/competitors shape.
+    function fbEspnHalfGoalsFromSummary(summary, teamId) {
+      const comp = summary?.header?.competitions?.[0];
+      const cs = Array.isArray(comp?.competitors) ? comp.competitors : [];
+      if (cs.length < 2) return null;
+      const mine = cs.find(c => String(c?.team?.id || c?.id || "") === String(teamId));
+      const opp = cs.find(c => String(c?.team?.id || c?.id || "") !== String(teamId));
+      if (!mine || !opp) return null;
+      const lines = c => Array.isArray(c?.linescores) ? c.linescores.map(fbEspnScoreValue).filter(Number.isFinite) : [];
+      const myL = lines(mine), oppL = lines(opp);
+      if (!myL.length || !oppL.length) return null;
+      return { my: myL[0], opp: oppL[0] };
+    }
     function fbEspnRenderInjury(side, meta, teamName) {
       const box=document.getElementById(side==="A"?"fbInjuryBoxA":"fbInjuryBoxB");
       const body=document.getElementById(side==="A"?"fbInjuryContentA":"fbInjuryContentB");
@@ -1895,15 +1914,29 @@
       // whether the team was home or away in each of them. (Previously this
       // filtered to only the venue the team plays in the upcoming fixture,
       // which silently dropped half the team's actual recent matches.)
-      const chosen=events.slice(0,10); const scored=[],allowed=[],h1s=[],h1a=[]; let lastGameDate="";
-      chosen.forEach(e=>{const mineHome=e.homeId===team.id;const hs=mineHome?e.homeScore:e.awayScore;const as=mineHome?e.awayScore:e.homeScore;scored.push(hs);allowed.push(as);if(e.homeLines.length>=2&&e.awayLines.length>=2){const mh=mineHome?e.homeLines:e.awayLines,ma=mineHome?e.awayLines:e.homeLines;h1s.push(mh[0]);h1a.push(ma[0]);}if(!lastGameDate)lastGameDate=e.date;});
+      const chosen=events.slice(0,10); const scored=[],allowed=[]; let lastGameDate="";
+      chosen.forEach(e=>{const mineHome=e.homeId===team.id;const hs=mineHome?e.homeScore:e.awayScore;const as=mineHome?e.awayScore:e.homeScore;scored.push(hs);allowed.push(as);if(!lastGameDate)lastGameDate=e.date;});
       const allLast7=events.filter(e=>{const t=Date.parse(e.date||"");return Number.isFinite(t)&&cutoff-t<=7*86400000&&cutoff>=t;}).length;
       const restDays=lastGameDate?Math.max(0,Math.floor((cutoff-Date.parse(lastGameDate))/86400000)-1):null;
-      let advanced={};
-      const advRefs=chosen.slice(0,5);
-      const advs=await Promise.all(advRefs.map(e=>fbEspnFetchSummary(slug,e.id).then(s=>fbEspnExtractAdvanced(s,team.id)).catch(()=>null)));
+      // Advanced stats (xG/shots) AND 1st-half goals both live in ESPN's
+      // per-event summary/boxscore payload, so fetch it once per recent game
+      // and derive both from that single fetch — no extra requests needed.
+      // Widened from the old 5-game cap to the full 10-game window so 1H
+      // sample size actually matches the FT sample size shown elsewhere.
+      const advRefs=chosen;
+      const summaries=await Promise.all(advRefs.map(e=>fbEspnFetchSummary(slug,e.id).catch(()=>null)));
+      const advs=summaries.map(s=>s?fbEspnExtractAdvanced(s,team.id):null);
       const finiteAvg=k=>{const vals=advs.map(x=>x&&x[k]).filter(Number.isFinite);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;};
-      advanced={xg:finiteAvg("xg"),xga:finiteAvg("xga"),shots:finiteAvg("shots"),sot:finiteAvg("sot"),big:finiteAvg("big")};
+      const advanced={xg:finiteAvg("xg"),xga:finiteAvg("xga"),shots:finiteAvg("shots"),sot:finiteAvg("sot"),big:finiteAvg("big")};
+      const h1s=[],h1a=[];
+      advRefs.forEach((e,i)=>{
+        const fromSummary=summaries[i]?fbEspnHalfGoalsFromSummary(summaries[i],team.id):null;
+        if(fromSummary){h1s.push(fromSummary.my);h1a.push(fromSummary.opp);return;}
+        // Fallback for the rare case a schedule/scoreboard event does carry
+        // linescores directly, or the summary fetch failed for this game.
+        const mineHome=e.homeId===team.id;
+        if(e.homeLines.length>=2&&e.awayLines.length>=2){const mh=mineHome?e.homeLines:e.awayLines,ma=mineHome?e.awayLines:e.homeLines;h1s.push(mh[0]);h1a.push(ma[0]);}
+      });
       const injury=await fbEspnFetchInjuryMeta(slug,team.id);
       return {id:team.id,name:team.name,scored,allowed,h1Scored:h1s,h1Allowed:h1a,matchesLast7d:allLast7,lastGameDate,restDays,advanced,injury:injury.impact,injuryMeta:injury,events};
     }
@@ -2029,7 +2062,24 @@
         document.getElementById("ssTournamentId").value=slug;document.getElementById("ssTournamentName").textContent=window.__fbAutoData.context.competition;
         document.getElementById("aFTScored").value=dataA.scored.join(",");document.getElementById("aFTAllowed").value=dataA.allowed.join(",");document.getElementById("a1HScored").value=dataA.h1Scored.join(",");document.getElementById("a1HAllowed").value=dataA.h1Allowed.join(",");document.getElementById("aFixtureLoad7d").value=String(dataA.matchesLast7d);
         document.getElementById("bFTScored").value=dataB.scored.join(",");document.getElementById("bFTAllowed").value=dataB.allowed.join(",");document.getElementById("b1HScored").value=dataB.h1Scored.join(",");document.getElementById("b1HAllowed").value=dataB.h1Allowed.join(",");document.getElementById("bFixtureLoad7d").value=String(dataB.matchesLast7d);
-        if(h2h.length>=2){const ha=[],hb=[],h1a=[],h1b=[];h2h.forEach(e=>{const aHome=e.homeId===teamA.id;ha.push(aHome?e.homeScore:e.awayScore);hb.push(aHome?e.awayScore:e.homeScore);if(e.homeLines.length) {const x=aHome?e.homeLines:e.awayLines,y=aHome?e.awayLines:e.homeLines;if(Number.isFinite(x[0])&&Number.isFinite(y[0])){h1a.push(x[0]);h1b.push(y[0]);}}});document.getElementById("aFTH2H").value=ha.join(",");document.getElementById("bFTH2H").value=hb.join(",");document.getElementById("useFTH2H").checked=true;if(h1a.length>=2){document.getElementById("a1HH2H").value=h1a.join(",");document.getElementById("b1HH2H").value=h1b.join(",");document.getElementById("use1HH2H").checked=true;}document.getElementById("h2hAutoTag").style.display="inline";}
+        if(h2h.length>=2){
+          const ha=[],hb=[],h1a=[],h1b=[];
+          // Same fix as team history: schedule-derived e.homeLines/awayLines
+          // are unreliable for soccer, so pull 1H goals from each H2H game's
+          // summary instead. fbEspnFetchSummary is cached, so games already
+          // fetched above for team history cost nothing extra here.
+          const h2hSummaries=await Promise.all(h2h.map(e=>fbEspnFetchSummary(slug,e.id).catch(()=>null)));
+          h2h.forEach((e,i)=>{
+            const aHome=e.homeId===teamA.id;
+            ha.push(aHome?e.homeScore:e.awayScore);hb.push(aHome?e.awayScore:e.homeScore);
+            const fromSummary=h2hSummaries[i]?fbEspnHalfGoalsFromSummary(h2hSummaries[i],teamA.id):null;
+            if(fromSummary){h1a.push(fromSummary.my);h1b.push(fromSummary.opp);return;}
+            if(e.homeLines.length){const x=aHome?e.homeLines:e.awayLines,y=aHome?e.awayLines:e.homeLines;if(Number.isFinite(x[0])&&Number.isFinite(y[0])){h1a.push(x[0]);h1b.push(y[0]);}}
+          });
+          document.getElementById("aFTH2H").value=ha.join(",");document.getElementById("bFTH2H").value=hb.join(",");document.getElementById("useFTH2H").checked=true;
+          if(h1a.length>=2){document.getElementById("a1HH2H").value=h1a.join(",");document.getElementById("b1HH2H").value=h1b.join(",");document.getElementById("use1HH2H").checked=true;}
+          document.getElementById("h2hAutoTag").style.display="inline";
+        }
         if(eventMeta?.date){const d=new Date(eventMeta.date);if(Number.isFinite(d.getTime())){const iso=d.toISOString().slice(0,16);const el=document.getElementById("fixtureKickoff");if(el)el.value=iso;}}
         const advA=dataA.advanced||{},advB=dataB.advanced||{}; window.__fbAutoData.A=Object.assign(dataA,{...advA});window.__fbAutoData.B=Object.assign(dataB,{...advB});
         if(Number.isFinite(prior.homeAvg)){window.__fbAutoData.context.homeAvg=prior.homeAvg;window.__fbAutoData.context.awayAvg=prior.awayAvg;}
