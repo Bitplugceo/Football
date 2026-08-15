@@ -1,3 +1,4 @@
+K
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1324,7 +1325,42 @@
       return m ? decodeURIComponent(m[1]) : "";
     }
     function fbEspnPrettySlug(slug) {
-      return String(slug || "").replace(/\./g, " · ").replace(/_/g, " ").replace(/-/g, " ")
+      const s = String(slug || "").toLowerCase();
+      // Full official names (SportyBet-style) – never abbreviated
+      const FULL = {
+        "eng.1":"English Premier League","eng.2":"English Championship","eng.3":"English League One",
+        "eng.4":"English League Two","eng.5":"English National League","eng.fa":"English FA Cup",
+        "eng.league_cup":"English Carabao Cup","eng.trophy":"English EFL Trophy",
+        "esp.1":"Spanish LaLiga","esp.2":"Spanish LaLiga 2","esp.copa_del_rey":"Spanish Copa del Rey",
+        "ger.1":"German Bundesliga","ger.2":"German 2. Bundesliga","ger.dfb_pokal":"German DFB-Pokal",
+        "ita.1":"Italian Serie A","ita.2":"Italian Serie B","ita.coppa_italia":"Italian Coppa Italia",
+        "fra.1":"French Ligue 1","fra.2":"French Ligue 2","fra.coupe_de_france":"French Coupe de France",
+        "ned.1":"Dutch Eredivisie","ned.2":"Dutch Eerste Divisie",
+        "por.1":"Portuguese Primeira Liga","por.2":"Portuguese Liga Portugal 2",
+        "bel.1":"Belgian Pro League","tur.1":"Turkish Super Lig","gre.1":"Greek Super League",
+        "sco.1":"Scottish Premiership","aut.1":"Austrian Bundesliga","aut.2":"Austrian 2. Liga",
+        "sui.1":"Swiss Super League","den.1":"Danish Superliga","nor.1":"Norwegian Eliteserien",
+        "swe.1":"Swedish Allsvenskan","pol.1":"Polish Ekstraklasa","cze.1":"Czech First League",
+        "cro.1":"Croatian HNL",
+        "arg.1":"Argentine Liga Profesional","arg.2":"Argentine Primera Nacional",
+        "arg.3":"Argentine Primera B","arg.copa":"Argentine Copa Argentina",
+        "bra.1":"Brazilian Serie A","bra.2":"Brazilian Serie B",
+        "mex.1":"Mexican Liga MX","usa.1":"Major League Soccer","usa.nwsl":"NWSL",
+        "jpn.1":"Japanese J1 League","jpn.2":"Japanese J2 League","kor.1":"Korean K League 1",
+        "chn.1":"Chinese Super League","sau.1":"Saudi Pro League","uae.1":"UAE Pro League",
+        "qat.1":"Qatar Stars League","egy.1":"Egyptian Premier League","rsa.1":"South African Premier Division",
+        "mar.1":"Moroccan Botola Pro","tun.1":"Tunisian Ligue Professionnelle 1","alg.1":"Algerian Ligue 1",
+        "aus.1":"Australian A-League","chi.1":"Chilean Primera División","col.1":"Colombian Primera A",
+        "uru.1":"Uruguayan Primera División","per.1":"Peruvian Liga 1","ecu.1":"Ecuadorian Serie A",
+        "par.1":"Paraguayan Primera División",
+        "uefa.champions":"UEFA Champions League","uefa.europa":"UEFA Europa League",
+        "uefa.europa.conf":"UEFA Conference League",
+        "conmebol.libertadores":"CONMEBOL Libertadores","conmebol.sudamericana":"CONMEBOL Sudamericana",
+        "fifa.world":"FIFA World Cup","fifa.friendly":"International Friendly"
+      };
+      if (FULL[s]) return FULL[s];
+      // Fallback: clean but still readable (never leave raw slug)
+      return s.replace(/\./g, " ").replace(/_/g, " ").replace(/-/g, " ")
         .replace(/\b\w/g, c => c.toUpperCase());
     }
     async function fbEspnFetchJSON(url, timeoutMs = 14000) {
