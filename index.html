@@ -1,4 +1,3 @@
-H
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1869,12 +1868,15 @@ H
       body.textContent=summary+notes;
     }
 
-    async function fbEspnBuildTeamData(slug, team, fixtureDate, venue) {
+    async function fbEspnBuildTeamData(slug, team, fixtureDate) {
       let events=await fbEspnFetchTeamEvents(slug,team.id);
       const cutoff=fixtureDate?Date.parse(fixtureDate):Date.now();
       events=events.filter(e=>Number.isFinite(Date.parse(e.date||""))?Date.parse(e.date)<cutoff:e.finished).filter(e=>e.finished&&Number.isFinite(e.homeScore)&&Number.isFinite(e.awayScore));
-      const venueEvents=events.filter(e=>venue?((venue==="home"&&e.homeId===team.id)||(venue==="away"&&e.awayId===team.id)):true);
-      const chosen=venueEvents.slice(0,10); const scored=[],allowed=[],h1s=[],h1a=[]; let lastGameDate="";
+      // "Last 10 Overall" means overall: most recent 10 results regardless of
+      // whether the team was home or away in each of them. (Previously this
+      // filtered to only the venue the team plays in the upcoming fixture,
+      // which silently dropped half the team's actual recent matches.)
+      const chosen=events.slice(0,10); const scored=[],allowed=[],h1s=[],h1a=[]; let lastGameDate="";
       chosen.forEach(e=>{const mineHome=e.homeId===team.id;const hs=mineHome?e.homeScore:e.awayScore;const as=mineHome?e.awayScore:e.homeScore;scored.push(hs);allowed.push(as);if(e.homeLines.length>=2&&e.awayLines.length>=2){const mh=mineHome?e.homeLines:e.awayLines,ma=mineHome?e.awayLines:e.homeLines;h1s.push(mh[0]);h1a.push(ma[0]);}if(!lastGameDate)lastGameDate=e.date;});
       const allLast7=events.filter(e=>{const t=Date.parse(e.date||"");return Number.isFinite(t)&&cutoff-t<=7*86400000&&cutoff>=t;}).length;
       const restDays=lastGameDate?Math.max(0,Math.floor((cutoff-Date.parse(lastGameDate))/86400000)-1):null;
@@ -1911,24 +1913,31 @@ H
       FB_ESPN.leagueCache.set(key, events);
       return events;
     }
-    async function fbEspnFindH2HDeep(slug, idA, idB, cutoff, eventsA, eventsB, seasonsBack = 6) {
+    async function fbEspnFindH2HDeep(slug, idA, idB, cutoff, eventsA, eventsB, maxGames = 5, maxSeasonsBack = 8) {
       const map = new Map();
       const add = e => {
         if (!e || !e.finished || !Number.isFinite(e.homeScore) || !Number.isFinite(e.awayScore)) return;
+        if (cutoff && Date.parse(e.date || 0) >= cutoff) return; // never count the fixture being predicted, or anything after it
         const hasA = e.homeId === idA || e.awayId === idA;
         const hasB = e.homeId === idB || e.awayId === idB;
         if (hasA && hasB) map.set(e.id, e);
       };
       // Free pass over whatever the recent-form fetch already pulled in (no extra requests).
       [...eventsA, ...eventsB].forEach(add);
-      // Then explicitly walk back N prior seasons per team, in parallel.
+      // Walk backward ONE season at a time and stop the moment we already
+      // have `maxGames` qualifying meetings. This means a season like 2022
+      // only ever gets queried if the two teams genuinely haven't met 10
+      // times more recently than that — it's never fetched "just in case".
       const baseYear = cutoff ? new Date(cutoff).getFullYear() : new Date().getFullYear();
-      const seasons = []; for (let i = 0; i < seasonsBack; i++) seasons.push(baseYear - i);
-      const jobs = [];
-      seasons.forEach(season => { jobs.push(fbEspnFetchTeamEventsSeason(slug, idA, season)); jobs.push(fbEspnFetchTeamEventsSeason(slug, idB, season)); });
-      const results = await Promise.allSettled(jobs);
-      results.forEach(r => { if (r.status === "fulfilled") r.value.forEach(add); });
-      return [...map.values()].filter(e => !cutoff || Date.parse(e.date || 0) < cutoff).sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0)).slice(0, 10);
+      for (let i = 0; i < maxSeasonsBack && map.size < maxGames; i++) {
+        const season = baseYear - i;
+        const [evA, evB] = await Promise.all([
+          fbEspnFetchTeamEventsSeason(slug, idA, season),
+          fbEspnFetchTeamEventsSeason(slug, idB, season)
+        ]);
+        evA.forEach(add); evB.forEach(add);
+      }
+      return [...map.values()].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0)).slice(0, maxGames);
     }
     async function fbEspnFetchCompetitionContext(slug, sampleEvents) {
       const goals=[]; (sampleEvents||[]).forEach(e=>{if(e.finished&&Number.isFinite(e.homeScore)&&Number.isFinite(e.awayScore)){goals.push([e.homeScore,e.awayScore]);}});
@@ -1981,9 +1990,7 @@ H
         document.getElementById("ssTeamAId").value=teamA.id;document.getElementById("ssTeamBId").value=teamB.id;
         fbEspnSetStatus("Loading recent form, H2H, fixture context and available ESPN stats…");
         const fixture=selected||null; const fixtureDate=fixture?.date||""; const cutoff=fixtureDate?Date.parse(fixtureDate):Date.now();
-        const venueA=fixture?(fixture.homeId===teamA.id?"home":fixture.awayId===teamA.id?"away":null):"home";
-        const venueB=fixture?(fixture.homeId===teamB.id?"home":fixture.awayId===teamB.id?"away":null):"away";
-        const [dataA,dataB]=await Promise.all([fbEspnBuildTeamData(slug,teamA,fixtureDate,venueA),fbEspnBuildTeamData(slug,teamB,fixtureDate,venueB)]);
+        const [dataA,dataB]=await Promise.all([fbEspnBuildTeamData(slug,teamA,fixtureDate),fbEspnBuildTeamData(slug,teamB,fixtureDate)]);
         const eventsA=dataA.events||[], eventsB=dataB.events||[];
         fbEspnRenderInjury("A",dataA.injuryMeta,teamA.name);
         fbEspnRenderInjury("B",dataB.injuryMeta,teamB.name);
