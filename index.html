@@ -1,4 +1,3 @@
-Q
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1358,6 +1357,22 @@ Q
     }
     let fbEspnFixtureOffset = 0;
     let fbEspnFixtureLoadToken = 0;
+    // Priority leagues to scan for Today/Tomorrow active matches (full coverage of major + secondary)
+    const FB_ESPN_DAY_SCAN_LEAGUES = [
+      "eng.1","eng.2","eng.3","eng.4","eng.5","eng.fa","eng.league_cup",
+      "esp.1","esp.2","esp.copa_del_rey",
+      "ger.1","ger.2","ger.dfb_pokal",
+      "ita.1","ita.2","ita.coppa_italia",
+      "fra.1","fra.2","fra.coupe_de_france",
+      "ned.1","ned.2","por.1","por.2","bel.1","tur.1","gre.1","sco.1",
+      "aut.1","aut.2","sui.1","den.1","nor.1","swe.1","pol.1","cze.1","cro.1",
+      "arg.1","arg.2","bra.1","bra.2","mex.1","usa.1","usa.nwsl",
+      "jpn.1","jpn.2","kor.1","chn.1","sau.1","uae.1","qat.1",
+      "egy.1","rsa.1","mar.1","tun.1","alg.1","nga.1","gha.1",
+      "aus.1","chi.1","col.1","uru.1","per.1","ecu.1","par.1",
+      "uefa.champions","uefa.europa","uefa.europa.conf","conmebol.libertadores","conmebol.sudamericana",
+      "fifa.world","fifa.friendly"
+    ];
     function fbEspnLocalDateKey(offset = 0) {
       const d = new Date();
       d.setDate(d.getDate() + Number(offset || 0));
@@ -1531,40 +1546,137 @@ Q
       }catch(e){return null;}
     }
     async function fbEspnLoadFixtures(offset = fbEspnFixtureOffset) {
-      const slug = fbEspnGetLeague();
-      if (!slug) { fbEspnSetStatus("Select an ESPN competition first.", "error"); return []; }
       const token = ++fbEspnFixtureLoadToken;
       fbEspnSetFixtureDay(offset);
-      const sel = document.getElementById("fbEspnFixtureSelect");
-      if (!sel) return [];
-      sel.innerHTML = '<option value="">Loading matches…</option>';
+      const leagueSel = document.getElementById("leagueSelect");
+      const fixtureSel = document.getElementById("fbEspnFixtureSelect");
+      if (!leagueSel || !fixtureSel) return [];
+
       const dateKey = fbEspnLocalDateKey(offset);
+      const currentSlug = fbEspnGetLeague();
+
+      // ========== MODE 1: No league selected → scan for active leagues that day ==========
+      if (!currentSlug) {
+        fixtureSel.innerHTML = '<option value="">Scanning leagues with matches…</option>';
+        leagueSel.innerHTML = '<option value="">Scanning active leagues…</option>';
+        fbEspnSetStatus("Scanning ESPN for leagues with matches " + (offset === 0 ? "today" : "tomorrow") + "…", "info");
+
+        const activeLeagues = [];
+        const seen = new Set();
+        const batchSize = 6;
+
+        for (let i = 0; i < FB_ESPN_DAY_SCAN_LEAGUES.length; i += batchSize) {
+          if (token !== fbEspnFixtureLoadToken) return [];
+          const batch = FB_ESPN_DAY_SCAN_LEAGUES.slice(i, i + batchSize);
+          const results = await Promise.allSettled(batch.map(async (slug) => {
+            try {
+              const url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + dateKey + "&limit=50";
+              const data = await fbEspnFetchJSON(url, 12000);
+              const events = Array.isArray(data?.events) ? data.events : [];
+              if (events.length > 0) {
+                // FULL official name only – never abbreviated
+                const fullName = data?.leagues?.[0]?.name || data?.leagues?.[0]?.displayName || data?.leagues?.[0]?.shortName || fbEspnPrettySlug(slug);
+                return { slug, name: String(fullName), count: events.length };
+              }
+            } catch (_) {}
+            return null;
+          }));
+          results.forEach(r => {
+            if (r.status === "fulfilled" && r.value && !seen.has(r.value.slug)) {
+              seen.add(r.value.slug);
+              activeLeagues.push(r.value);
+            }
+          });
+        }
+
+        if (token !== fbEspnFixtureLoadToken) return [];
+
+        if (!activeLeagues.length) {
+          leagueSel.innerHTML = '<option value="">No matches found for this day</option>';
+          fixtureSel.innerHTML = '<option value="">No matches</option>';
+          fbEspnSetStatus("No ESPN matches found for " + (offset === 0 ? "today" : "tomorrow") + ".", "info");
+          return [];
+        }
+
+        // Group by country – full names only
+        const COUNTRY_MAP = {
+          eng:"England", spa:"Spain", esp:"Spain", ger:"Germany", ita:"Italy", fra:"France",
+          ned:"Netherlands", por:"Portugal", bel:"Belgium", tur:"Turkey", gre:"Greece",
+          sco:"Scotland", aut:"Austria", sui:"Switzerland", den:"Denmark", nor:"Norway",
+          swe:"Sweden", pol:"Poland", cze:"Czechia", cro:"Croatia", arg:"Argentina",
+          bra:"Brazil", mex:"Mexico", usa:"USA", jpn:"Japan", kor:"South Korea",
+          chn:"China", sau:"Saudi Arabia", uae:"UAE", qat:"Qatar", egy:"Egypt",
+          rsa:"South Africa", mar:"Morocco", tun:"Tunisia", alg:"Algeria", aus:"Australia",
+          chi:"Chile", col:"Colombia", uru:"Uruguay", per:"Peru", ecu:"Ecuador",
+          par:"Paraguay", uefa:"UEFA", conmebol:"CONMEBOL", fifa:"FIFA"
+        };
+        function countryFromSlug(slug) {
+          const s = String(slug || "").toLowerCase();
+          const m = s.match(/^([a-z]{2,8})[.\-_]/);
+          if (m && COUNTRY_MAP[m[1]]) return COUNTRY_MAP[m[1]];
+          if (s.startsWith("uefa")) return "UEFA";
+          if (s.startsWith("conmebol")) return "CONMEBOL";
+          if (s.startsWith("fifa")) return "FIFA";
+          return "Other";
+        }
+
+        const byCountry = {};
+        activeLeagues.forEach(x => {
+          const c = countryFromSlug(x.slug);
+          if (!byCountry[c]) byCountry[c] = [];
+          byCountry[c].push(x);
+        });
+        const countryNames = Object.keys(byCountry).sort((a,b) => {
+          if (a === "Other") return 1;
+          if (b === "Other") return -1;
+          return a.localeCompare(b);
+        });
+
+        let html = '<option value="">Select country / league…</option>';
+        countryNames.forEach(country => {
+          const leagues = byCountry[country].sort((a,b) => a.name.localeCompare(b.name));
+          html += `<optgroup label="${country}">`;
+          leagues.forEach(x => {
+            const fullName = String(x.name).replace(/[&<>]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+            html += `<option value="${String(x.slug).replace(/"/g,"&quot;")}">${fullName} (${x.count})</option>`;
+          });
+          html += `</optgroup>`;
+        });
+        leagueSel.innerHTML = html;
+        fixtureSel.innerHTML = '<option value="">Select a league first…</option>';
+        fbEspnSetStatus(activeLeagues.length + " leagues with matches " + (offset === 0 ? "today" : "tomorrow") + ". Select one.", "ok");
+        engineDebug("ESPN active leagues scanned", { date: dateKey, count: activeLeagues.length });
+        return [];
+      }
+
+      // ========== MODE 2: League already selected → load its fixtures ==========
+      fixtureSel.innerHTML = '<option value="">Loading matches…</option>';
       try {
-        const key = "fixtures:" + slug + ":" + dateKey;
+        const key = "fixtures:" + currentSlug + ":" + dateKey;
         let events = FB_ESPN.eventCache.get(key);
         if (!events) {
-          const url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + dateKey + "&limit=500";
+          const url = FB_ESPN.SITE(currentSlug) + "/scoreboard?dates=" + dateKey + "&limit=500";
           const data = await fbEspnFetchJSON(url, 15000);
-          events = Array.isArray(data?.events) ? data.events.map(ev => fbEspnNormalizeEvent(ev, slug)).filter(Boolean) : [];
+          events = Array.isArray(data?.events) ? data.events.map(ev => fbEspnNormalizeEvent(ev, currentSlug)).filter(Boolean) : [];
           const seen = new Set();
           events = events.filter(e => !seen.has(e.id) && seen.add(e.id));
           FB_ESPN.eventCache.set(key, events);
         }
         if (token !== fbEspnFixtureLoadToken) return events;
         events.sort((a,b) => Date.parse(a.date||0)-Date.parse(b.date||0));
-        sel.innerHTML = '<option value="">- Select match -</option>' + events.map(e => {
+        fixtureSel.innerHTML = '<option value="">- Select match -</option>' + events.map(e => {
           const when = e.date ? new Date(e.date).toLocaleString() : "time unavailable";
           const label = `${e.homeName} vs ${e.awayName} · ${when}`;
           return `<option value='${JSON.stringify(e).replace(/'/g,"&#39;")}'>${label.replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</option>`;
         }).join("");
         fbEspnSetStatus(events.length ? `${events.length} ESPN matches loaded for ${offset===0?"today":"tomorrow"}.` : `No ESPN matches found for ${offset===0?"today":"tomorrow"}.`, events.length ? "ok" : "info");
-        engineDebug("ESPN football fixtures loaded", {league:slug,date:dateKey,count:events.length});
+        engineDebug("ESPN football fixtures loaded", {league:currentSlug,date:dateKey,count:events.length});
         return events;
       } catch (e) {
         if (token !== fbEspnFixtureLoadToken) return [];
-        sel.innerHTML = '<option value="">Fixture load failed</option>';
+        fixtureSel.innerHTML = '<option value="">Fixture load failed</option>';
         fbEspnSetStatus("Fixture fetch failed: " + (e?.message || e), "error");
-        engineDebug("ESPN fixture fetch failed", { league: slug, date: dateKey, error: e?.message || String(e) });
+        engineDebug("ESPN fixture fetch failed", { league: currentSlug, date: dateKey, error: e?.message || String(e) });
         return [];
       }
     }
