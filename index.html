@@ -1,3 +1,4 @@
+Q
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1451,14 +1452,62 @@
         FB_ESPN.registry = refs.map(r => fbEspnSlugFromRef(r?.$ref || r?.ref || r?.slug))
           .filter(Boolean).filter(slug => !seen.has(slug) && seen.add(slug)).map(slug => ({ slug, name: fbEspnPrettySlug(slug) }));
         FB_ESPN.loaded = true;
-        sel.innerHTML = '<option value="">Select ESPN competition…</option>' + FB_ESPN.registry
-          .sort((a,b) => a.name.localeCompare(b.name))
-          .map(x => `<option value="${String(x.slug).replace(/"/g,"&quot;")}">${String(x.name).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</option>`).join("");
-        const coverageText = FB_ESPN.registry.length + " ESPN soccer competitions discovered";
+        const COUNTRY_MAP = {
+          eng:"England", spa:"Spain", esp:"Spain", ger:"Germany", ita:"Italy", fra:"France",
+          ned:"Netherlands", por:"Portugal", bel:"Belgium", tur:"Turkey", gre:"Greece",
+          sco:"Scotland", aut:"Austria", sui:"Switzerland", den:"Denmark", nor:"Norway",
+          swe:"Sweden", pol:"Poland", cze:"Czechia", cro:"Croatia", srb:"Serbia",
+          ukr:"Ukraine", rus:"Russia", arg:"Argentina", bra:"Brazil", mex:"Mexico",
+          usa:"USA", can:"Canada", jpn:"Japan", kor:"South Korea", chn:"China",
+          sau:"Saudi Arabia", uae:"UAE", qat:"Qatar", egy:"Egypt", rsa:"South Africa",
+          mar:"Morocco", tun:"Tunisia", alg:"Algeria", aus:"Australia", chi:"Chile",
+          col:"Colombia", uru:"Uruguay", per:"Peru", ecu:"Ecuador", par:"Paraguay",
+          bol:"Bolivia", ven:"Venezuela", ind:"India", idn:"Indonesia", tha:"Thailand",
+          vie:"Vietnam", mys:"Malaysia", irn:"Iran", irq:"Iraq", isr:"Israel",
+          rou:"Romania", hun:"Hungary", bul:"Bulgaria", svk:"Slovakia", svn:"Slovenia",
+          bih:"Bosnia", mne:"Montenegro", alb:"Albania", mda:"Moldova", geo:"Georgia",
+          arm:"Armenia", aze:"Azerbaijan", kaz:"Kazakhstan", uzb:"Uzbekistan",
+          blr:"Belarus", ltu:"Lithuania", lva:"Latvia", est:"Estonia", fin:"Finland",
+          isl:"Iceland", nir:"Northern Ireland", wal:"Wales", irl:"Ireland",
+          mex:"Mexico", crc:"Costa Rica", hon:"Honduras", slv:"El Salvador",
+          gua:"Guatemala", pan:"Panama", jam:"Jamaica", tto:"Trinidad",
+          nga:"Nigeria", gha:"Ghana", civ:"Ivory Coast", sen:"Senegal", cmr:"Cameroon",
+          zam:"Zambia", zim:"Zimbabwe", ang:"Angola", moz:"Mozambique"
+        };
+        function fbEspnCountryFromSlug(slug) {
+          const s = String(slug || "").toLowerCase();
+          const m = s.match(/^([a-z]{2,3})[.\-_]/);
+          if (m && COUNTRY_MAP[m[1]]) return COUNTRY_MAP[m[1]];
+          const m2 = s.match(/^([a-z]{2,3})\d/);
+          if (m2 && COUNTRY_MAP[m2[1]]) return COUNTRY_MAP[m2[1]];
+          return "Other";
+        }
+        const byCountry = {};
+        FB_ESPN.registry.forEach(x => {
+          const c = fbEspnCountryFromSlug(x.slug);
+          if (!byCountry[c]) byCountry[c] = [];
+          byCountry[c].push(x);
+        });
+        const countryNames = Object.keys(byCountry).sort((a,b) => {
+          if (a === "Other") return 1;
+          if (b === "Other") return -1;
+          return a.localeCompare(b);
+        });
+        let html = '<option value="">Select country / league…</option>';
+        countryNames.forEach(country => {
+          const leagues = byCountry[country].sort((a,b) => a.name.localeCompare(b.name));
+          html += `<optgroup label="${country.replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}">`;
+          leagues.forEach(x => {
+            html += `<option value="${String(x.slug).replace(/"/g,"&quot;")}">${String(x.name).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</option>`;
+          });
+          html += `</optgroup>`;
+        });
+        sel.innerHTML = html;
+        const coverageText = FB_ESPN.registry.length + " ESPN soccer competitions discovered (grouped by country)";
         fbEspnSetCoverage(coverageText);
         const leagueCoverage = document.getElementById("leagueCoverage");
         if (leagueCoverage) leagueCoverage.textContent = coverageText;
-        engineDebug("ESPN soccer registry loaded", { count: FB_ESPN.registry.length });
+        engineDebug("ESPN soccer registry loaded", { count: FB_ESPN.registry.length, countries: countryNames.length });
         return FB_ESPN.registry;
       } catch (e) {
         fbEspnSetCoverage("ESPN registry unavailable");
