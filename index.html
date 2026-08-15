@@ -1,3 +1,4 @@
+H
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1889,6 +1890,46 @@
       const map=new Map(); [...eventsA,...eventsB].forEach(e=>{if(e.homeId!==idA&&e.awayId!==idA&&e.homeId!==idB&&e.awayId!==idB)return;if(!e.finished||!Number.isFinite(e.homeScore)||!Number.isFinite(e.awayScore))return;const hasA=(e.homeId===idA||e.awayId===idA),hasB=(e.homeId===idB||e.awayId===idB);if(hasA&&hasB)map.set(e.id,e);});
       return [...map.values()].filter(e=>!cutoff||Date.parse(e.date||0)<cutoff).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0)).slice(0,10);
     }
+    // /teams/{id}/schedule with no `season` param returns ESPN's *current*
+    // season only, so fbEspnFindH2H (above) can only ever see meetings that
+    // fall inside whatever single season each team's default fetch covers —
+    // for a two-legged league fixture that's a hard ceiling of ~2 games, even
+    // when ESPN's own H2H view (and its "Show more games" link) shows a much
+    // longer multi-season history. This pulls explicit past seasons per team
+    // so real head-to-head depth isn't silently truncated.
+    async function fbEspnFetchTeamEventsSeason(slug, teamId, season) {
+      const key = "history_season:" + slug + ":" + teamId + ":" + season;
+      if (FB_ESPN.leagueCache.has(key)) return FB_ESPN.leagueCache.get(key);
+      let events = [];
+      try {
+        const url = FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/schedule?season=" + encodeURIComponent(season) + "&limit=1000";
+        const data = await fbEspnFetchJSON(url, 15000);
+        events = (data?.events || data?.team?.schedule?.events || []).map(ev => fbEspnNormalizeEvent(ev, slug)).filter(Boolean);
+      } catch (e) {
+        engineDebug("ESPN season schedule fetch failed", { league: slug, teamId, season, error: e?.message || String(e) });
+      }
+      FB_ESPN.leagueCache.set(key, events);
+      return events;
+    }
+    async function fbEspnFindH2HDeep(slug, idA, idB, cutoff, eventsA, eventsB, seasonsBack = 6) {
+      const map = new Map();
+      const add = e => {
+        if (!e || !e.finished || !Number.isFinite(e.homeScore) || !Number.isFinite(e.awayScore)) return;
+        const hasA = e.homeId === idA || e.awayId === idA;
+        const hasB = e.homeId === idB || e.awayId === idB;
+        if (hasA && hasB) map.set(e.id, e);
+      };
+      // Free pass over whatever the recent-form fetch already pulled in (no extra requests).
+      [...eventsA, ...eventsB].forEach(add);
+      // Then explicitly walk back N prior seasons per team, in parallel.
+      const baseYear = cutoff ? new Date(cutoff).getFullYear() : new Date().getFullYear();
+      const seasons = []; for (let i = 0; i < seasonsBack; i++) seasons.push(baseYear - i);
+      const jobs = [];
+      seasons.forEach(season => { jobs.push(fbEspnFetchTeamEventsSeason(slug, idA, season)); jobs.push(fbEspnFetchTeamEventsSeason(slug, idB, season)); });
+      const results = await Promise.allSettled(jobs);
+      results.forEach(r => { if (r.status === "fulfilled") r.value.forEach(add); });
+      return [...map.values()].filter(e => !cutoff || Date.parse(e.date || 0) < cutoff).sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0)).slice(0, 10);
+    }
     async function fbEspnFetchCompetitionContext(slug, sampleEvents) {
       const goals=[]; (sampleEvents||[]).forEach(e=>{if(e.finished&&Number.isFinite(e.homeScore)&&Number.isFinite(e.awayScore)){goals.push([e.homeScore,e.awayScore]);}});
       const home=goals.length?goals.reduce((s,x)=>s+x[0],0)/goals.length:1.35, away=goals.length?goals.reduce((s,x)=>s+x[1],0)/goals.length:1.10;
@@ -1946,7 +1987,7 @@
         const eventsA=dataA.events||[], eventsB=dataB.events||[];
         fbEspnRenderInjury("A",dataA.injuryMeta,teamA.name);
         fbEspnRenderInjury("B",dataB.injuryMeta,teamB.name);
-        const h2h=fbEspnFindH2H(eventsA,eventsB,teamA.id,teamB.id,cutoff);
+        const h2h=await fbEspnFindH2HDeep(slug,teamA.id,teamB.id,cutoff,eventsA,eventsB);
         const compEvents=(selected?[selected]:[]).concat(eventsA.slice(0,30),eventsB.slice(0,30));
         const prior=await fbEspnFetchCompetitionContext(slug,compEvents);
         let eventMeta=selected;
