@@ -3974,6 +3974,56 @@
       if(!event||!event.id)return 0; const h=event.homeScore?.current ?? event.homeScore?.normaltime; const a=event.awayScore?.current ?? event.awayScore?.normaltime; const h1h=event.homeScore?.period1; const h1a=event.awayScore?.period1;if(!Number.isFinite(Number(h))||!Number.isFinite(Number(a)))return 0;
       let n=0;const all=[...(g_trackerState.activePicks||[])];all.filter(p=>String(p.eventId)===String(event.id)).forEach(p=>{if(fb2_settlePickFromScore(p,h,a,h1h,h1a)){n++;}});if(n){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>String(p.eventId)!==String(event.id));const settled=all.filter(p=>String(p.eventId)===String(event.id));g_trackerState.archivedPicks=[...settled,...(g_trackerState.archivedPicks||[])].slice(0,TRACKER_ARCHIVED_LIMIT);rebuildTrackerStats();saveTrackerState();renderTrackedPicks();renderTrackerAnalytics();}return n;
     };
+    // Nothing previously called autoSettleFootballEvent — it existed but was
+    // never wired to a live-score source, so every pick stayed "pending"
+    // forever. This reuses the same ESPN single-event summary fetch already
+    // trusted elsewhere in this file (fbEspnFetchSummary / fbEspnNormalizeEvent)
+    // to check each tracked fixture for a final result and settle it the
+    // moment ESPN reports it finished.
+    window.__FB_SETTLE_IN_FLIGHT = false;
+    async function fbCheckAndSettleActivePicks() {
+      if (window.__FB_SETTLE_IN_FLIGHT) return 0;
+      window.__FB_SETTLE_IN_FLIGHT = true;
+      try {
+        const active = g_trackerState.activePicks || [];
+        if (!active.length) return 0;
+        const seen = new Set();
+        const jobs = [];
+        active.forEach(function(p) {
+          const eventId = p.eventId, slug = p.tournamentId;
+          if (!eventId || !slug || String(eventId).indexOf("manual_fb_") === 0) return;
+          const key = slug + "|" + eventId;
+          if (seen.has(key)) return;
+          seen.add(key);
+          jobs.push({ eventId: eventId, slug: slug });
+        });
+        let settledCount = 0;
+        for (const job of jobs) {
+          try {
+            const summary = await fbEspnFetchSummary(job.slug, job.eventId);
+            if (!summary || !summary.header) continue;
+            const ev = fbEspnNormalizeEvent(summary.header, job.slug);
+            if (!ev || !ev.finished || !Number.isFinite(ev.homeScore) || !Number.isFinite(ev.awayScore)) continue;
+            const n = window.autoSettleFootballEvent({
+              id: ev.id,
+              homeScore: { current: ev.homeScore, period1: Array.isArray(ev.homeLines) ? ev.homeLines[0] : null },
+              awayScore: { current: ev.awayScore, period1: Array.isArray(ev.awayLines) ? ev.awayLines[0] : null }
+            });
+            settledCount += n || 0;
+          } catch (e) {
+            engineDebug("Auto-settle check failed for event " + job.eventId, e?.message || String(e));
+          }
+        }
+        if (settledCount) engineDebug("Auto-settle: picks settled this pass", { settledCount: settledCount });
+        return settledCount;
+      } catch (e) {
+        engineDebug("fbCheckAndSettleActivePicks failed", e?.message || String(e));
+        return 0;
+      } finally {
+        window.__FB_SETTLE_IN_FLIGHT = false;
+      }
+    }
+    window.fbCheckAndSettleActivePicks = fbCheckAndSettleActivePicks;
     function fb2_countOver(mean,line,dispersion=1.15){
       if(!Number.isFinite(mean)||!Number.isFinite(line))return null;const variance=Math.max(0.1,mean*dispersion);const sd=Math.sqrt(variance);
       const isWhole=Math.abs(line-Math.round(line))<1e-9;
@@ -4013,12 +4063,14 @@
         const ev=fb2_ev(cal,oddsVal);
         // Grade always reflects model conviction; actionable pick requires real odds + EV
         const g=fb2_grade(cal,ev,sample,integrity);
-        let pick="NO PLAY";
-        if(Number.isFinite(oddsVal)&&oddsVal>1){
-          const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);
-          pick=q.pick;
-        }
-        // No-odds markets stay informational (prob + grade visible, never auto-tracked as value)
+        // Always run the market-pick gate. fb2_marketPick already branches
+        // internally between the odds-aware EV path and the pure
+        // model-probability path when no odds exist for this market — it was
+        // being skipped entirely by the oddsVal guard that used to wrap this
+        // call, which silently forced every no-odds market straight to
+        // "NO PLAY" regardless of how strong the model's edge actually was.
+        const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);
+        const pick=q.pick;
         rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});
       };
       const ftLine=parseMarketLine(fb2_text("ftMarket"));const h1Line=parseMarketLine(fb2_text("h1Market"));
@@ -4129,7 +4181,10 @@
       const ah=parseMarketLine(fb2_text("ahLine"));if(Number.isFinite(ah)){const ha=fb2_asianHandicap(ftM,ah,true),aa=fb2_asianHandicap(ftM,-ah,false);add("ah_home","Asian Handicap Home "+displayLine(ah),ha.win,"AH HOME "+displayLine(ah),odds.homeAH,ah,null);add("ah_away","Asian Handicap Away "+displayLine(-ah),aa.win,"AH AWAY "+displayLine(-ah),odds.awayAH,-ah,null);}
       const ta=parseMarketLine(fb2_text("teamATotalLine")),tb=parseMarketLine(fb2_text("teamBTotalLine"));if(Number.isFinite(ta)){const p=fb2_fromMatrix(ftM,(h)=>h>ta),u=fb2_fromMatrix(ftM,(h)=>h<ta);add("teamA_over","Team A Over "+displayLine(ta),p,"TEAM A OVER "+displayLine(ta),odds.aOver,ta,lambdas.home);add("teamA_under","Team A Under "+displayLine(ta),u,"TEAM A UNDER "+displayLine(ta),odds.aUnder,ta,lambdas.home);}if(Number.isFinite(tb)){const p=fb2_fromMatrix(ftM,(h,a)=>a>tb),u=fb2_fromMatrix(ftM,(h,a)=>a<tb);add("teamB_over","Team B Over "+displayLine(tb),p,"TEAM B OVER "+displayLine(tb),odds.bOver,tb,lambdas.away);add("teamB_under","Team B Under "+displayLine(tb),u,"TEAM B UNDER "+displayLine(tb),odds.bUnder,tb,lambdas.away);}
       const ancillary=[{prefix:"corners",a:fb2_num("aCorners",null),b:fb2_num("bCorners",null),line:parseMarketLine(fb2_text("cornersLine")),odds:fb2_parseOdds("oddsCornersOver"),underOdds:fb2_parseOdds("oddsCornersUnder"),label:"Corners",dispersion:1.10},{prefix:"cards",a:fb2_num("aCards",null),b:fb2_num("bCards",null),line:parseMarketLine(fb2_text("cardsLine")),odds:fb2_parseOdds("oddsCardsOver"),underOdds:fb2_parseOdds("oddsCardsUnder"),label:"Cards",dispersion:1.20},{prefix:"shots",a:fb2_num("aShotsMarket",null),b:fb2_num("bShotsMarket",null),line:parseMarketLine(fb2_text("shotsLine")),odds:fb2_parseOdds("oddsShotsOver"),underOdds:fb2_parseOdds("oddsShotsUnder"),label:"Shots",dispersion:1.35}];
-      ancillary.forEach(z=>{if(Number.isFinite(z.a)&&Number.isFinite(z.b)&&Number.isFinite(z.line)){const mean=z.a+z.b,p=fb2_countOver(mean,z.line,z.dispersion);if(p==null)return;const pu=fb2_countUnder(mean,z.line,z.dispersion);if(pu==null)return;const ev=fb2_ev(p,z.odds),g=fb2_grade(p,ev,sample,integrity);rows.push({marketKey:z.prefix+"_over",name:z.label+" Over "+displayLine(z.line),prob:p,rawProb:p,odds:z.odds,ev,line:z.line,projection:mean,grade:g,pick:(Number.isFinite(z.odds)&&z.odds>1&&ev!=null&&ev>=0.025?"OVER "+displayLine(z.line):"NO PLAY"),side:"OVER "+displayLine(z.line),integrity});const evU=fb2_ev(pu,z.underOdds),gU=fb2_grade(pu,evU,sample,integrity);rows.push({marketKey:z.prefix+"_under",name:z.label+" Under "+displayLine(z.line),prob:pu,rawProb:pu,odds:z.underOdds,ev:evU,line:z.line,projection:mean,grade:gU,pick:(Number.isFinite(z.underOdds)&&z.underOdds>1&&evU!=null&&evU>=0.025?"UNDER "+displayLine(z.line):"NO PLAY"),side:"UNDER "+displayLine(z.line),integrity});}});
+      // Same fix as the main add() helper: route both legs through
+      // fb2_marketPick so a missing odds field falls back to the pure
+      // model-probability gate instead of hard-defaulting to "NO PLAY".
+      ancillary.forEach(z=>{if(Number.isFinite(z.a)&&Number.isFinite(z.b)&&Number.isFinite(z.line)){const mean=z.a+z.b,p=fb2_countOver(mean,z.line,z.dispersion);if(p==null)return;const pu=fb2_countUnder(mean,z.line,z.dispersion);if(pu==null)return;const ev=fb2_ev(p,z.odds),g=fb2_grade(p,ev,sample,integrity);rows.push({marketKey:z.prefix+"_over",name:z.label+" Over "+displayLine(z.line),prob:p,rawProb:p,odds:z.odds,ev,line:z.line,projection:mean,grade:g,pick:fb2_marketPick(p,"OVER "+displayLine(z.line),z.odds,sample,integrity,0.025).pick,side:"OVER "+displayLine(z.line),integrity});const evU=fb2_ev(pu,z.underOdds),gU=fb2_grade(pu,evU,sample,integrity);rows.push({marketKey:z.prefix+"_under",name:z.label+" Under "+displayLine(z.line),prob:pu,rawProb:pu,odds:z.underOdds,ev:evU,line:z.line,projection:mean,grade:gU,pick:fb2_marketPick(pu,"UNDER "+displayLine(z.line),z.underOdds,sample,integrity,0.025).pick,side:"UNDER "+displayLine(z.line),integrity});}});
       return rows;
     }
     function fb2_renderRows(rows,ctx,lambdas,integrity){
@@ -4943,6 +4998,15 @@
         });
       } catch (e) {}
       try { proposeFbConfigUpgrades(false); } catch (e) {}
+
+      // Auto-settle: check once on load, then every 5 minutes, so tracked
+      // picks resolve themselves against ESPN final scores with no manual step.
+      try { fbCheckAndSettleActivePicks(); } catch (e) {}
+      if (!window.__FB_SETTLE_TIMER) {
+        window.__FB_SETTLE_TIMER = setInterval(function() {
+          try { fbCheckAndSettleActivePicks(); } catch (e) {}
+        }, 5 * 60 * 1000);
+      }
 
       document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
       if(localStorage.getItem("theme")==="dark") document.body.classList.add("dark-mode");
