@@ -1,3 +1,4 @@
+O
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2779,9 +2780,9 @@
       const pushes = settled.filter(function(p){ return p.resultStatus === "push"; }).length;
       const winRate = settled.length ? ((wins + pushes * 0.5) / settled.length * 100).toFixed(1) : "—";
 
-      // Per-market breakdown
-      const ft = all.filter(p=>p.marketKey==="ft");
-      const h1 = all.filter(p=>p.marketKey==="h1");
+      // Per-market breakdown (live keys are ft_over/ft_under/h1_*, not bare "ft"/"h1")
+      const ft = all.filter(function(p){ return typeof fbMatchesFamily === "function" ? fbMatchesFamily(p, "ft") : (String(p.marketKey||"").indexOf("ft") === 0); });
+      const h1 = all.filter(function(p){ return typeof fbMatchesFamily === "function" ? fbMatchesFamily(p, "h1") : (String(p.marketKey||"").indexOf("h1") === 0); });
       const ftSettled = ft.filter(p=>p.resultStatus && p.resultStatus!=="pending");
       const h1Settled = h1.filter(p=>p.resultStatus && p.resultStatus!=="pending");
       const ftW = ftSettled.filter(p=>p.resultStatus==="win").length;
@@ -3140,7 +3141,14 @@
         }
         // Recalculate thresholds from settled history (BB-style retrospective gate)
         recomputeTtThresholdsFromSettled();
-        // Refresh Phase-2 proposals after each settle (still propose-only)
+        // Populate candidate-threshold scores then refresh Phase-2 proposals
+        try {
+          const allP = [...(g_trackerState.activePicks || []), ...(g_trackerState.archivedPicks || [])];
+          const settledP = allP.filter(function(p) {
+            return p && (p.resultStatus === "win" || p.resultStatus === "loss" || p.resultStatus === "push" || p.resultStatus === "half_win" || p.resultStatus === "half_loss");
+          });
+          updateFbCandidateScoresFromSettled(settledP);
+        } catch (e) {}
         try { proposeFbConfigUpgrades(true); } catch (e) {}
         renderTrackerAnalytics();
         updateEnginePerformanceScore();
@@ -3154,7 +3162,11 @@
       const settled=all.filter(p=>p.resultStatus==="win"||p.resultStatus==="loss"||p.resultStatus==="push");
       if(settled.length<10){ window.__fbThresholdProposals=null; return window.__fbThresholds||{ft:0.5,h1:0.35}; }
       const bestThreshold=function(marketKey,fallback){
-        const pool=settled.filter(p=>p.marketKey===marketKey&&isFinite(p.edge)); if(pool.length<6)return fallback;
+        const pool=settled.filter(function(p){
+          const fam = (typeof fbMarketFamily === "function") ? fbMarketFamily(p.marketKey) : p.marketKey;
+          return fam === marketKey && isFinite(p.edge);
+        });
+        if(pool.length<6)return fallback;
         const candidates=[0.25,0.5,0.75,1.0,1.25,1.5,2.0,2.5]; let best=fallback,bestScore=-Infinity;
         candidates.forEach(function(th){const s=scoreFbThresholdCandidate(pool,th);if(s.count<6)return;const score=s.netDelta/Math.sqrt(s.count);if(score>bestScore){bestScore=score;best=th;}}); return best;
       };
@@ -3214,12 +3226,22 @@
         winRate: taken ? (wins + pushes * 0.5) / taken : 0
       };
     }
+    /** Map live granular keys (ft_over, h1_under, …) onto family buckets used by Config Lab / report. */
+    function fbMarketFamily(mk) {
+      const k = String(mk || "").toLowerCase();
+      if (k === "ft" || k.indexOf("ft_") === 0) return "ft";
+      if (k === "h1" || k.indexOf("h1_") === 0) return "h1";
+      return k;
+    }
+    function fbMatchesFamily(p, family) {
+      return fbMarketFamily(p && p.marketKey) === family;
+    }
     function updateFbCandidateScoresFromSettled(settled) {
       const markets = ["ft", "h1"];
       const candidateThs = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
       markets.forEach(function(mk) {
         const pool = (settled || []).filter(function(p) {
-          return p.marketKey === mk && (p.resultStatus === "win" || p.resultStatus === "loss" || p.resultStatus === "push");
+          return fbMatchesFamily(p, mk) && (p.resultStatus === "win" || p.resultStatus === "loss" || p.resultStatus === "push" || p.resultStatus === "half_win" || p.resultStatus === "half_loss");
         });
         if (pool.length < 6) return;
         const scores = loadFbCandidateScores(mk);
@@ -3708,8 +3730,10 @@
       if(Number.isFinite(team.ta)) attack*=1+clamp((team.ta-50)/100*0.08,-0.06,0.06);
       if(Number.isFinite(team.spd)) defense*=1+clamp((team.spd-50)/100*0.12,-0.08,0.08);
       if(Number.isFinite(team.td)) defense*=1+clamp((team.td-50)/100*0.10,-0.07,0.07);
-      if(home){ attack*=1.035; defense*=1.020; }
-      else { attack*=0.985; defense*=0.990; }
+      // HOME_ADVANTAGE scales the home/away split (1.0 = default; tune via FB2 or overrides)
+      const ha=Number.isFinite(Number(window.__fbCoreOverrides&&window.__fbCoreOverrides.homeAdvantage))?Number(window.__fbCoreOverrides.homeAdvantage):(Number.isFinite(FB2.HOME_ADVANTAGE)?FB2.HOME_ADVANTAGE:1.0);
+      if(home){ attack*=1+(0.035*ha); defense*=1+(0.020*ha); }
+      else { attack*=1-(0.015*ha); defense*=1-(0.010*ha); }
       return {attack:clamp(attack,0.55,1.15),defense:clamp(defense,0.70,1.15)};
     }
     function fb2_lambdas(data,context){
@@ -3938,6 +3962,12 @@
     window.settleTrackedPickFromScore=function(signature,homeGoals,awayGoals,h1HomeGoals=null,h1AwayGoals=null){
       let p=g_trackerState.activePicks.find(x=>x.signature===signature)||g_trackerState.archivedPicks.find(x=>x.signature===signature);if(!p)return false;
       if(!fb2_settlePickFromScore(p,homeGoals,awayGoals,h1HomeGoals,h1AwayGoals))return false;
+      try{
+        const allP=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])];
+        const settledP=allP.filter(function(x){return x&&(x.resultStatus==="win"||x.resultStatus==="loss"||x.resultStatus==="push"||x.resultStatus==="half_win"||x.resultStatus==="half_loss");});
+        if(typeof updateFbCandidateScoresFromSettled==="function") updateFbCandidateScoresFromSettled(settledP);
+        if(typeof proposeFbConfigUpgrades==="function") proposeFbConfigUpgrades(false);
+      }catch(e){}
       if(p.resultStatus!=="pending"){g_trackerState.activePicks=g_trackerState.activePicks.filter(x=>x.signature!==signature);g_trackerState.archivedPicks=g_trackerState.archivedPicks.filter(x=>x.signature!==signature);g_trackerState.archivedPicks.unshift(p);}
       rebuildTrackerStats();saveTrackerState();renderTrackedPicks();renderTrackerAnalytics();return true;
     };
@@ -3979,7 +4009,19 @@
     function fb2_marketRows(data,ctx,lambdas,fhLambdas,ftM,h1M,integrity,sample){
       const rows=[];const odds={home:fb2_parseOdds("oddsHome"),draw:fb2_parseOdds("oddsDraw"),away:fb2_parseOdds("oddsAway"),over:fb2_parseOdds("oddsOverFT"),under:fb2_parseOdds("oddsUnderFT"),bttsYes:fb2_parseOdds("oddsBttsYes"),bttsNo:fb2_parseOdds("oddsBttsNo"),homeAH:fb2_parseOdds("oddsHomeAH"),awayAH:fb2_parseOdds("oddsAwayAH"),aOver:fb2_parseOdds("oddsTeamAOver"),aUnder:fb2_parseOdds("oddsTeamAUnder"),bOver:fb2_parseOdds("oddsTeamBOver"),bUnder:fb2_parseOdds("oddsTeamBUnder")};
       let x12=fb2_1x2(ftM); const elo=lambdas.elo||{home:x12.home,draw:x12.draw,away:x12.away,weight:0}; const ew=elo.weight||0; x12={home:x12.home*(1-ew)+elo.home*ew,draw:x12.draw*(1-ew)+elo.draw*ew,away:x12.away*(1-ew)+elo.away*ew}; const xs=x12.home+x12.draw+x12.away; x12.home/=xs;x12.draw/=xs;x12.away/=xs; const btts=fb2_btts(ftM); const calH=fb2_calibrateBinary("1x2_home",x12.home).p,calD=fb2_calibrateBinary("1x2_draw",x12.draw).p,calA=fb2_calibrateBinary("1x2_away",x12.away).p;
-      const add=(key,name,prob,pickSide,oddsVal,line,projection)=>{const cal=key.startsWith("1x2")?(key.endsWith("home")?calH:key.endsWith("draw")?calD:calA):fb2_calibrateBinary(key,prob).p;const ev=fb2_ev(cal,oddsVal);const g=fb2_grade(cal,ev,sample,integrity);let pick="NO PLAY";if(Number.isFinite(oddsVal)){const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);pick=q.pick;}else if(/^1x2_|^h1_1x2_|^htft_|^home_1up|^away_1up|^wm_|^gb_|^mg_|^high_|^h1_cs_|^h1_home|^h1_away|^h1_draw|^teamA_2p|^teamB_2p|^any_2p/.test(key)){pick=cal>=0.52?pickSide:"NO PLAY";}else if(/^double_|^dnb_|^btts_/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";}else if(/^ft_|^h1_|^h2_|^ah_|^team/.test(key)){pick=cal>=0.56?pickSide:"NO PLAY";} rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});};
+      const add=(key,name,prob,pickSide,oddsVal,line,projection)=>{
+        const cal=key.startsWith("1x2")?(key.endsWith("home")?calH:key.endsWith("draw")?calD:calA):fb2_calibrateBinary(key,prob).p;
+        const ev=fb2_ev(cal,oddsVal);
+        // Grade always reflects model conviction; actionable pick requires real odds + EV
+        const g=fb2_grade(cal,ev,sample,integrity);
+        let pick="NO PLAY";
+        if(Number.isFinite(oddsVal)&&oddsVal>1){
+          const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);
+          pick=q.pick;
+        }
+        // No-odds markets stay informational (prob + grade visible, never auto-tracked as value)
+        rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});
+      };
       const ftLine=parseMarketLine(fb2_text("ftMarket"));const h1Line=parseMarketLine(fb2_text("h1Market"));
       add("1x2_home","1X2 — Home",x12.home,"HOME",odds.home,null,x12.home);
       add("1x2_draw","1X2 — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);
@@ -4060,14 +4102,19 @@
       const topH1=[]; for(let hh=0;hh<=3;hh++) for(let aa=0;aa<=3;aa++) topH1.push({h:hh,a:aa,p:h1M[hh]?h1M[hh][aa]:0});
       topH1.sort(function(u,v){return v.p-u.p;});
       topH1.slice(0,5).forEach(function(sc){ add("h1_cs_"+sc.h+"_"+sc.a,"1H CS "+sc.h+"-"+sc.a,sc.p,sc.h+"-"+sc.a+" (1H)",null,null,sc.p); });
-      // 1H Winner + GG/NG
-      const h1Btts=fb2_btts(h1M);
-      add("h1_home_gg","1H Home & GG",x12h1.home*h1Btts,"1H HOME + GG",null,null,x12h1.home*h1Btts);
-      add("h1_home_ng","1H Home & NG",x12h1.home*(1-h1Btts),"1H HOME + NG",null,null,x12h1.home*(1-h1Btts));
-      add("h1_away_gg","1H Away & GG",x12h1.away*h1Btts,"1H AWAY + GG",null,null,x12h1.away*h1Btts);
-      add("h1_away_ng","1H Away & NG",x12h1.away*(1-h1Btts),"1H AWAY + NG",null,null,x12h1.away*(1-h1Btts));
-      add("h1_draw_gg","1H Draw & GG",x12h1.draw*h1Btts,"1H DRAW + GG",null,null,x12h1.draw*h1Btts);
-      add("h1_draw_ng","1H Draw & NG",x12h1.draw*(1-h1Btts),"1H DRAW + NG",null,null,x12h1.draw*(1-h1Btts));
+      // 1H Winner + GG/NG — joint from matrix (NOT independent product of 1X2 × BTTS)
+      const h1HomeGg=fb2_fromMatrix(h1M,function(h,a){return h>a&&h>0&&a>0;});
+      const h1HomeNg=fb2_fromMatrix(h1M,function(h,a){return h>a&&(h===0||a===0);});
+      const h1AwayGg=fb2_fromMatrix(h1M,function(h,a){return a>h&&h>0&&a>0;});
+      const h1AwayNg=fb2_fromMatrix(h1M,function(h,a){return a>h&&(h===0||a===0);});
+      const h1DrawGg=fb2_fromMatrix(h1M,function(h,a){return h===a&&h>0&&a>0;});
+      const h1DrawNg=fb2_fromMatrix(h1M,function(h,a){return h===a&&(h===0||a===0);});
+      add("h1_home_gg","1H Home & GG",h1HomeGg,"1H HOME + GG",null,null,h1HomeGg);
+      add("h1_home_ng","1H Home & NG",h1HomeNg,"1H HOME + NG",null,null,h1HomeNg);
+      add("h1_away_gg","1H Away & GG",h1AwayGg,"1H AWAY + GG",null,null,h1AwayGg);
+      add("h1_away_ng","1H Away & NG",h1AwayNg,"1H AWAY + NG",null,null,h1AwayNg);
+      add("h1_draw_gg","1H Draw & GG",h1DrawGg,"1H DRAW + GG",null,null,h1DrawGg);
+      add("h1_draw_ng","1H Draw & NG",h1DrawNg,"1H DRAW + NG",null,null,h1DrawNg);
       // Team to score 2+ (approximation for "2 or more" — not sequential)
       const a2p=fb2_fromMatrix(ftM,function(h){return h>=2;});
       const b2p=fb2_fromMatrix(ftM,function(h,a){return a>=2;});
@@ -4083,7 +4130,7 @@
       const ah=parseMarketLine(fb2_text("ahLine"));if(Number.isFinite(ah)){const ha=fb2_asianHandicap(ftM,ah,true),aa=fb2_asianHandicap(ftM,-ah,false);add("ah_home","Asian Handicap Home "+displayLine(ah),ha.win,"AH HOME "+displayLine(ah),odds.homeAH,ah,null);add("ah_away","Asian Handicap Away "+displayLine(-ah),aa.win,"AH AWAY "+displayLine(-ah),odds.awayAH,-ah,null);}
       const ta=parseMarketLine(fb2_text("teamATotalLine")),tb=parseMarketLine(fb2_text("teamBTotalLine"));if(Number.isFinite(ta)){const p=fb2_fromMatrix(ftM,(h)=>h>ta),u=fb2_fromMatrix(ftM,(h)=>h<ta);add("teamA_over","Team A Over "+displayLine(ta),p,"TEAM A OVER "+displayLine(ta),odds.aOver,ta,lambdas.home);add("teamA_under","Team A Under "+displayLine(ta),u,"TEAM A UNDER "+displayLine(ta),odds.aUnder,ta,lambdas.home);}if(Number.isFinite(tb)){const p=fb2_fromMatrix(ftM,(h,a)=>a>tb),u=fb2_fromMatrix(ftM,(h,a)=>a<tb);add("teamB_over","Team B Over "+displayLine(tb),p,"TEAM B OVER "+displayLine(tb),odds.bOver,tb,lambdas.away);add("teamB_under","Team B Under "+displayLine(tb),u,"TEAM B UNDER "+displayLine(tb),odds.bUnder,tb,lambdas.away);}
       const ancillary=[{prefix:"corners",a:fb2_num("aCorners",null),b:fb2_num("bCorners",null),line:parseMarketLine(fb2_text("cornersLine")),odds:fb2_parseOdds("oddsCornersOver"),underOdds:fb2_parseOdds("oddsCornersUnder"),label:"Corners",dispersion:1.10},{prefix:"cards",a:fb2_num("aCards",null),b:fb2_num("bCards",null),line:parseMarketLine(fb2_text("cardsLine")),odds:fb2_parseOdds("oddsCardsOver"),underOdds:fb2_parseOdds("oddsCardsUnder"),label:"Cards",dispersion:1.20},{prefix:"shots",a:fb2_num("aShotsMarket",null),b:fb2_num("bShotsMarket",null),line:parseMarketLine(fb2_text("shotsLine")),odds:fb2_parseOdds("oddsShotsOver"),underOdds:fb2_parseOdds("oddsShotsUnder"),label:"Shots",dispersion:1.35}];
-      ancillary.forEach(z=>{if(Number.isFinite(z.a)&&Number.isFinite(z.b)&&Number.isFinite(z.line)){const mean=z.a+z.b,p=fb2_countOver(mean,z.line,z.dispersion);if(p==null)return;const pu=fb2_countUnder(mean,z.line,z.dispersion);if(pu==null)return;const ev=fb2_ev(p,z.odds),g=fb2_grade(p,ev,sample,integrity);rows.push({marketKey:z.prefix+"_over",name:z.label+" Over "+displayLine(z.line),prob:p,rawProb:p,odds:z.odds,ev,line:z.line,projection:mean,grade:g,pick:(Number.isFinite(z.odds)?(ev!=null&&ev>=0.025?"OVER "+displayLine(z.line):"NO PLAY"):(p>=0.56?"OVER "+displayLine(z.line):"NO PLAY")),side:"OVER "+displayLine(z.line),integrity});const evU=fb2_ev(pu,z.underOdds),gU=fb2_grade(pu,evU,sample,integrity);rows.push({marketKey:z.prefix+"_under",name:z.label+" Under "+displayLine(z.line),prob:pu,rawProb:pu,odds:z.underOdds,ev:evU,line:z.line,projection:mean,grade:gU,pick:(Number.isFinite(z.underOdds)?(evU!=null&&evU>=0.025?"UNDER "+displayLine(z.line):"NO PLAY"):(pu>=0.56?"UNDER "+displayLine(z.line):"NO PLAY")),side:"UNDER "+displayLine(z.line),integrity});}});
+      ancillary.forEach(z=>{if(Number.isFinite(z.a)&&Number.isFinite(z.b)&&Number.isFinite(z.line)){const mean=z.a+z.b,p=fb2_countOver(mean,z.line,z.dispersion);if(p==null)return;const pu=fb2_countUnder(mean,z.line,z.dispersion);if(pu==null)return;const ev=fb2_ev(p,z.odds),g=fb2_grade(p,ev,sample,integrity);rows.push({marketKey:z.prefix+"_over",name:z.label+" Over "+displayLine(z.line),prob:p,rawProb:p,odds:z.odds,ev,line:z.line,projection:mean,grade:g,pick:(Number.isFinite(z.odds)&&z.odds>1&&ev!=null&&ev>=0.025?"OVER "+displayLine(z.line):"NO PLAY"),side:"OVER "+displayLine(z.line),integrity});const evU=fb2_ev(pu,z.underOdds),gU=fb2_grade(pu,evU,sample,integrity);rows.push({marketKey:z.prefix+"_under",name:z.label+" Under "+displayLine(z.line),prob:pu,rawProb:pu,odds:z.underOdds,ev:evU,line:z.line,projection:mean,grade:gU,pick:(Number.isFinite(z.underOdds)&&z.underOdds>1&&evU!=null&&evU>=0.025?"UNDER "+displayLine(z.line):"NO PLAY"),side:"UNDER "+displayLine(z.line),integrity});}});
       return rows;
     }
     function fb2_renderRows(rows,ctx,lambdas,integrity){
@@ -4792,11 +4839,12 @@
           const proj = parseFloat(cells[1].textContent);
           const edge = parseFloat(String(cells[2].textContent).replace("+", ""));
           const grade = String(cells[3].textContent || "").trim();
-          if (name.indexOf("full") >= 0) {
+          // Live V2 names: "FT Over 2.5", "FT Under 2.5", "1H Over 1.5", …
+          if (name.indexOf("ft over") >= 0 || name.indexOf("ft under") >= 0 || name.indexOf("full-time") >= 0 || name.indexOf("full time") >= 0) {
             out.ftProj = isFinite(proj) ? proj : null;
             out.ftEdge = isFinite(edge) ? edge : null;
             out.ftGrade = grade || null;
-          } else if (name.indexOf("1st") >= 0 || name.indexOf("1h") >= 0 || name.indexOf("half") >= 0) {
+          } else if (name.indexOf("1h over") >= 0 || name.indexOf("1h under") >= 0) {
             out.h1Proj = isFinite(proj) ? proj : null;
             out.h1Edge = isFinite(edge) ? edge : null;
             out.h1Grade = grade || null;
