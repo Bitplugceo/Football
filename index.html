@@ -1929,9 +1929,12 @@
       // Advanced stats (xG/shots) AND 1st-half goals both live in ESPN's
       // per-event summary/boxscore payload, so fetch it once per recent game
       // and derive both from that single fetch — no extra requests needed.
-      // Widened from the old 5-game cap to the full 10-game window so 1H
-      // sample size actually matches the FT sample size shown elsewhere.
-      const advRefs=chosen;
+      // Capped at 5 (not the full 10-game window): each of these is a real
+      // network request with a multi-step CORS-proxy fallback chain, and
+      // firing 10 per team (20 total, plus H2H) in parallel is enough to
+      // trip ESPN's rate limiting / exhaust the free proxy fallbacks, which
+      // breaks the whole auto-fetch rather than just thinning the 1H sample.
+      const advRefs=chosen.slice(0,5);
       const summaries=await Promise.all(advRefs.map(e=>fbEspnFetchSummary(slug,e.id).catch(()=>null)));
       const advs=summaries.map(s=>s?fbEspnExtractAdvanced(s,team.id):null);
       const finiteAvg=k=>{const vals=advs.map(x=>x&&x[k]).filter(Number.isFinite);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;};
