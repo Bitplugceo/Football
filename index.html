@@ -1,4 +1,3 @@
-D
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +10,7 @@ D
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: football_engine_v2_tier12_patch8_registry_fix — bump this string on every deploy.
+  <!-- BUILD_MARKER: football_engine_v3_world_registry_today_tomorrow_storage_fix — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon. -->
@@ -439,32 +438,7 @@ D
   <h3>League Tier</h3>
   <label>Select League</label>
   <select id="leagueSelect" class="league-box" onchange="if(typeof fbEspnOnLeagueChange==='function')fbEspnOnLeagueChange()">
-    <option value="">- Select League -</option>
-    <option value="eng.1">eng.1</option>
-    <option value="eng.2">eng.2</option>
-    <option value="esp.1">esp.1</option>
-    <option value="esp.2">esp.2</option>
-    <option value="ger.1">ger.1</option>
-    <option value="ger.2">ger.2</option>
-    <option value="ita.1">ita.1</option>
-    <option value="ita.2">ita.2</option>
-    <option value="fra.1">fra.1</option>
-    <option value="fra.2">fra.2</option>
-    <option value="ned.1">ned.1</option>
-    <option value="por.1">por.1</option>
-    <option value="bel.1">bel.1</option>
-    <option value="tur.1">tur.1</option>
-    <option value="sco.1">sco.1</option>
-    <option value="bra.1">bra.1</option>
-    <option value="bra.2">bra.2</option>
-    <option value="arg.1">arg.1</option>
-    <option value="mex.1">mex.1</option>
-    <option value="usa.1">usa.1</option>
-    <option value="uefa.champions">uefa.champions</option>
-    <option value="uefa.europa">uefa.europa</option>
-    <option value="uefa.europa.conf">uefa.europa.conf</option>
-    <option value="conmebol.libertadores">conmebol.libertadores</option>
-    <option value="conmebol.sudamericana">conmebol.sudamericana</option>
+    <option value="">All leagues</option>
   </select>
   <div id="leagueCoverage" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
 </div>
@@ -495,7 +469,7 @@ D
     <button type="button" class="fetch-btn" id="fbEspnAutoFetchBtn">📡 Fetch Stats</button>
   </div>
   <div id="fbEspnStatus" style="font-size:10px;min-height:16px;color:var(--muted);">Pick a league → Today/Tomorrow loads matches → select match or type names → Fetch Stats.</div>
-  <div id="fbEspnCoverage" style="font-size:10px;color:var(--muted);"></div>
+  <div id="fbEspnCoverage" style="font-size:10px;color:var(--muted);">World registry: loading… · Fixtures: Today + Tomorrow only</div>
   <div id="ssFetchStatus" style="font-size:10px;min-height:0;color:var(--muted);"></div>
 
   <div class="injury-box" id="fbInjuryBoxA" style="display:none;">
@@ -837,7 +811,7 @@ D
         if (mean > 8) report('WARN', 'DRIFT', 'Elevated projection drift mean ' + mean.toFixed(2) + ' pts');
       }
       const th = window.__fbThresholds || {};
-      if (!isFinite(th.ft) || !isFinite(th.h1)) {
+      if (!isFinite(th.ft) || !isFinite(th.h1) || !isFinite(th.h2)) {
         report('ERROR', 'THRESHOLDS', 'Live __fbThresholds missing or non-finite');
       } else {
         log('INFO', 'THRESHOLDS', 'Live gates FT=' + th.ft + ' / 1st=' + th.h1);
@@ -1048,7 +1022,7 @@ D
       if (Math.abs(edge) < 0.25) return "NO PLAY";
       // Use retrospective thresholds if available
       const th = window.__fbThresholds || {};
-      const threshold = marketKey==="h1" ? (th.h1 || 0.35) : (th.ft || 0.5);
+      const threshold = marketKey==="h1" ? (th.h1 || 0.35) : marketKey==="h2" ? (th.h2 || th.h1 || 0.35) : (th.ft || 0.5);
       if (Math.abs(edge) < threshold) return "NO PLAY";
       return edge > 0 ? "OVER " + displayLine(line) : "UNDER " + displayLine(line);
     }
@@ -1338,7 +1312,7 @@ D
       const ra = ratings[keyA] && isFinite(ratings[keyA].rating) ? ratings[keyA].rating : FOOTBALL_ELO_DEFAULT_RATING;
       const rb = ratings[keyB] && isFinite(ratings[keyB].rating) ? ratings[keyB].rating : FOOTBALL_ELO_DEFAULT_RATING;
       const expectedA = eloMatchWinProb(ra, rb);
-      const actualA = aWon ? 1 : 0;
+      const actualA = aWon === null || aWon === "draw" ? 0.5 : (aWon ? 1 : 0);
       const newRa = ra + FOOTBALL_ELO_K_FACTOR * (actualA - expectedA);
       const newRb = rb + FOOTBALL_ELO_K_FACTOR * ((1 - actualA) - (1 - expectedA));
       ratings[keyA] = { rating: newRa, matches: ((ratings[keyA] && ratings[keyA].matches) || 0) + 1, updatedAt: new Date().toISOString() };
@@ -1434,11 +1408,132 @@ D
       summaryCache: new Map(),
       requestCache: new Map(),
       controller: null,
-      loaded: false
+      loaded: false,
+      storageReady: false,
+      fixtureSyncBusy: false,
+      lastWorldSyncAt: 0
     };
     window.__fbAutoData = window.__fbAutoData || {
       context: {}, A: {}, B: {}, market: {}, h2h: [], source: "none", coverage: null
     };
+
+    /* ------------------------------------------------------------------
+       WORLD FOOTBALL STORAGE
+       - Persists the complete ESPN soccer competition registry.
+       - Persists ONLY today's and tomorrow's fixture objects.
+       - Historical team form / summaries remain on-demand and in-memory.
+       - IndexedDB is primary; localStorage is a small fallback for the
+         registry when IndexedDB is unavailable.
+       ------------------------------------------------------------------ */
+    const FB_WORLD_DB = { name: "FOOTBALL_WORLD_STORAGE_V3", version: 1 };
+    const FB_WORLD_LS_REGISTRY = "FOOTBALL_WORLD_LEAGUE_REGISTRY_V3";
+    const FB_WORLD_LS_FIXTURES = "FOOTBALL_WORLD_FIXTURES_2DAY_V3";
+    let fbWorldDbPromise = null;
+
+    function fbWorldOpenDB() {
+      if (fbWorldDbPromise) return fbWorldDbPromise;
+      if (!window.indexedDB) return Promise.resolve(null);
+      fbWorldDbPromise = new Promise(function(resolve) {
+        try {
+          const req = indexedDB.open(FB_WORLD_DB.name, FB_WORLD_DB.version);
+          req.onupgradeneeded = function(e) {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains("leagues")) {
+              const st = db.createObjectStore("leagues", { keyPath: "slug" });
+              st.createIndex("country", "country", { unique: false });
+            }
+            if (!db.objectStoreNames.contains("fixtures")) {
+              const st = db.createObjectStore("fixtures", { keyPath: "id" });
+              st.createIndex("dateKey", "dateKey", { unique: false });
+              st.createIndex("leagueSlug", "leagueSlug", { unique: false });
+            }
+            if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+          };
+          req.onsuccess = function(e) { FB_ESPN.storageReady = true; resolve(e.target.result); };
+          req.onerror = function() { resolve(null); };
+          req.onblocked = function() { resolve(null); };
+        } catch (err) { resolve(null); }
+      });
+      return fbWorldDbPromise;
+    }
+    function fbWorldTx(store, mode, work) {
+      return fbWorldOpenDB().then(function(db) {
+        if (!db) return null;
+        return new Promise(function(resolve, reject) {
+          try {
+            const tx = db.transaction(store, mode);
+            const st = tx.objectStore(store);
+            let result;
+            try { result = work(st); } catch (e) { reject(e); return; }
+            tx.oncomplete = function() { resolve(result); };
+            tx.onerror = function() { reject(tx.error || new Error("IndexedDB transaction failed")); };
+            tx.onabort = function() { reject(tx.error || new Error("IndexedDB transaction aborted")); };
+          } catch (e) { reject(e); }
+        });
+      });
+    }
+    function fbWorldPutAll(store, rows) {
+      const arr = Array.isArray(rows) ? rows : [];
+      return fbWorldTx(store, "readwrite", function(st) { arr.forEach(function(row) { st.put(row); }); });
+    }
+    function fbWorldGetAll(store) {
+      return fbWorldOpenDB().then(function(db) {
+        if (!db) return null;
+        return new Promise(function(resolve, reject) {
+          try {
+            const tx = db.transaction(store, "readonly");
+            const req = tx.objectStore(store).getAll();
+            req.onsuccess = function() { resolve(Array.isArray(req.result) ? req.result : []); };
+            req.onerror = function() { reject(req.error || new Error("IndexedDB read failed")); };
+          } catch (e) { reject(e); }
+        });
+      });
+    }
+    function fbWorldClear(store) {
+      return fbWorldTx(store, "readwrite", function(st) { st.clear(); });
+    }
+    function fbWorldSaveRegistry(registry) {
+      const rows = (registry || []).map(function(x) { return Object.assign({}, x); });
+      try { localStorage.setItem(FB_WORLD_LS_REGISTRY, JSON.stringify(rows)); } catch (e) {}
+      return fbWorldPutAll("leagues", rows).catch(function() { return null; });
+    }
+    async function fbWorldLoadRegistry() {
+      try {
+        const rows = await fbWorldGetAll("leagues");
+        if (Array.isArray(rows) && rows.length) return rows;
+      } catch (e) {}
+      try {
+        const rows = JSON.parse(localStorage.getItem(FB_WORLD_LS_REGISTRY) || "[]");
+        return Array.isArray(rows) ? rows : [];
+      } catch (e) { return []; }
+    }
+    function fbWorldDateKeyFromDate(dateValue) {
+      const d = new Date(dateValue || Date.now());
+      if (!Number.isFinite(d.getTime())) return "";
+      return d.getFullYear() + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0");
+    }
+    function fbWorldTwoDayKeys() { return [fbEspnLocalDateKey(0), fbEspnLocalDateKey(1)]; }
+    async function fbWorldSaveFixtures(fixtures) {
+      const keys = new Set(fbWorldTwoDayKeys());
+      const rows = (fixtures || []).filter(function(e) { return e && keys.has(fbWorldDateKeyFromDate(e.date)); }).map(function(e) {
+        return Object.assign({}, e, { dateKey: fbWorldDateKeyFromDate(e.date) });
+      });
+      try { localStorage.setItem(FB_WORLD_LS_FIXTURES, JSON.stringify(rows)); } catch (e) {}
+      try { await fbWorldClear("fixtures"); await fbWorldPutAll("fixtures", rows); } catch (e) {}
+      return rows;
+    }
+    async function fbWorldLoadFixtures() {
+      const keys = new Set(fbWorldTwoDayKeys());
+      let rows = [];
+      try { rows = await fbWorldGetAll("fixtures") || []; } catch (e) {}
+      if (!rows.length) {
+        try { const x = JSON.parse(localStorage.getItem(FB_WORLD_LS_FIXTURES) || "[]"); rows = Array.isArray(x) ? x : []; } catch (e) {}
+      }
+      return rows.filter(function(e) { return e && keys.has(e.dateKey || fbWorldDateKeyFromDate(e.date)); });
+    }
+    async function fbWorldSaveMeta(key, value) {
+      try { await fbWorldPutAll("meta", [{ key: key, value: value, updatedAt: Date.now() }]); } catch (e) {}
+    }
 
     function fbEspnNormalizeName(v) {
       return String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -1578,6 +1673,13 @@ D
       return st?.type?.completed === true || st?.type?.state === "post" || st?.type?.name === "STATUS_FINAL" || st?.completed === true;
     }
     function fbEspnCompetitors(ev) { return ev?.competitions?.[0]?.competitors || []; }
+    function fbEspnResolveLeagueSlugByName(name) {
+      const target=fbEspnNormalizeName(name); if(!target) return "";
+      const exact=(FB_ESPN.registry||[]).find(function(x){return fbEspnNormalizeName(x.name)===target;});
+      if(exact) return exact.slug;
+      const contains=(FB_ESPN.registry||[]).find(function(x){const n=fbEspnNormalizeName(x.name);return n && (n.includes(target)||target.includes(n));});
+      return contains ? contains.slug : "";
+    }
     function fbEspnNormalizeEvent(ev, leagueSlug) {
       const comp = ev?.competitions?.[0];
       const cs = fbEspnCompetitors(ev);
@@ -1588,17 +1690,24 @@ D
       const lines = c => Array.isArray(c?.linescores) ? c.linescores.map(fbEspnScoreValue).filter(Number.isFinite) : [];
       const hs = lines(home), as = lines(away);
       const h = score(home), a = score(away);
+      const rawLeagueName = comp?.league?.name || ev?.league?.name || "";
+      let resolvedSlug = String(
+        comp?.league?.slug || ev?.league?.slug || comp?.league?.abbreviation || ev?.league?.abbreviation || leagueSlug || ""
+      ).trim();
+      if (!resolvedSlug || resolvedSlug === "all") resolvedSlug = fbEspnResolveLeagueSlugByName(rawLeagueName);
+      const resolvedName = rawLeagueName || (resolvedSlug && resolvedSlug !== "all" ? fbEspnPrettySlug(resolvedSlug) : "Soccer");
       return {
-        id: String(ev.id), date: ev.date || comp?.date || "", leagueSlug,
-        competitionName: comp?.league?.name || ev?.league?.name || fbEspnPrettySlug(leagueSlug),
-        competitionSlug: String(comp?.league?.slug || ev?.league?.slug || comp?.league?.abbreviation || ""),
+        id: String(ev.id), date: ev.date || comp?.date || "", leagueSlug: resolvedSlug,
+        competitionName: resolvedName,
+        competitionSlug: resolvedSlug,
         season: ev?.season?.displayName || ev?.season?.slug || comp?.season?.displayName || "",
         venue: comp?.venue?.fullName || comp?.venue?.address?.city || "",
         competitionType: comp?.type?.text || comp?.type?.abbreviation || "",
         homeId: String(home?.team?.id || home?.id || ""), awayId: String(away?.team?.id || away?.id || ""),
         homeName: home?.team?.displayName || home?.team?.name || home?.team?.shortDisplayName || "Home",
         awayName: away?.team?.displayName || away?.team?.name || away?.team?.shortDisplayName || "Away",
-        homeScore: h, awayScore: a, homeLines: hs, awayLines: as, finished: fbEspnIsFinished(ev), raw: ev
+        homeScore: h, awayScore: a, homeLines: hs, awayLines: as, finished: fbEspnIsFinished(ev),
+        odds: fbEspnFindOdds(ev), raw: ev
       };
     }
     function fbEspnFindOdds(ev) {
@@ -1626,11 +1735,20 @@ D
     async function fbEspnLoadRegistry() {
       const sel = document.getElementById("leagueSelect");
       if (!sel) return [];
+      // Render persisted registry immediately, then refresh from ESPN.
+      try {
+        const cached = await fbWorldLoadRegistry();
+        if (cached.length) {
+          FB_ESPN.registry = cached.map(function(x){ return { slug:String(x.slug), name:String(x.name || fbEspnPrettySlug(x.slug)), country:String(x.country || "") }; });
+          FB_ESPN.loaded = true;
+          fbEspnRenderLeagueRegistry();
+        }
+      } catch (e) {}
       try {
         let data = await fbEspnFetchJSON(FB_ESPN.REGISTRY + "&page=1");
         let refs = Array.isArray(data && data.items) ? data.items.slice() : [];
-        const pages = Number(data && data.pageCount) || 1;
-        if (pages > 1 && refs.length < Number((data && data.count) || 0)) {
+        const pages = Math.max(1, Number(data && data.pageCount) || 1);
+        if (pages > 1) {
           const jobs = [];
           for (let p = 2; p <= pages; p++) jobs.push(fbEspnFetchJSON(FB_ESPN.REGISTRY + "&page=" + p));
           const rest = await Promise.allSettled(jobs);
@@ -1638,90 +1756,57 @@ D
             if (r.status === "fulfilled" && r.value && Array.isArray(r.value.items)) refs.push.apply(refs, r.value.items);
           });
         }
-        const seen = new Set();
-        FB_ESPN.registry = refs
-          .map(function(r) { return fbEspnSlugFromRef((r && (r.$ref || r.ref || r.slug)) || ""); })
-          .filter(Boolean)
-          .filter(function(slug) { if (seen.has(slug)) return false; seen.add(slug); return true; })
-          .map(function(slug) { return { slug: slug, name: fbEspnPrettySlug(slug) }; });
-        FB_ESPN.loaded = true;
-
         const COUNTRY_MAP = {
-          eng:"England", spa:"Spain", esp:"Spain", ger:"Germany", ita:"Italy", fra:"France",
-          ned:"Netherlands", por:"Portugal", bel:"Belgium", tur:"Turkey", gre:"Greece",
-          sco:"Scotland", aut:"Austria", sui:"Switzerland", den:"Denmark", nor:"Norway",
-          swe:"Sweden", pol:"Poland", cze:"Czechia", cro:"Croatia", srb:"Serbia",
-          ukr:"Ukraine", rus:"Russia", arg:"Argentina", bra:"Brazil", mex:"Mexico",
-          usa:"USA", can:"Canada", jpn:"Japan", kor:"South Korea", chn:"China",
-          sau:"Saudi Arabia", uae:"UAE", qat:"Qatar", egy:"Egypt", rsa:"South Africa",
-          mar:"Morocco", tun:"Tunisia", alg:"Algeria", aus:"Australia", chi:"Chile",
-          col:"Colombia", uru:"Uruguay", per:"Peru", ecu:"Ecuador", par:"Paraguay",
-          bol:"Bolivia", ven:"Venezuela", ind:"India", idn:"Indonesia", tha:"Thailand",
-          vie:"Vietnam", mys:"Malaysia", irn:"Iran", irq:"Iraq", isr:"Israel",
-          rou:"Romania", hun:"Hungary", bul:"Bulgaria", svk:"Slovakia", svn:"Slovenia",
-          bih:"Bosnia", mne:"Montenegro", alb:"Albania", mda:"Moldova", geo:"Georgia",
-          arm:"Armenia", aze:"Azerbaijan", kaz:"Kazakhstan", uzb:"Uzbekistan",
-          blr:"Belarus", ltu:"Lithuania", lva:"Latvia", est:"Estonia", fin:"Finland",
-          isl:"Iceland", nir:"Northern Ireland", wal:"Wales", irl:"Ireland",
-          crc:"Costa Rica", hon:"Honduras", slv:"El Salvador", gua:"Guatemala",
-          uefa:"UEFA", conmebol:"CONMEBOL", fifa:"FIFA", afc:"AFC", caf:"CAF"
+          eng:"England",spa:"Spain",esp:"Spain",ger:"Germany",ita:"Italy",fra:"France",ned:"Netherlands",por:"Portugal",bel:"Belgium",tur:"Turkey",gre:"Greece",sco:"Scotland",aut:"Austria",sui:"Switzerland",den:"Denmark",nor:"Norway",swe:"Sweden",pol:"Poland",cze:"Czechia",cro:"Croatia",srb:"Serbia",ukr:"Ukraine",rus:"Russia",arg:"Argentina",bra:"Brazil",mex:"Mexico",usa:"USA",can:"Canada",jpn:"Japan",kor:"South Korea",chn:"China",sau:"Saudi Arabia",uae:"UAE",qat:"Qatar",egy:"Egypt",rsa:"South Africa",mar:"Morocco",tun:"Tunisia",alg:"Algeria",aus:"Australia",chi:"Chile",col:"Colombia",uru:"Uruguay",per:"Peru",ecu:"Ecuador",par:"Paraguay",bol:"Bolivia",ven:"Venezuela",ind:"India",idn:"Indonesia",tha:"Thailand",vie:"Vietnam",mys:"Malaysia",irn:"Iran",irq:"Iraq",isr:"Israel",rou:"Romania",hun:"Hungary",bul:"Bulgaria",svk:"Slovakia",svn:"Slovenia",bih:"Bosnia",mne:"Montenegro",alb:"Albania",mda:"Moldova",geo:"Georgia",arm:"Armenia",aze:"Azerbaijan",kaz:"Kazakhstan",uzb:"Uzbekistan",blr:"Belarus",ltu:"Lithuania",lva:"Latvia",est:"Estonia",fin:"Finland",isl:"Iceland",nir:"Northern Ireland",wal:"Wales",irl:"Ireland",crc:"Costa Rica",hon:"Honduras",slv:"El Salvador",gua:"Guatemala",uefa:"UEFA",conmebol:"CONMEBOL",fifa:"FIFA",afc:"AFC",caf:"CAF"
         };
         function countryFromSlug(slug) {
-          const s = String(slug || "");
-          if (s.indexOf("uefa.") === 0) return "UEFA";
-          if (s.indexOf("conmebol.") === 0) return "CONMEBOL";
-          if (s.indexOf("fifa.") === 0) return "FIFA";
-          if (s.indexOf("afc.") === 0) return "AFC";
-          if (s.indexOf("caf.") === 0) return "CAF";
-          const pre = s.split(".")[0];
-          return COUNTRY_MAP[pre] || pre.toUpperCase();
+          const s=String(slug||"");
+          if (/^(uefa|conmebol|fifa|afc|caf)\./.test(s)) return s.split(".")[0].toUpperCase();
+          return COUNTRY_MAP[s.split(".")[0]] || s.split(".")[0].toUpperCase();
         }
-
-        const byCountry = {};
-        FB_ESPN.registry.forEach(function(x) {
-          const c = countryFromSlug(x.slug);
-          (byCountry[c] = byCountry[c] || []).push(x);
+        const seen = new Set();
+        FB_ESPN.registry = refs.map(function(r) {
+          return fbEspnSlugFromRef((r && (r.$ref || r.ref || r.slug)) || "");
+        }).filter(Boolean).filter(function(slug){
+          if (slug === "all" || seen.has(slug)) return false; seen.add(slug); return true;
+        }).map(function(slug){
+          return { slug:slug, name:fbEspnPrettySlug(slug), country:countryFromSlug(slug) };
         });
-        const countryNames = Object.keys(byCountry).sort();
-        let html = '<option value="">- Select League -</option>';
-        countryNames.forEach(function(country) {
-          const leagues = byCountry[country].sort(function(a, b) { return a.name.localeCompare(b.name); });
-          html += '<optgroup label="' + country.replace(/[&<>]/g, function(m) { return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m]; }) + '">';
-          leagues.forEach(function(x) {
-            html += '<option value="' + String(x.slug).replace(/"/g, "&quot;") + '">' +
-              String(x.name).replace(/[&<>]/g, function(m) { return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m]; }) +
-              "</option>";
-          });
-          html += "</optgroup>";
-        });
-        sel.innerHTML = html;
-
-        const coverageText = FB_ESPN.registry.length + " ESPN soccer competitions discovered (grouped by country)";
-        fbEspnSetCoverage(coverageText);
-        const leagueCoverage = document.getElementById("leagueCoverage");
-        if (leagueCoverage) leagueCoverage.textContent = coverageText;
-        if (typeof engineDebug === "function") {
-          engineDebug("ESPN soccer registry loaded", { count: FB_ESPN.registry.length, countries: countryNames.length });
-        }
+        FB_ESPN.loaded = true;
+        await fbWorldSaveRegistry(FB_ESPN.registry);
+        fbEspnRenderLeagueRegistry();
+        fbEspnSetCoverage(FB_ESPN.registry.length + " ESPN soccer competitions stored");
+        const leagueCoverage=document.getElementById("leagueCoverage");
+        if(leagueCoverage) leagueCoverage.textContent=FB_ESPN.registry.length + " ESPN soccer competitions stored locally";
+        engineDebug("ESPN soccer world registry refreshed", { count:FB_ESPN.registry.length });
         return FB_ESPN.registry;
-      } catch (e) {
-        fbEspnSetCoverage("ESPN registry unavailable");
-        const leagueCoverage = document.getElementById("leagueCoverage");
-        if (leagueCoverage) leagueCoverage.textContent = "ESPN competition registry unavailable";
-        fbEspnSetStatus("ESPN registry failed: " + (e && e.message ? e.message : e), "error");
-        if (typeof engineDebug === "function") {
-          engineDebug("ESPN registry fetch failed", { error: e && e.message ? e.message : String(e) });
+      } catch(e) {
+        if (!FB_ESPN.registry.length) {
+          FB_ESPN.registry = (typeof FB_ESPN_DAY_SCAN_LEAGUES !== "undefined" ? FB_ESPN_DAY_SCAN_LEAGUES : []).map(function(slug){return {slug:slug,name:fbEspnPrettySlug(slug),country:""};});
+          FB_ESPN.loaded = FB_ESPN.registry.length > 0;
+          fbEspnRenderLeagueRegistry();
         }
-        // Fallback: still offer priority leagues so the UI is usable offline of registry
-        if (sel && typeof FB_ESPN_DAY_SCAN_LEAGUES !== "undefined") {
-          let html = '<option value="">- Select League -</option>';
-          FB_ESPN_DAY_SCAN_LEAGUES.forEach(function(slug) {
-            html += '<option value="' + slug + '">' + fbEspnPrettySlug(slug) + "</option>";
-          });
-          sel.innerHTML = html;
-        }
-        return [];
+        fbEspnSetCoverage((FB_ESPN.registry.length || 0) + " stored competitions · refresh unavailable");
+        fbEspnSetStatus("League registry refresh failed; using stored registry.", "error");
+        engineDebug("ESPN registry refresh failed", {error:e?.message||String(e)});
+        return FB_ESPN.registry;
       }
+    }
+    function fbEspnRenderLeagueRegistry() {
+      const sel=document.getElementById("leagueSelect"); if(!sel) return;
+      const current=sel.value || "";
+      const groups={};
+      (FB_ESPN.registry||[]).forEach(function(x){ const c=x.country||"Other"; (groups[c]=groups[c]||[]).push(x); });
+      let html='<option value="">All leagues</option>';
+      Object.keys(groups).sort().forEach(function(country){
+        html+='<optgroup label="'+safeText(country)+'">';
+        groups[country].sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(x){
+          html+='<option value="'+String(x.slug).replace(/"/g,"&quot;")+'">'+safeText(x.name)+'</option>';
+        });
+        html+='</optgroup>';
+      });
+      sel.innerHTML=html;
+      if(current && Array.from(sel.options).some(function(o){return o.value===current;})) sel.value=current;
     }
     async function fbEspnLoadLeagueMeta(slug) {
       if(!slug)return null;
@@ -1735,83 +1820,70 @@ D
         return name;
       }catch(e){return null;}
     }
-    async function fbEspnLoadFixtures(offset = fbEspnFixtureOffset) {
-      // BB-style: only load scoreboard for the SELECTED league (fast, reliable).
-      const token = ++fbEspnFixtureLoadToken;
-      fbEspnFixtureOffset = offset === 1 ? 1 : 0;
-      const todayBtn = document.getElementById("fbEspnDayToday");
-      const tomBtn = document.getElementById("fbEspnDayTomorrow");
-      if (todayBtn) todayBtn.classList.toggle("active", fbEspnFixtureOffset === 0);
-      if (tomBtn) tomBtn.classList.toggle("active", fbEspnFixtureOffset === 1);
-
-      const leagueSel = document.getElementById("leagueSelect");
-      const fixtureSel = document.getElementById("fbEspnFixtureSelect");
-      if (!leagueSel || !fixtureSel) return [];
-
-      const slug = (leagueSel.value || "").trim();
-      const dateKey = fbEspnLocalDateKey(offset);
-      const dayLabel = offset === 0 ? "today" : "tomorrow";
-
-      if (!slug) {
-        fixtureSel.innerHTML = '<option value="">— Select league first —</option>';
-        fbEspnSetStatus("Select a league, then Today/Tomorrow will load matches.", "info");
-        return [];
-      }
-
-      fixtureSel.innerHTML = '<option value="">Loading matches…</option>';
-      fbEspnSetStatus("Loading " + slug + " matches for " + dayLabel + "…", "info");
-
+    async function fbEspnSyncWorldDay(offset, force) {
+      const dateKey=fbEspnLocalDateKey(offset);
+      const cacheKey="world:"+dateKey;
+      const cached=FB_ESPN.eventCache.get(cacheKey);
+      if(!force && Array.isArray(cached) && Date.now()-Number(cached._updatedAt||0)<120000) return cached;
+      const url=FB_ESPN.SITE("all")+"/scoreboard?dates="+dateKey+"&limit=1000";
+      const data=await fbEspnFetchJSON(url,15000);
+      const raw=Array.isArray(data?.events)?data.events:[];
+      const seen=new Set(), clean=[];
+      raw.map(function(ev){return fbEspnNormalizeEvent(ev,"all");}).filter(Boolean).forEach(function(e){
+        if(!seen.has(e.id)){seen.add(e.id);clean.push(e);}
+      });
+      clean.sort(function(a,b){return Date.parse(a.date||0)-Date.parse(b.date||0);});
+      Object.defineProperty(clean,"_updatedAt",{value:Date.now(),enumerable:false});
+      FB_ESPN.eventCache.set(cacheKey,clean);
+      return clean;
+    }
+    async function fbEspnSyncWorldFixtures(force) {
+      if(FB_ESPN.fixtureSyncBusy && !force) return false;
+      FB_ESPN.fixtureSyncBusy=true;
       try {
-        const key = "fixtures:" + slug + ":" + dateKey;
-        let events = FB_ESPN.eventCache.get(key);
-        if (!events) {
-          const url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + dateKey + "&limit=500";
-          const data = await fbEspnFetchJSON(url, 15000);
-          const raw = Array.isArray(data?.events) ? data.events : [];
-          events = raw.map(function(ev) { return fbEspnNormalizeEvent(ev, slug); }).filter(Boolean);
-          const seen = new Set();
-          events = events.filter(function(e) {
-            if (seen.has(e.id)) return false;
-            seen.add(e.id);
-            return true;
-          });
-          events.sort(function(a, b) { return Date.parse(a.date || 0) - Date.parse(b.date || 0); });
-          FB_ESPN.eventCache.set(key, events);
-          // Prefer official league name on the selected option when available
-          const fullName = data?.leagues?.[0]?.name || data?.leagues?.[0]?.displayName;
-          if (fullName) {
-            const opt = Array.from(leagueSel.options).find(function(o) { return o.value === slug; });
-            if (opt) opt.textContent = String(fullName);
-          }
+        const days=await Promise.all([fbEspnSyncWorldDay(0,!!force),fbEspnSyncWorldDay(1,!!force)]);
+        const persistRows=[].concat(days[0]||[],days[1]||[]).map(function(e){const x=Object.assign({},e);delete x.raw;return x;});
+        await fbWorldSaveFixtures(persistRows);
+        FB_ESPN.lastWorldSyncAt=Date.now();
+        await fbWorldSaveMeta("lastWorldSync",{at:FB_ESPN.lastWorldSyncAt,today:(days[0]||[]).length,tomorrow:(days[1]||[]).length});
+        return true;
+      } finally { FB_ESPN.fixtureSyncBusy=false; }
+    }
+    async function fbEspnLoadFixtures(offset = fbEspnFixtureOffset) {
+      const token=++fbEspnFixtureLoadToken;
+      fbEspnFixtureOffset=offset===1?1:0;
+      const todayBtn=document.getElementById("fbEspnDayToday"), tomBtn=document.getElementById("fbEspnDayTomorrow");
+      if(todayBtn) todayBtn.classList.toggle("active",fbEspnFixtureOffset===0);
+      if(tomBtn) tomBtn.classList.toggle("active",fbEspnFixtureOffset===1);
+      const leagueSel=document.getElementById("leagueSelect"), fixtureSel=document.getElementById("fbEspnFixtureSelect");
+      if(!fixtureSel) return [];
+      const slug=(leagueSel?.value||"").trim();
+      const dateKey=fbEspnLocalDateKey(offset), dayLabel=offset===0?"today":"tomorrow";
+      fixtureSel.innerHTML='<option value="">Loading '+dayLabel+' matches…</option>';
+      try {
+        let events=await fbEspnSyncWorldDay(offset,false);
+        if(!events || !events.length) {
+          const stored=await fbWorldLoadFixtures();
+          events=stored.filter(function(e){return (e.dateKey||fbWorldDateKeyFromDate(e.date))===dateKey;});
+          if(!events.length) events=await fbEspnSyncWorldDay(offset,true);
         }
-        if (token !== fbEspnFixtureLoadToken) return events || [];
-
-        fixtureSel.innerHTML = '<option value="">— Select match —</option>' + (events || []).map(function(e) {
-          const when = e.date ? new Date(e.date).toLocaleString() : "time unavailable";
-          const label = e.homeName + " vs " + e.awayName + " · " + when;
-          return "<option value='" + JSON.stringify(e).replace(/'/g, "&#39;") + "'>" +
-            label.replace(/[&<>]/g, function(m) { return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m]; }) +
-            "</option>";
+        if(slug) events=events.filter(function(e){return String(e.leagueSlug||"").toLowerCase()===slug.toLowerCase();});
+        if(token!==fbEspnFixtureLoadToken) return events||[];
+        fixtureSel.innerHTML='<option value="">— Select match —</option>'+(events||[]).map(function(e){
+          const when=e.date?new Date(e.date).toLocaleString():"time unavailable";
+          const label=(e.homeName||"Home")+" vs "+(e.awayName||"Away")+" · "+(e.competitionName||fbEspnPrettySlug(e.leagueSlug))+" · "+when;
+          return "<option value='"+JSON.stringify(e).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";
         }).join("");
-
-        fbEspnSetStatus(
-          events && events.length
-            ? events.length + " matches loaded for " + dayLabel + "."
-            : "No matches in this league for " + dayLabel + ".",
-          events && events.length ? "ok" : "info"
-        );
-        if (typeof engineDebug === "function") {
-          engineDebug("ESPN football fixtures loaded", { league: slug, date: dateKey, count: (events || []).length });
-        }
-        return events || [];
-      } catch (e) {
-        if (token !== fbEspnFixtureLoadToken) return [];
-        fixtureSel.innerHTML = '<option value="">Fixture load failed</option>';
-        fbEspnSetStatus("Fixture fetch failed: " + (e && e.message ? e.message : e), "error");
-        if (typeof engineDebug === "function") {
-          engineDebug("ESPN fixture fetch failed", { league: slug, date: dateKey, error: e && e.message ? e.message : String(e) });
-        }
-        return [];
+        fbEspnSetStatus((events&&events.length?events.length+" matches loaded for "+dayLabel:"No matches found for "+dayLabel)+" · world feed",events&&events.length?"ok":"info");
+        fbEspnSetCoverage((FB_ESPN.registry||[]).length+" leagues stored · "+(events||[]).length+" matches shown");
+        return events||[];
+      } catch(e) {
+        const stored=await fbWorldLoadFixtures();
+        let events=stored.filter(function(x){return (x.dateKey||fbWorldDateKeyFromDate(x.date))===dateKey;});
+        if(slug) events=events.filter(function(x){return String(x.leagueSlug||"").toLowerCase()===slug.toLowerCase();});
+        fixtureSel.innerHTML='<option value="">'+(events.length?"Stored matches available":"Fixture refresh failed")+'</option>'+(events||[]).map(function(x){return "<option value='"+JSON.stringify(x).replace(/'/g,"&#39;")+"'>"+safeText((x.homeName||"")+" vs "+(x.awayName||"")+" · "+(x.competitionName||x.leagueSlug||"Soccer"))+"</option>";}).join("");
+        fbEspnSetStatus(events.length?"Using stored world fixtures while refresh is unavailable.":"World fixture refresh failed: "+(e?.message||String(e)),events.length?"info":"error");
+        return events;
       }
     }
 
@@ -2095,7 +2167,7 @@ D
       set(prefix + "FTAllowed", (data.allowed || []).slice(0, 10).join(","));
       set(prefix + "1HScored", (data.h1Scored || []).slice(0, 10).join(","));
       set(prefix + "1HAllowed", (data.h1Allowed || []).slice(0, 10).join(","));
-      set(side === "A" ? "aMatchesLast7d" : "bMatchesLast7d", data.matchesLast7d != null ? data.matchesLast7d : "");
+      set(side === "A" ? "aFixtureLoad7d" : "bFixtureLoad7d", data.matchesLast7d != null ? data.matchesLast7d : "");
       // name / id sync
       const nameEl = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName");
       const idEl = document.getElementById(side === "A" ? "ssTeamAId" : "ssTeamBId");
@@ -2254,9 +2326,7 @@ D
 
 
     async function fbEspnOnLeagueChange() {
-      if (typeof fbEspnLoadFixtures === "function") {
-        await fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0);
-      }
+      if (typeof fbEspnLoadFixtures === "function") await fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0);
     }
     window.fbEspnOnLeagueChange = fbEspnOnLeagueChange;
 
@@ -2269,7 +2339,7 @@ D
     window.fbEspnFillFormFromTeamData = fbEspnFillFormFromTeamData;
 
     
-    // SofaScore path removed — ESPN is the sole ingest path.
+    // Legacy SofaScore surface intentionally disabled; ESPN is the sole ingest path.
     window.ssIsFootballEvent = function() { return false; };
     window.parseSofascoreTeam = function() {
       const st = document.getElementById("ssFetchStatus");
@@ -2322,6 +2392,7 @@ D
       const useH2H1 = document.getElementById("use1HH2H").checked && h2h1A.length>=2 && h2h1B.length>=2;
       const ftLine = parseMarketLine(document.getElementById("ftMarket").value);
       const h1Line = parseMarketLine(document.getElementById("h1Market").value);
+      const h2Line = parseMarketLine(document.getElementById("h2Market")?.value || "");
       const aFixtureLoad7d = parseFloat(document.getElementById("aFixtureLoad7d")?.value || "0") || 0;
       const bFixtureLoad7d = parseFloat(document.getElementById("bFixtureLoad7d")?.value || "0") || 0;
 
@@ -2405,6 +2476,11 @@ D
       const LEAGUE_H1_BASE = 1.1;
       let ftProj = anchorProjection(matchMarkov.expectedTotal, ftN, LEAGUE_FT_BASE);
       let h1Proj = anchorProjection(h1Markov.expectedTotal, h1N, LEAGUE_H1_BASE);
+      // Second-half projection is the internally reconciled remainder of the
+      // full-match and first-half models. Never invent an independent H2 model
+      // that can contradict FT = H1 + H2.
+      let h2Proj = Math.max(0, ftProj - h1Proj);
+      if (!isFinite(h2Proj)) h2Proj = NaN;
 
       // Volatility reused from early calc (same series / scale) for trap detection
       const ftVol = ftVolEarly;
@@ -2415,26 +2491,36 @@ D
       const UNDER_EDGE_FACTOR = 1.08;
       let ftEdge = isFinite(ftLine) ? ftProj - ftLine : NaN;
       let h1Edge = isFinite(h1Line) ? h1Proj - h1Line : NaN;
+      let h2Edge = isFinite(h2Line) ? h2Proj - h2Line : NaN;
       if (isFinite(ftEdge) && ftEdge < 0) ftEdge = ftEdge * UNDER_EDGE_FACTOR;
       if (isFinite(h1Edge) && h1Edge < 0) h1Edge = h1Edge * UNDER_EDGE_FACTOR;
+      if (isFinite(h2Edge) && h2Edge < 0) h2Edge = h2Edge * UNDER_EDGE_FACTOR;
 
       // Model-native P(total > line) — the Markov model's actual answer,
       // independent of the point-edge heuristic above.
       const ftProbOver = isFinite(ftLine) ? probOverLine(matchMarkov.expectedTotal, matchMarkov.varianceTotal, ftLine) : NaN;
       const h1ProbOver = isFinite(h1Line) ? probOverLine(h1Markov.expectedTotal, h1Markov.varianceTotal, h1Line) : NaN;
+      const h2Variance = isFinite(ftProj) && isFinite(h1Proj) ? Math.max(0.15, h2Proj * FOOTBALL_MODEL.OVERDISPERSION) : NaN;
+      const h2ProbOver = isFinite(h2Line) ? probOverLine(h2Proj, h2Variance, h2Line) : NaN;
       const ftMarginSwing = detectMarginSwingAnomaly(aFT, aFA) || detectMarginSwingAnomaly(bFT, bFA);
       const h1MarginSwing = detectMarginSwingAnomaly(a1H, a1A) || detectMarginSwingAnomaly(b1H, b1A);
       const ftIntegrityFlag = flagIntegrityRisk(ftVol, ftSampleTier) || ftMarginSwing;
       const h1IntegrityFlag = flagIntegrityRisk(h1Vol, h1SampleTier) || h1MarginSwing;
+      const h2IntegrityFlag = ftIntegrityFlag || h1IntegrityFlag;
 
       let ftPick = (ftSampleTier === "insufficient") ? "NO PLAY" : getPick(ftEdge, ftLine, "ft");
       let h1Pick = (h1SampleTier === "insufficient") ? "NO PLAY" : getPick(h1Edge, h1Line, "h1");
+      const h2SampleTier = (ftSampleTier === "insufficient" || h1SampleTier === "insufficient") ? "insufficient" : (ftSampleTier === "full" && h1SampleTier === "full" ? "full" : "thin");
+      let h2Pick = h2SampleTier === "insufficient" ? "NO PLAY" : getPick(h2Edge, h2Line, "h2");
       const ftTrap = detectTrap(ftEdge, ftLine, ftPick, "ft", ftVol);
       const h1Trap = detectTrap(h1Edge, h1Line, h1Pick, "h1", h1Vol);
+      const h2Trap = detectTrap(h2Edge, h2Line, h2Pick, "h2", Math.max(ftVol,h1Vol));
       if (ftTrap) ftPick = "NO PLAY";
       if (h1Trap) h1Pick = "NO PLAY";
+      if (h2Trap) h2Pick = "NO PLAY";
       const ftConf = getConfidenceGrade(ftEdge, ftLine, ftSampleTier, { trap: ftTrap, volRatio: ftVol, hasH2H: useH2H, probOver: ftProbOver });
       const h1Conf = getConfidenceGrade(h1Edge, h1Line, h1SampleTier, { trap: h1Trap, volRatio: h1Vol, hasH2H: useH2H1, probOver: h1ProbOver });
+      const h2Conf = getConfidenceGrade(h2Edge, h2Line, h2SampleTier, { trap: h2Trap, volRatio: Math.max(ftVol,h1Vol), hasH2H: useH2H && useH2H1, probOver: h2ProbOver });
       engineDebug("Projections computed", {
         ftProj, ftEdge, ftPick, ftConf, ftSampleTier, ftVol: +ftVol.toFixed(2), ftTrap,
         ftProbOver: isFinite(ftProbOver) ? +ftProbOver.toFixed(3) : null, ftIntegrityFlag,
@@ -2442,6 +2528,7 @@ D
         ftW: { team: +ftW.teamWeight.toFixed(3), opp: +ftW.oppWeight.toFixed(3) },
         h1Proj, h1Edge, h1Pick, h1Conf, h1SampleTier, h1Vol: +h1Vol.toFixed(2), h1Trap,
         h1ProbOver: isFinite(h1ProbOver) ? +h1ProbOver.toFixed(3) : null, h1IntegrityFlag,
+        h2Proj, h2Line, h2Edge, h2Pick, h2Conf, h2ProbOver: isFinite(h2ProbOver) ? +h2ProbOver.toFixed(3) : null,
         pGame1: +pGame1.toFixed(3),
         h1W: { team: +h1W.teamWeight.toFixed(3), opp: +h1W.oppWeight.toFixed(3) },
         elo: { ratingA: +eloResult.ratingA.toFixed(0), ratingB: +eloResult.ratingB.toFixed(0), weight: eloResult.weight, matchesA: eloResult.matchesA, matchesB: eloResult.matchesB }
@@ -2450,7 +2537,8 @@ D
       // Build pick objects for lock selection
       const pickObjects = [
         { name: "Full-Time Total Goals", marketKey: "ft", proj: ftProj, edge: ftEdge, line: ftLine, pick: ftPick, conf: ftConf, sampleTier: ftSampleTier, hasH2H: useH2H, trap: ftTrap, vol: ftVol, probOver: ftProbOver, integrityFlag: ftIntegrityFlag, pWinMatchModel: matchMarkov.pWin, eloRatingA: eloResult.ratingA, eloRatingB: eloResult.ratingB, eloWeight: eloResult.weight },
-        { name: "1st Half Total Goals", marketKey: "h1", proj: h1Proj, edge: h1Edge, line: h1Line, pick: h1Pick, conf: h1Conf, sampleTier: h1SampleTier, hasH2H: useH2H1, trap: h1Trap, vol: h1Vol, probOver: h1ProbOver, integrityFlag: h1IntegrityFlag, pWinMatchModel: h1Markov.pWin, eloRatingA: eloResult.ratingA, eloRatingB: eloResult.ratingB, eloWeight: eloResult.weight }
+        { name: "1st Half Total Goals", marketKey: "h1", proj: h1Proj, edge: h1Edge, line: h1Line, pick: h1Pick, conf: h1Conf, sampleTier: h1SampleTier, hasH2H: useH2H1, trap: h1Trap, vol: h1Vol, probOver: h1ProbOver, integrityFlag: h1IntegrityFlag, pWinMatchModel: h1Markov.pWin, eloRatingA: eloResult.ratingA, eloRatingB: eloResult.ratingB, eloWeight: eloResult.weight },
+        { name: "2nd Half Total Goals", marketKey: "h2", proj: h2Proj, edge: h2Edge, line: h2Line, pick: h2Pick, conf: h2Conf, sampleTier: h2SampleTier, hasH2H: useH2H && useH2H1, trap: h2Trap, vol: Math.max(ftVol,h1Vol), probOver: h2ProbOver, integrityFlag: h2IntegrityFlag, pWinMatchModel: matchMarkov.pWin, eloRatingA: eloResult.ratingA, eloRatingB: eloResult.ratingB, eloWeight: eloResult.weight }
       ];
       const leagueTrust = getLeagueTrustMeta(fb2_competitionLabel());
       // Select lock: highest confidence grade (A>B>C>D>NaN), then highest edge magnitude
@@ -2469,9 +2557,10 @@ D
       });
       // Build rows with lock indicator
       const rows = [];
+      const selectedFixture = typeof fbEspnGetSelectedFixture === "function" ? fbEspnGetSelectedFixture() : null;
       const fixtureMeta = {
-        eventId: "manual_fb_"+Date.now(),
-        eventDate: new Date().toISOString(),
+        eventId: selectedFixture?.id ? String(selectedFixture.id) : "",
+        eventDate: selectedFixture?.date || (document.getElementById("fixtureKickoff")?.value || new Date().toISOString()),
         homeTeam: document.getElementById("ssTeamAName").value||"A",
         awayTeam: document.getElementById("ssTeamBName").value||"B",
         homeTeamId: document.getElementById("ssTeamAId").value||"",
@@ -2556,7 +2645,8 @@ D
             volRatio: isFinite(p.vol) ? Number(p.vol) : null,
             probOver: isFinite(probOver) ? Number(probOver) : null,
             integrityFlag: integrityFlag,
-            pWinMatchModel: isFinite(p.pWinMatchModel) ? Number(p.pWinMatchModel) : null
+            pWinMatchModel: isFinite(p.pWinMatchModel) ? Number(p.pWinMatchModel) : null,
+            fixtureLinescores: selectedFixture ? [].concat(selectedFixture.homeLines||[], selectedFixture.awayLines||[]) : []
           };
           rows.push(payload);
         }
@@ -2575,7 +2665,7 @@ D
         });
         engineDebug("Success: " + rows.length + " pick(s) saved to tracker", { total: rows.length, lockIdx });
       } else {
-        engineDebug("No picks saved — all markets were NO PLAY", { ftPick, h1Pick });
+        engineDebug("No picks saved — all markets were NO PLAY", { ftPick, h1Pick, h2Pick });
       }
     }
 
@@ -2986,6 +3076,202 @@ D
       return { run: run, resetGolden: resetGolden };
     })();
 
+    // ---------- Repaired football core exports ----------
+    function fb2_competitionLabel(){
+      const sel=document.getElementById('leagueSelect');
+      if(sel && sel.value){const o=sel.options[sel.selectedIndex];return String(o?.textContent||sel.value).trim();}
+      return String(window.__fbAutoData?.context?.competition || 'World Soccer').trim() || 'World Soccer';
+    }
+    function fb2_scoreMatrix(lambdaHome,lambdaAway){
+      const lh=Math.max(0,Number(lambdaHome)||0), la=Math.max(0,Number(lambdaAway)||0), max=8;
+      function pois(k,l){let p=Math.exp(-l),v=p;for(let i=1;i<=k;i++){p*=l/i;v=p;}return v;}
+      const m=[];for(let i=0;i<=max;i++){m[i]=[];for(let j=0;j<=max;j++)m[i][j]=pois(i,lh)*pois(j,la);}return m;
+    }
+    function fb2_1x2(m){let h=0,d=0,a=0;for(let i=0;i<m.length;i++)for(let j=0;j<m[i].length;j++){if(i>j)h+=m[i][j];else if(i===j)d+=m[i][j];else a+=m[i][j];}const z=h+d+a||1;return {home:h/z,draw:d/z,away:a/z};}
+    function fb2_btts(m){let noH=0,noA=0,no=0;for(let i=0;i<m.length;i++)for(let j=0;j<m[i].length;j++){const p=m[i][j];if(i===0)noH+=p;if(j===0)noA+=p;if(i===0&&j===0)no+=p;}return Math.max(0,Math.min(1,1-noH-noA+no));}
+    function fb2_asianHandicap(m,line,homeSide){
+      let home=0,draw=0,away=0;for(let i=0;i<m.length;i++)for(let j=0;j<m[i].length;j++){const p=m[i][j],d=(homeSide?i-j:j-i)+Number(line||0);if(d>0)home+=p;else if(d===0)draw+=p;else away+=p;}const z=home+draw+away||1;return {win:home/z,push:draw/z,lose:away/z};
+    }
+    function fb2_fairOdds(prob){const p=Number(prob);return p>0&&p<1?1/p:Infinity;}
+    function loadFbVerifiedConfig(market){
+      try{const x=JSON.parse(localStorage.getItem('FOOTBALL_THRESHOLD_VERIFIED_'+String(market))||'null');return x||null;}catch(e){return null;}
+    }
+    function toggleTheme(){document.body.classList.toggle('dark-mode');try{localStorage.setItem('theme',document.body.classList.contains('dark-mode')?'dark':'light');}catch(e){}}
+    function clearAll(){
+      ['ssTeamAName','ssTeamAId','ssTeamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','a1HScored','a1HAllowed','b1HScored','b1HAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','a1HH2H','b1HH2H','ftMarket','h1Market','h2Market','fixtureKickoff'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
+      ['useFTH2H','use1HH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
+      const r=document.getElementById('results');if(r){r.style.display='none';r.innerHTML='<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>';}
+      window.__fbAutoData={context:{},A:{},B:{},market:{},h2h:[],source:'none',coverage:null};
+      engineDebug('Football engine inputs cleared');
+    }
+    function runEngine(){return runEngineLegacy();}
+    window.fb2_competitionLabel=fb2_competitionLabel;window.fb2_scoreMatrix=fb2_scoreMatrix;window.fb2_1x2=fb2_1x2;window.fb2_btts=fb2_btts;window.fb2_asianHandicap=fb2_asianHandicap;window.fb2_fairOdds=fb2_fairOdds;window.loadFbVerifiedConfig=loadFbVerifiedConfig;window.toggleTheme=toggleTheme;window.clearAll=clearAll;window.runEngine=runEngine;
+
+    // ---------- Tracker / settlement core (self-contained) ----------
+    // The football build previously referenced the basketball tracker API
+    // without shipping its implementation. This module owns tracker state,
+    // persistence, rendering, manual settlement and ESPN auto-settlement.
+    const FB_TRACKER_KEY = "FOOTBALL_TRACKER_STATE_V3";
+    const FB_TRACKER_LIMIT = 500;
+    const FB_ARCHIVE_LIMIT = 2000;
+    var g_trackerState = window.g_trackerState = (function(){
+      try {
+        const x = JSON.parse(localStorage.getItem(FB_TRACKER_KEY) || "null");
+        if (x && Array.isArray(x.activePicks) && Array.isArray(x.archivedPicks)) return x;
+      } catch(e) {}
+      return {activePicks:[], archivedPicks:[], stats:{settled:0,wins:0,losses:0,pushes:0}, updatedAt:new Date().toISOString()};
+    })();
+    window.g_trackerState = g_trackerState;
+    var g_engineLineMemory = window.g_engineLineMemory = window.g_engineLineMemory || {};
+
+    function fbTrackerSave(){
+      g_trackerState.updatedAt=new Date().toISOString();
+      try{ localStorage.setItem(FB_TRACKER_KEY,JSON.stringify(g_trackerState)); }catch(e){}
+      try{ updateEnginePerformanceScore(); updateDriftDisplay(); }catch(e){}
+    }
+    function fbTrackerRecount(){
+      const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])];
+      const settled=all.filter(p=>p.resultStatus==='win'||p.resultStatus==='loss'||p.resultStatus==='push');
+      g_trackerState.stats={settled:settled.length,wins:settled.filter(p=>p.resultStatus==='win').length,losses:settled.filter(p=>p.resultStatus==='loss').length,pushes:settled.filter(p=>p.resultStatus==='push').length};
+    }
+    function addTrackedPicks(rows){
+      const incoming=Array.isArray(rows)?rows:[]; const existing=new Set();
+      [...g_trackerState.activePicks,...g_trackerState.archivedPicks].forEach(p=>{if(p?.signature)existing.add(p.signature);});
+      incoming.forEach(p=>{if(!p||!p.signature||existing.has(p.signature))return;g_trackerState.activePicks.push(Object.assign({},p,{resultStatus:p.resultStatus||'pending'}));existing.add(p.signature);});
+      if(g_trackerState.activePicks.length>FB_TRACKER_LIMIT) g_trackerState.activePicks=g_trackerState.activePicks.slice(-FB_TRACKER_LIMIT);
+      if(g_trackerState.archivedPicks.length>FB_ARCHIVE_LIMIT) g_trackerState.archivedPicks=g_trackerState.archivedPicks.slice(-FB_ARCHIVE_LIMIT);
+      fbTrackerRecount(); fbTrackerSave(); renderTrackedPicks();
+      return incoming;
+    }
+    function fbTrackerStatusClass(st){return st==='win'?'track-win':st==='loss'?'track-loss':st==='push'?'track-push':'track-pending';}
+    function fbTrackerEsc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+    function renderTrackedPicks(){
+      const body=document.getElementById('trackedPicksBody'), empty=document.getElementById('trackerEmpty'), summary=document.getElementById('trackerSummary');
+      if(!body)return; const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])].slice().reverse();
+      body.innerHTML=all.map(function(p){
+        const date=p.eventDate||p.createdAt||''; const when=date?new Date(date).toLocaleDateString():'';
+        const match=(p.homeTeam||'A')+' vs '+(p.awayTeam||'B'); const st=p.resultStatus||'pending';
+        const sig=encodeURIComponent(p.signature||'');
+        return '<tr><td>'+fbTrackerEsc(when)+'</td><td>'+fbTrackerEsc(p.league||'')+'</td><td>'+fbTrackerEsc(match)+'</td><td>'+fbTrackerEsc(p.marketName||p.marketKey||'')+'</td><td>'+fbTrackerEsc(displayLine(p.line))+'</td><td>'+fbTrackerEsc(p.predictionText||'')+(p.isLock?' 🔒':'')+'</td><td class="'+getConfidenceClass(p.confidenceGrade)+'">'+fbTrackerEsc(p.confidenceGrade||'—')+'</td><td><div class="tracker-status-stack"><span class="'+fbTrackerStatusClass(st)+'">'+fbTrackerEsc(st.toUpperCase())+'</span><div class="tracker-manual-settle"><button type="button" class="tracker-manual-btn tracker-settle-btn" data-sig="'+sig+'" data-manual-settle="win">W</button><button type="button" class="tracker-manual-btn tracker-settle-btn" data-sig="'+sig+'" data-manual-settle="loss">L</button><button type="button" class="tracker-manual-btn tracker-settle-btn" data-sig="'+sig+'" data-manual-settle="push">P</button><button type="button" class="tracker-manual-btn tracker-delete-pick-btn" data-sig="'+sig+'">×</button></div></div></td></tr>';
+      }).join('');
+      if(empty) empty.style.display=all.length?'none':'block';
+      if(summary) summary.textContent=all.length+' saved • '+g_trackerState.stats.settled+' settled • '+g_trackerState.stats.wins+' wins';
+      const ms=document.getElementById('trackerMarketSummary');
+      if(ms){
+        const map={}; all.forEach(p=>{const k=p.marketKey||'other';map[k]=map[k]||{n:0,w:0};map[k].n++;if(p.resultStatus==='win')map[k].w++;});
+        ms.innerHTML=Object.keys(map).map(k=>'<span class="tracker-market-chip">'+fbTrackerEsc(k.toUpperCase())+' · '+map[k].n+' · '+(map[k].n?((map[k].w/map[k].n)*100).toFixed(1):'0')+'%</span>').join('');
+      }
+    }
+    var __fbTrackerView='picks';
+    function isTrackerReportView(){return __fbTrackerView==='report';}
+    function setTrackerModalView(view){
+      __fbTrackerView=view==='report'?'report':'picks';
+      const panel=document.getElementById('trackerAnalyticsPanel'), wrap=document.getElementById('trackedPicksTable');
+      if(panel) panel.style.display=__fbTrackerView==='report'?'block':'none';
+      if(wrap) wrap.style.display=__fbTrackerView==='report'?'none':'table';
+      const title=document.getElementById('trackerHeadTitle'); if(title) title.textContent=__fbTrackerView==='report'?'Football Engine Report':'Tracked Picks';
+      if(__fbTrackerView==='report' && panel){
+        const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])]; const settled=all.filter(p=>['win','loss','push'].includes(p.resultStatus));
+        const wr=settled.length?settled.filter(p=>p.resultStatus==='win').length/settled.length*100:null;
+        const avgEdge=all.length?all.reduce((s,p)=>s+(Number(p.edge)||0),0)/all.length:null;
+        panel.innerHTML='<div class="tracker-analytics-shell"><div class="tracker-analytics-topbar"><div class="tracker-analytics-heading"><div class="tracker-analytics-kicker">FOOTBALL MODEL</div><div class="tracker-analytics-title">Performance report</div><div class="tracker-analytics-subtitle">Persistent tracker statistics; pushes excluded from win/loss rate.</div></div></div><div class="tracker-kpi-grid"><div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Win rate</div><div class="tracker-kpi-value">'+(wr==null?'—':wr.toFixed(1)+'%')+'</div><div class="tracker-kpi-sub">'+settled.length+' settled</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Active</div><div class="tracker-kpi-value">'+g_trackerState.activePicks.length+'</div><div class="tracker-kpi-sub">pending picks</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Average edge</div><div class="tracker-kpi-value">'+(avgEdge==null?'—':avgEdge.toFixed(2))+'</div><div class="tracker-kpi-sub">goals</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Losses</div><div class="tracker-kpi-value">'+g_trackerState.stats.losses+'</div><div class="tracker-kpi-sub">tracked</div></div></div></div>';
+      }
+    }
+    function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView(__fbTrackerView);}
+    function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}}
+    function applyManualSettlementToTrackedPick(signature,status){
+      const all=[g_trackerState.activePicks,g_trackerState.archivedPicks]; let found=null;
+      all.forEach(arr=>arr.forEach(p=>{if(p.signature===signature)found=p;})); if(!found)return false;
+      found.resultStatus=status; found.settledAt=status==='pending'?null:new Date().toISOString();
+      if(status!=='pending' && g_trackerState.activePicks.includes(found)){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p!==found);g_trackerState.archivedPicks.push(found);}
+      fbTrackerRecount();fbTrackerSave();renderTrackedPicks();return true;
+    }
+    function deleteTrackedPickBySignature(signature){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p.signature!==signature);g_trackerState.archivedPicks=g_trackerState.archivedPicks.filter(p=>p.signature!==signature);fbTrackerRecount();fbTrackerSave();renderTrackedPicks();}
+    function copyTrackerData(){
+      const text=JSON.stringify({exportedAt:new Date().toISOString(),state:g_trackerState},null,2);
+      const done=()=>{const b=document.getElementById('trackerCopyDataBtn');if(b){const o=b.textContent;b.textContent='✅';setTimeout(()=>b.textContent=o,1200);}};
+      if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(()=>{}); else {try{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch(e){}}
+    }
+    function updateEnginePerformanceScore(){
+      const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])]; const s=all.filter(p=>p.resultStatus==='win'||p.resultStatus==='loss');
+      const score=s.length?Math.round((s.filter(p=>p.resultStatus==='win').length/s.length)*100):0;
+      const fill=document.getElementById('enginePerfFill'),pct=document.getElementById('enginePerfPct'); if(fill)fill.style.width=score+'%';if(pct)pct.textContent=s.length?score+'%':'—';
+    }
+    function updateDriftDisplay(){return true;}
+    function militaryRaid(){if(typeof AFDB!=='undefined'&&AFDB.runTestFetch)return AFDB.runTestFetch();return null;}
+    async function reconcileFootballSources(){
+      try {
+        const ok=await fbEspnSyncWorldFixtures(true);
+        return {ok:!!ok,source:'ESPN world soccer scoreboard',today:fbEspnLocalDateKey(0),tomorrow:fbEspnLocalDateKey(1),checkedAt:new Date().toISOString()};
+      } catch(e){return {ok:false,error:e?.message||String(e),checkedAt:new Date().toISOString()};}
+    }
+    function exportFootballEngineState(){return JSON.stringify({exportedAt:new Date().toISOString(),build:window.__APP_BUILD_VERSION||'',model:window.ENGINE_MODEL_VERSION||'',tracker:g_trackerState,thresholds:window.__fbThresholds||{},registryCount:(FB_ESPN.registry||[]).length},null,2);}
+    function getFbConfigLabSnapshot(){return {live:Object.assign({},window.__fbThresholds||{}),modelVersion:window.ENGINE_MODEL_VERSION||window.__APP_BUILD_VERSION||'football_v3',storedAt:new Date().toISOString()};}
+    function proposeFbConfigUpgrades(){return {status:'advisory',candidates:[],message:'No automatic configuration promotion without out-of-sample evidence.'};}
+    function applyFbVerifiedConfig(market,threshold){
+      const mk=String(market||'ft'), v=Number(threshold); if(!['ft','h1','h2'].includes(mk)||!Number.isFinite(v)||v<0)return false;
+      window.__fbThresholds=Object.assign({ft:0.5,h1:0.35,h2:0.35},window.__fbThresholds||{}, {[mk]:v});
+      try{localStorage.setItem('FOOTBALL_THRESHOLD_VERIFIED_'+mk,JSON.stringify({verified:true,threshold:v,updatedAt:new Date().toISOString()}));localStorage.setItem('FOOTBALL_THRESHOLDS_PRIMARY',JSON.stringify(window.__fbThresholds));}catch(e){} return true;
+    }
+    function fbFootballActualForMarket(summary,pick){
+      const comp=summary?.header?.competitions?.[0]; const cs=Array.isArray(comp?.competitors)?comp.competitors:[];
+      let scores=cs.map(c=>fbEspnScoreValue(c?.score));
+      if(scores.length<2){const c=summary?.competitions?.[0];scores=Array.isArray(c?.competitors)?c.competitors.map(x=>fbEspnScoreValue(x?.score)):[];}
+      if(scores.length<2)return null; const total=scores.reduce((a,b)=>a+b,0);
+      let h1=null; const lineMap=[]; (cs||[]).forEach(c=>{const ls=Array.isArray(c?.linescores)?c.linescores.map(fbEspnScoreValue).filter(Number.isFinite):[];if(ls.length)lineMap.push(ls[0]);});
+      if(lineMap.length>=2)h1=lineMap.reduce((a,b)=>a+b,0); else if(pick?.fixtureLinescores?.length>=2)h1=pick.fixtureLinescores[0]+pick.fixtureLinescores[1];
+      const mk=pick.marketKey; if(mk==='ft')return total; if(mk==='h1')return h1; if(mk==='h2')return h1==null?null:total-h1; return null;
+    }
+    function fbSettleTotal(actual,line,side){
+      if(!Number.isFinite(actual)||!Number.isFinite(line))return 'pending';
+      const s=String(side||'').toLowerCase(); if(s!=='over'&&s!=='under')return 'pending';
+      const q=Math.round(line*4)/4; const frac=Math.abs(q-Math.round(q*2)/2);
+      if(Math.abs(frac-0.25)<0.001){const lo=Math.floor(q*2)/2,hi=lo+0.5;const a=fbSettleTotal(actual,lo,side),b=fbSettleTotal(actual,hi,side);if(a===b)return a;if(a==='push'&&b==='loss'||a==='loss'&&b==='push')return 'half-loss';if(a==='push'&&b==='win'||a==='win'&&b==='push')return 'half-win';return a==='win'&&b==='loss'?'split':'split';}
+      if(s==='over')return actual>q?'win':actual===q?'push':'loss';
+      return actual<q?'win':actual===q?'push':'loss';
+    }
+    async function settleTrackedPickFromScore(signature,summary){
+      const all=[...g_trackerState.activePicks,...g_trackerState.archivedPicks]; const pick=all.find(p=>p.signature===signature); if(!pick)return null;
+      const actual=fbFootballActualForMarket(summary,pick); if(actual==null)return null;
+      const side=pick.side||getPickSideFromText(pick.predictionText); const status=fbSettleTotal(actual,Number(pick.line),side); if(!status||status==='pending')return null;
+      pick.actual=actual;pick.settledAt=new Date().toISOString();pick.resultStatus=status;
+      if(g_trackerState.activePicks.includes(pick)){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p!==pick);g_trackerState.archivedPicks.push(pick);}
+      fbTrackerRecount();fbTrackerSave();renderTrackedPicks();return status;
+    }
+    async function autoSettleFootballEvent(eventId,leagueSlug){
+      if(!eventId)return false; const slug=leagueSlug||''; if(!slug||slug==='all')return false;
+      try{
+        const summary=await fbEspnFetchSummary(slug,eventId);
+        const picks=g_trackerState.activePicks.filter(p=>String(p.eventId)===String(eventId));
+        for(const p of picks) await settleTrackedPickFromScore(p.signature,summary);
+        // Update team ELO exactly once per completed real match. Draws are a
+        // 0.5 result, not a forced B win.
+        try {
+          const c=summary?.header?.competitions?.[0]; const cs=Array.isArray(c?.competitors)?c.competitors:[];
+          if(cs.length>=2){
+            const ca=cs[0], cb=cs[1], sa=fbEspnScoreValue(ca?.score), sb=fbEspnScoreValue(cb?.score);
+            if(Number.isFinite(sa)&&Number.isFinite(sb)){
+              const key='FOOTBALL_ELO_EVENT_'+eventId;
+              if(!localStorage.getItem(key)){
+                const aId=ca?.team?.id||ca?.id||picks[0]?.homeTeamId||''; const bId=cb?.team?.id||cb?.id||picks[0]?.awayTeamId||'';
+                const aName=ca?.team?.displayName||ca?.team?.name||picks[0]?.homeTeam||'A'; const bName=cb?.team?.displayName||cb?.team?.name||picks[0]?.awayTeam||'B';
+                const ka=getEloKey(aName,aId), kb=getEloKey(bName,bId);
+                updateEloForMatch(ka,kb,sa===sb?null:sa>sb);
+                try{localStorage.setItem(key,new Date().toISOString());}catch(_e){}
+              }
+            }
+          }
+        } catch(_e){}
+        return true;
+      }catch(e){return false;}
+    }
+    async function fbCheckAndSettleActivePicks(){
+      const groups={};g_trackerState.activePicks.forEach(p=>{if(p.eventId&&p.league&&p.league!=='all'){const k=p.league+'|'+p.eventId;(groups[k]=groups[k]||[]).push(p);}});
+      for(const k of Object.keys(groups)){const parts=k.split('|');await autoSettleFootballEvent(parts[1],parts[0]);}
+    }
+    window.reconcileFootballSources=reconcileFootballSources;window.exportFootballEngineState=exportFootballEngineState;window.addTrackedPicks=addTrackedPicks;window.renderTrackedPicks=renderTrackedPicks;window.openTrackerModal=openTrackerModal;window.closeTrackerModal=closeTrackerModal;window.setTrackerModalView=setTrackerModalView;window.isTrackerReportView=isTrackerReportView;window.applyManualSettlementToTrackedPick=applyManualSettlementToTrackedPick;window.deleteTrackedPickBySignature=deleteTrackedPickBySignature;window.copyTrackerData=copyTrackerData;window.updateEnginePerformanceScore=updateEnginePerformanceScore;window.updateDriftDisplay=updateDriftDisplay;window.militaryRaid=militaryRaid;window.getFbConfigLabSnapshot=getFbConfigLabSnapshot;window.proposeFbConfigUpgrades=proposeFbConfigUpgrades;window.applyFbVerifiedConfig=applyFbVerifiedConfig;window.settleTrackedPickFromScore=settleTrackedPickFromScore;window.autoSettleFootballEvent=autoSettleFootballEvent;window.fbCheckAndSettleActivePicks=fbCheckAndSettleActivePicks;
+    fbTrackerRecount();
+
     // ---------- DOM ready ----------
     document.addEventListener("DOMContentLoaded", function() {
       makeSectionsCollapsible();
@@ -3002,16 +3288,16 @@ D
       try {
         const savedTh = JSON.parse(localStorage.getItem("FOOTBALL_THRESHOLDS_PRIMARY") || "null");
         if (savedTh && isFinite(savedTh.ft) && isFinite(savedTh.h1)) {
-          window.__fbThresholds = { ft: Number(savedTh.ft), h1: Number(savedTh.h1) };
+          window.__fbThresholds = { ft: Number(savedTh.ft), h1: Number(savedTh.h1), h2: Number(savedTh.h2 ?? savedTh.h1) };
         } else {
-          window.__fbThresholds = { ft: 0.5, h1: 0.35 };
+          window.__fbThresholds = { ft: 0.5, h1: 0.35, h2: 0.35 };
         }
       } catch (e) {
-        window.__fbThresholds = { ft: 0.5, h1: 0.35 };
+        window.__fbThresholds = { ft: 0.5, h1: 0.35, h2: 0.35 };
       }
       // Prefer verified silos when present (manual locks from Phase-2)
       try {
-        ["ft", "h1"].forEach(function(mk) {
+        ["ft", "h1", "h2"].forEach(function(mk) {
           const v = loadFbVerifiedConfig(mk);
           if (v && v.verified && isFinite(v.threshold)) {
             window.__fbThresholds[mk] = Number(v.threshold);
@@ -3121,8 +3407,7 @@ D
       document.getElementById("runBtn").addEventListener("click", runEngine);
       document.getElementById("clearBtn").addEventListener("click", clearAll);
 
-      // ESPN auto-fetch boot wiring removed — ESPN is the sole ingest path.
-      // Competition / matchup are detected from pasted SofaScore tournament context.
+      // ESPN world-feed boot is wired below; ESPN is the sole ingest path.
 
       // Audit copy button
       document.getElementById("auditCopyBtn").addEventListener("click", function() {
@@ -3151,7 +3436,7 @@ D
           "aFTScored", "aFTAllowed", "bFTScored", "bFTAllowed",
           "a1HScored", "a1HAllowed", "b1HScored", "b1HAllowed",
           "aFTH2H", "bFTH2H", "a1HH2H", "b1HH2H",
-          "ftMarket", "h1Market"
+          "ftMarket", "h1Market", "h2Market"
         ];
         const data = {};
         ids.forEach(id => {
@@ -3192,7 +3477,7 @@ D
  */
 (function(){
   'use strict';
-  const NS = 'FB_ENGINE_LIFECYCLE_V1';
+  const NS = 'FB_ENGINE_LIFECYCLE_V2_WORLD_STORAGE';
   const STORE = {
     state: NS + ':state',
     experiments: NS + ':experiments',
@@ -3273,13 +3558,13 @@ D
   function loadList(key,limit){ const x=safeParse(key,[]); return Array.isArray(x)?x.slice(-limit):[]; }
   function append(key,item,limit){ const x=loadList(key,limit);x.push(item);safeSave(key,x);return item; }
   function registerExperiment(input){
-    const e=Object.assign({id:NS+'-EXP-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),createdAt:now(),status:'EVALUATED',engineVersion:window.ENGINE_MODEL_VERSION||window.APP_BUILD_VERSION||'football_v1'},input||{});
+    const e=Object.assign({id:NS+'-EXP-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),createdAt:now(),status:'EVALUATED',engineVersion:window.ENGINE_MODEL_VERSION||window.APP_BUILD_VERSION||'football_v3'},input||{});
     e.configHash=e.configHash||hash(e.config||{}); append(STORE.experiments,e,LIMITS.experiments); return e;
   }
   function recordLedger(event){ return append(STORE.ledger,Object.assign({timestamp:now()},event||{}),LIMITS.ledger); }
 
   /* ---------------- model lineage / verified config ---------------- */
-  function getVersion(){ return String(window.ENGINE_MODEL_VERSION||window.APP_BUILD_VERSION||'football_v1'); }
+  function getVersion(){ return String(window.ENGINE_MODEL_VERSION||window.APP_BUILD_VERSION||'football_v3'); }
   function getLiveConfig(){ return {thresholds:window.__fbThresholds||{},modelVersion:getVersion(),core:window.__fbCoreConfig||null,competition:fb2_competitionLabel()}; }
   function snapshot(label){ const cfg=getLiveConfig(); return {label:label||'snapshot',createdAt:now(),modelVersion:getVersion(),config:cfg,configHash:hash(cfg)}; }
 
@@ -3301,7 +3586,7 @@ D
   }
   function rollback(){
     const c=loadCanary(); if(!c||!c.baseline)return false;
-    const th=c.baseline.config&&c.baseline.config.thresholds; if(th&&finite(th.ft)&&finite(th.h1)){ window.__fbThresholds={ft:Number(th.ft),h1:Number(th.h1)}; safeSave('FOOTBALL_THRESHOLDS_PRIMARY',Object.assign({},window.__fbThresholds,{updatedAt:now(),source:'canary_rollback'})); }
+    const th=c.baseline.config&&c.baseline.config.thresholds; if(th&&finite(th.ft)&&finite(th.h1)){ window.__fbThresholds={ft:Number(th.ft),h1:Number(th.h1),h2:finite(th.h2)?Number(th.h2):Number(th.h1)}; safeSave('FOOTBALL_THRESHOLDS_PRIMARY',Object.assign({},window.__fbThresholds,{updatedAt:now(),source:'canary_rollback'})); }
     if(c.baseline.config&&c.baseline.config.core){ window.__fbCoreConfig=c.baseline.config.core; window.__fbCoreOverrides=(c.baseline.config.core.overrides||{}); }
     c.active=false;c.status='ROLLED_BACK';c.rolledBackAt=now();saveCanary(c);recordLedger({type:'ROLLBACK',baseline:c.baseline});debug('Football config rolled back',c);return true;
   }
@@ -3309,7 +3594,7 @@ D
   /* ---------------- engine health / integrity ---------------- */
   function health(){
     const issues=[], warnings=[]; const th=window.__fbThresholds||{};
-    if(!finite(th.ft)||!finite(th.h1))issues.push('Live football thresholds are missing/non-finite');
+    if(!finite(th.ft)||!finite(th.h1)||!finite(th.h2))issues.push('Live football thresholds are missing/non-finite');
     const tracker=window.g_trackerState;
     if(tracker){ const all=[...(tracker.activePicks||[]),...(tracker.archivedPicks||[])]; const sigs=new Set(); let dup=0; for(const p of all){const s=p.signature||((p.eventId||'')+'|'+(p.marketKey||'')+'|'+(p.side||''));if(sigs.has(s))dup++;sigs.add(s);} if(dup)issues.push('Duplicate tracker signatures: '+dup); const settled=all.filter(p=>p.resultStatus&&p.resultStatus!=='pending'); if(settled.length>=20){const w=settled.filter(p=>p.resultStatus==='win').length;const wr=w/settled.length;if(wr<0.45)warnings.push('Rolling settled win rate below 45%');}}
     if(typeof window.runEngine!=='function')issues.push('runEngine export missing');
@@ -5244,17 +5529,38 @@ document.addEventListener("DOMContentLoaded", function() {
     if (el) el.classList.remove("collapsed");
   });
   if (typeof fbEspnLoadRegistry === "function") {
-    fbEspnLoadRegistry().then(function() {
-      if (typeof fbEspnSetStatus === "function") {
-        fbEspnSetStatus("Leagues loaded. Select a league, then Today/Tomorrow.", "ok");
+    fbEspnLoadRegistry().then(async function() {
+      try {
+        await fbEspnSyncWorldFixtures(false);
+        if (typeof fbEspnLoadFixtures === "function") await fbEspnLoadFixtures(0);
+        if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("World leagues + Today/Tomorrow fixtures loaded.", "ok");
+      } catch (e) {
+        if (typeof engineDebug === "function") engineDebug("ESPN world boot sync failed", { error: e && e.message ? e.message : String(e) });
       }
     }).catch(function(e) {
       if (typeof engineDebug === "function") engineDebug("ESPN boot load failed", { error: e && e.message ? e.message : String(e) });
-      if (typeof fbEspnSetStatus === "function") {
-        fbEspnSetStatus("League registry failed: " + (e && e.message ? e.message : e), "error");
-      }
+      if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("Using stored league/fixture data; refresh unavailable.", "error");
     });
   }
+  // Best-effort background refresh while the page/PWA is alive. Browsers may
+  // suspend timers when the app is backgrounded, so visibility/pageshow also
+  // trigger an immediate refresh on return. The storage itself is persistent.
+  if (!window.__FB_WORLD_REFRESH_TIMER) {
+    window.__FB_WORLD_REFRESH_TIMER = setInterval(function(){
+      if (document.visibilityState === "hidden") return;
+      Promise.resolve(fbEspnSyncWorldFixtures(true)).then(function(){
+        if (typeof fbEspnLoadFixtures === "function") return fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0);
+      }).catch(function(e){ if(typeof engineDebug === "function") engineDebug("Background world refresh failed",{error:e?.message||String(e)}); });
+    }, 3 * 60 * 1000);
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible") {
+      Promise.resolve(fbEspnSyncWorldFixtures(true)).then(function(){ return fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0); }).catch(function(){});
+    }
+  });
+  window.addEventListener("pageshow", function(){
+    Promise.resolve(fbEspnSyncWorldFixtures(true)).then(function(){ return fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0); }).catch(function(){});
+  });
 });
 
 window.EngineAuditor = EngineAuditor;
