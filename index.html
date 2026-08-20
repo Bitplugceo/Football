@@ -1,3 +1,4 @@
+D
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: football_engine_v2_tier12_patch7_bb_ui — bump this string on every deploy.
+  <!-- BUILD_MARKER: football_engine_v2_tier12_patch8_registry_fix — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon. -->
@@ -439,6 +440,31 @@
   <label>Select League</label>
   <select id="leagueSelect" class="league-box" onchange="if(typeof fbEspnOnLeagueChange==='function')fbEspnOnLeagueChange()">
     <option value="">- Select League -</option>
+    <option value="eng.1">eng.1</option>
+    <option value="eng.2">eng.2</option>
+    <option value="esp.1">esp.1</option>
+    <option value="esp.2">esp.2</option>
+    <option value="ger.1">ger.1</option>
+    <option value="ger.2">ger.2</option>
+    <option value="ita.1">ita.1</option>
+    <option value="ita.2">ita.2</option>
+    <option value="fra.1">fra.1</option>
+    <option value="fra.2">fra.2</option>
+    <option value="ned.1">ned.1</option>
+    <option value="por.1">por.1</option>
+    <option value="bel.1">bel.1</option>
+    <option value="tur.1">tur.1</option>
+    <option value="sco.1">sco.1</option>
+    <option value="bra.1">bra.1</option>
+    <option value="bra.2">bra.2</option>
+    <option value="arg.1">arg.1</option>
+    <option value="mex.1">mex.1</option>
+    <option value="usa.1">usa.1</option>
+    <option value="uefa.champions">uefa.champions</option>
+    <option value="uefa.europa">uefa.europa</option>
+    <option value="uefa.europa.conf">uefa.europa.conf</option>
+    <option value="conmebol.libertadores">conmebol.libertadores</option>
+    <option value="conmebol.sudamericana">conmebol.sudamericana</option>
   </select>
   <div id="leagueCoverage" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
 </div>
@@ -1602,18 +1628,24 @@
       if (!sel) return [];
       try {
         let data = await fbEspnFetchJSON(FB_ESPN.REGISTRY + "&page=1");
-        let refs = Array.isArray(data?.items) ? data.items.slice() : [];
-        const pages = Number(data?.pageCount) || 1;
-        if (pages > 1 && refs.length < Number(data?.count || 0)) {
+        let refs = Array.isArray(data && data.items) ? data.items.slice() : [];
+        const pages = Number(data && data.pageCount) || 1;
+        if (pages > 1 && refs.length < Number((data && data.count) || 0)) {
           const jobs = [];
           for (let p = 2; p <= pages; p++) jobs.push(fbEspnFetchJSON(FB_ESPN.REGISTRY + "&page=" + p));
           const rest = await Promise.allSettled(jobs);
-          rest.forEach(r => { if (r.status === "fulfilled" && Array.isArray(r.value?.items)) refs.push(...r.value.items); });
+          rest.forEach(function(r) {
+            if (r.status === "fulfilled" && r.value && Array.isArray(r.value.items)) refs.push.apply(refs, r.value.items);
+          });
         }
         const seen = new Set();
-        FB_ESPN.registry = refs.map(r => fbEspnSlugFromRef(r?.$ref || r?.ref || r?.slug))
-          .filter(Boolean).filter(slug => !seen.has(slug) && seen.add(slug)).map(slug => ({ slug, name: fbEspnPrettySlug(slug) }));
+        FB_ESPN.registry = refs
+          .map(function(r) { return fbEspnSlugFromRef((r && (r.$ref || r.ref || r.slug)) || ""); })
+          .filter(Boolean)
+          .filter(function(slug) { if (seen.has(slug)) return false; seen.add(slug); return true; })
+          .map(function(slug) { return { slug: slug, name: fbEspnPrettySlug(slug) }; });
         FB_ESPN.loaded = true;
+
         const COUNTRY_MAP = {
           eng:"England", spa:"Spain", esp:"Spain", ger:"Germany", ita:"Italy", fra:"France",
           ned:"Netherlands", por:"Portugal", bel:"Belgium", tur:"Turkey", gre:"Greece",
@@ -1631,86 +1663,63 @@
           arm:"Armenia", aze:"Azerbaijan", kaz:"Kazakhstan", uzb:"Uzbekistan",
           blr:"Belarus", ltu:"Lithuania", lva:"Latvia", est:"Estonia", fin:"Finland",
           isl:"Iceland", nir:"Northern Ireland", wal:"Wales", irl:"Ireland",
-          mex:"Mexico", crc:"Costa Rica", hon:"Honduras", slv:"El Salvador",
-          gua:"Guatemala", pan:"Panama", jam:"Jamaica", tto:"Trinidad",
-          nga:"Nigeria", gha:"Ghana", civ:"Ivory Coast", sen:"Senegal", cmr:"Cameroon",
-          zam:"Zambia", zim:"Zimbabwe", ang:"Angola", moz:"Mozambique"
+          crc:"Costa Rica", hon:"Honduras", slv:"El Salvador", gua:"Guatemala",
+          uefa:"UEFA", conmebol:"CONMEBOL", fifa:"FIFA", afc:"AFC", caf:"CAF"
         };
-        function fbEspnCountryFromSlug(slug) {
-          const s = String(slug || "").toLowerCase();
-          const m = s.match(/^([a-z]{2,3})[.\-_]/);
-          if (m && COUNTRY_MAP[m[1]]) return COUNTRY_MAP[m[1]];
-          const m2 = s.match(/^([a-z]{2,3})\d/);
-          if (m2 && COUNTRY_MAP[m2[1]]) return COUNTRY_MAP[m2[1]];
-          return "Other";
-        }
-        const byCountry = {};
-        FB_ESPN.registry.forEach(x => {
-          const c = fbEspnCountryFromSlug(x.slug);
-          if (!byCountry[c]) byCountry[c] = [];
-          byCountry[c].push(x);
-        });
-        const countryNames = Object.keys(byCountry).sort((a,b) => {
-          if (a === "Other") return 1;
-          if (b === "Other") return -1;
-          return a.localeCompare(b);
-        });
-        // 
-        {
-          const COUNTRY_MAP = {
-            eng:"England", spa:"Spain", esp:"Spain", ger:"Germany", ita:"Italy", fra:"France",
-            ned:"Netherlands", por:"Portugal", bel:"Belgium", tur:"Turkey", gre:"Greece",
-            sco:"Scotland", aut:"Austria", sui:"Switzerland", den:"Denmark", nor:"Norway",
-            swe:"Sweden", pol:"Poland", cze:"Czechia", cro:"Croatia", rou:"Romania", hun:"Hungary",
-            arg:"Argentina", bra:"Brazil", mex:"Mexico", usa:"USA", jpn:"Japan", kor:"South Korea",
-            chn:"China", sau:"Saudi Arabia", uae:"UAE", qat:"Qatar", irn:"Iran",
-            egy:"Egypt", rsa:"South Africa", mar:"Morocco", tun:"Tunisia", alg:"Algeria",
-            nga:"Nigeria", gha:"Ghana", aus:"Australia", chi:"Chile", col:"Colombia",
-            uru:"Uruguay", per:"Peru", ecu:"Ecuador", par:"Paraguay", bol:"Bolivia", ven:"Venezuela",
-            uefa:"UEFA", conmebol:"CONMEBOL", fifa:"FIFA", afc:"AFC", caf:"CAF"
-          };
-          function countryFromSlug(slug) {
-            const s = String(slug || "");
-            if (s.indexOf("uefa.") === 0) return "UEFA";
-            if (s.indexOf("conmebol.") === 0) return "CONMEBOL";
-            if (s.indexOf("fifa.") === 0) return "FIFA";
-            if (s.indexOf("afc.") === 0) return "AFC";
-            if (s.indexOf("caf.") === 0) return "CAF";
-            const pre = s.split(".")[0];
-            return COUNTRY_MAP[pre] || pre.toUpperCase();
-          }
-          const byCountry = {};
-          FB_ESPN.registry.forEach(function(x) {
-            const c = countryFromSlug(x.slug);
-            (byCountry[c] = byCountry[c] || []).push(x);
-          });
-          const countryNames = Object.keys(byCountry).sort();
-          let html = '<option value="">- Select League -</option>';
-          countryNames.forEach(function(country) {
-            const leagues = byCountry[country].sort(function(a,b){ return a.name.localeCompare(b.name); });
-            html += '<optgroup label="' + country.replace(/[&<>]/g, function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m];}) + '">';
-            leagues.forEach(function(x) {
-              html += '<option value="' + String(x.slug).replace(/"/g,"&quot;") + '">' +
-                String(x.name).replace(/[&<>]/g, function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m];}) +
-                '</option>';
-            });
-            html += '</optgroup>';
-          });
-          sel.innerHTML = html;
+        function countryFromSlug(slug) {
+          const s = String(slug || "");
+          if (s.indexOf("uefa.") === 0) return "UEFA";
+          if (s.indexOf("conmebol.") === 0) return "CONMEBOL";
+          if (s.indexOf("fifa.") === 0) return "FIFA";
+          if (s.indexOf("afc.") === 0) return "AFC";
+          if (s.indexOf("caf.") === 0) return "CAF";
+          const pre = s.split(".")[0];
+          return COUNTRY_MAP[pre] || pre.toUpperCase();
         }
 
-        const coverageText = FB_ESPN.registry.lengthconst coverageText = FB_ESPN.registry.length + " ESPN soccer competitions discovered (grouped by country)";
+        const byCountry = {};
+        FB_ESPN.registry.forEach(function(x) {
+          const c = countryFromSlug(x.slug);
+          (byCountry[c] = byCountry[c] || []).push(x);
+        });
+        const countryNames = Object.keys(byCountry).sort();
+        let html = '<option value="">- Select League -</option>';
+        countryNames.forEach(function(country) {
+          const leagues = byCountry[country].sort(function(a, b) { return a.name.localeCompare(b.name); });
+          html += '<optgroup label="' + country.replace(/[&<>]/g, function(m) { return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m]; }) + '">';
+          leagues.forEach(function(x) {
+            html += '<option value="' + String(x.slug).replace(/"/g, "&quot;") + '">' +
+              String(x.name).replace(/[&<>]/g, function(m) { return {"&":"&amp;","<":"&lt;",">":"&gt;"}[m]; }) +
+              "</option>";
+          });
+          html += "</optgroup>";
+        });
+        sel.innerHTML = html;
+
+        const coverageText = FB_ESPN.registry.length + " ESPN soccer competitions discovered (grouped by country)";
         fbEspnSetCoverage(coverageText);
         const leagueCoverage = document.getElementById("leagueCoverage");
         if (leagueCoverage) leagueCoverage.textContent = coverageText;
-        engineDebug("ESPN soccer registry loaded", { count: FB_ESPN.registry.length, countries: countryNames.length });
+        if (typeof engineDebug === "function") {
+          engineDebug("ESPN soccer registry loaded", { count: FB_ESPN.registry.length, countries: countryNames.length });
+        }
         return FB_ESPN.registry;
       } catch (e) {
         fbEspnSetCoverage("ESPN registry unavailable");
         const leagueCoverage = document.getElementById("leagueCoverage");
         if (leagueCoverage) leagueCoverage.textContent = "ESPN competition registry unavailable";
-        fbEspnSetStatus("ESPN registry failed: " + (e?.message || e), "error");
-        engineDebug("ESPN registry fetch failed", { error: e?.message || String(e) });
+        fbEspnSetStatus("ESPN registry failed: " + (e && e.message ? e.message : e), "error");
+        if (typeof engineDebug === "function") {
+          engineDebug("ESPN registry fetch failed", { error: e && e.message ? e.message : String(e) });
+        }
+        // Fallback: still offer priority leagues so the UI is usable offline of registry
+        if (sel && typeof FB_ESPN_DAY_SCAN_LEAGUES !== "undefined") {
+          let html = '<option value="">- Select League -</option>';
+          FB_ESPN_DAY_SCAN_LEAGUES.forEach(function(slug) {
+            html += '<option value="' + slug + '">' + fbEspnPrettySlug(slug) + "</option>";
+          });
+          sel.innerHTML = html;
+        }
         return [];
       }
     }
