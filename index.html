@@ -1,4 +1,3 @@
-H
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -377,16 +376,7 @@ H
   </span>
 </header>
   <div class="wrapper">
-<div class="section" id="leagueSection">
-  <h3>League Tier</h3>
-  <label>Select League</label>
-  <select id="leagueSelect" class="league-box">
-    <option value="">Loading ESPN soccer competitions…</option>
-  </select>
-  <div id="leagueCoverage" style="font-size:10px;color:var(--muted);margin-top:2px;"></div>
-</div>
-
-  <div class="section" id="sofascoreManualSection">
+<div class="section" id="sofascoreManualSection">
   <h3>🔍 Team Lookup <span style="font-size:11px;color:#aaa;">(SofaScore manual — football)</span></h3>
 
   <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
@@ -399,10 +389,10 @@ H
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
       <input id="ssTeamAId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('A')" style="margin-bottom:0;font-size:11px;padding:4px 6px;max-width:160px;" aria-label="Team A numerical ID" />
-      <a id="ssTeamALink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON A</a>
-      <a id="ssTeamALink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p1</a>
-      <a id="ssTeamALink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p2</a>
-      <a id="ssTeamALink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p3</a>
+      <a id="ssTeamALink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p0</a>
+      <a id="ssTeamALink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p1</a>
+      <a id="ssTeamALink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p2</a>
+      <a id="ssTeamALink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p3</a>
     </div>
   </div>
 
@@ -416,10 +406,10 @@ H
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
       <input id="ssTeamBId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('B')" style="margin-bottom:0;font-size:11px;padding:4px 6px;max-width:160px;" aria-label="Team B numerical ID" />
-      <a id="ssTeamBLink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON B</a>
-      <a id="ssTeamBLink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p1</a>
-      <a id="ssTeamBLink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p2</a>
-      <a id="ssTeamBLink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p3</a>
+      <a id="ssTeamBLink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p0</a>
+      <a id="ssTeamBLink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p1</a>
+      <a id="ssTeamBLink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p2</a>
+      <a id="ssTeamBLink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p3</a>
     </div>
   </div>
 
@@ -1474,11 +1464,15 @@ H
     }
     function fbEspnSetFixtureDay(offset) {
       fbEspnFixtureOffset = offset === 1 ? 1 : 0;
-      const t =       const tm =       if (t) t.classList.toggle("active", fbEspnFixtureOffset === 0);
-      if (tm) tm.classList.toggle("active", fbEspnFixtureOffset === 1);
+      // ESPN day-toggle UI removed — SofaScore manual path only.
     }
     function fbEspnGetLeague() {
-      return document.getElementById("leagueSelect")?.value || "";
+      // League dropdown removed — competition comes from SofaScore tournament context.
+      const name = (document.getElementById("ssTournamentName")?.textContent || "").trim();
+      const tid = (document.getElementById("ssTournamentId")?.value || "").trim();
+      if (name && name.indexOf("Multiple competitions") === -1 && name.indexOf("thin match") === -1) return name;
+      if (tid) return "tournament:" + tid;
+      return (window.__fbAutoData && window.__fbAutoData.context && window.__fbAutoData.context.competition) || "";
     }
     function fbEspnGetSelectedFixture() {
       const sel = document.getElementById("fbEspnFixtureSelect");
@@ -2041,83 +2035,14 @@ H
     }
 
     async function fbEspnAutoFetch() {
-      if (typeof engineDebug === "function") {
-        engineDebug("fbEspnAutoFetch start", {
-          league: fbEspnGetLeague(),
-          teamA: document.getElementById("ssTeamAName")?.value || "",
-          teamB: document.getElementById("ssTeamBName")?.value || "",
-          idA: document.getElementById("ssTeamAId")?.value || "",
-          idB: document.getElementById("ssTeamBId")?.value || ""
-        });
+      // RETIRED — ESPN auto-fetch removed. SofaScore manual is the sole ingest path.
+      const st = document.getElementById("ssFetchStatus");
+      if (st) {
+        st.style.color = "#d98a00";
+        st.textContent = "ESPN auto-fetch removed. Use SofaScore team search + paste JSON.";
       }
-      const slug=fbEspnGetLeague(); if(!slug){fbEspnSetStatus("Select an ESPN competition first.","error");return false;}
-      const btn=      try{
-        const selected=fbEspnGetSelectedFixture();
-        let nameA=(document.getElementById("ssTeamAName")?.value||"").trim(),nameB=(document.getElementById("ssTeamBName")?.value||"").trim();
-        if(selected){nameA=selected.homeName;nameB=selected.awayName;document.getElementById("ssTeamAName").value=nameA;document.getElementById("ssTeamBName").value=nameB;}
-        if(!nameA||!nameB)throw new Error("Enter both team names or select a fixture.");
-        fbEspnSetStatus("Resolving ESPN teams…");
-        let teamA = selected ? {id:String(selected.homeId),name:selected.homeName} : null;
-        let teamB = selected ? {id:String(selected.awayId),name:selected.awayName} : null;
-        if (!teamA?.id || !teamB?.id) {
-          [teamA,teamB]=await Promise.all([fbEspnSearchTeam(slug,nameA),fbEspnSearchTeam(slug,nameB)]);
-        }
-        if(!teamA)throw new Error("ESPN could not resolve Team A in this competition.");
-        if(!teamB)throw new Error("ESPN could not resolve Team B in this competition.");
-        if(teamA.id===teamB.id)throw new Error("Team A and Team B resolved to the same ESPN team.");
-        document.getElementById("ssTeamAId").value=teamA.id;document.getElementById("ssTeamBId").value=teamB.id;
-        fbEspnSetStatus("Loading recent form, H2H, fixture context and available ESPN stats…");
-        const fixture=selected||null; const fixtureDate=fixture?.date||""; const cutoff=fixtureDate?Date.parse(fixtureDate):Date.now();
-        const [dataA,dataB]=await Promise.all([fbEspnBuildTeamData(slug,teamA,fixtureDate),fbEspnBuildTeamData(slug,teamB,fixtureDate)]);
-        const eventsA=dataA.events||[], eventsB=dataB.events||[];
-        fbEspnRenderInjury("A",dataA.injuryMeta,teamA.name);
-        fbEspnRenderInjury("B",dataB.injuryMeta,teamB.name);
-        const h2h=await fbEspnFindH2HDeep(slug,teamA.id,teamB.id,cutoff,eventsA,eventsB);
-        const compEvents=(selected?[selected]:[]).concat(eventsA.slice(0,30),eventsB.slice(0,30));
-        const prior=await fbEspnFetchCompetitionContext(slug,compEvents);
-        let eventMeta=selected;
-        if(!eventMeta){
-          eventMeta=await fbEspnResolveFixtureEvent(slug,teamA.id,teamB.id,document.getElementById("fixtureKickoff")?.value||"");
-          if(!eventMeta){
-            const candidates=eventsA.concat(eventsB).filter(e=>(e.homeId===teamA.id&&e.awayId===teamB.id)||(e.homeId===teamB.id&&e.awayId===teamA.id));
-            eventMeta=candidates.sort((a,b)=>Math.abs(Date.parse(a.date)-cutoff)-Math.abs(Date.parse(b.date)-cutoff))[0]||null;
-          }
-        }
-        let odds={}; if(eventMeta?.raw)odds=fbEspnFindOdds(eventMeta.raw); else if(eventMeta?.id){try{const sum=await fbEspnFetchSummary(slug,eventMeta.id);odds=fbEspnFindOdds(sum?.header?.competitions?.[0] ? {competitions:[sum.header.competitions[0]]}:null);}catch(e){}}
-        window.__fbAutoData={source:"espn",leagueSlug:slug,coverage:{registry:FB_ESPN.registry.length,historyA:dataA.scored.length,historyB:dataB.scored.length,h2h:h2h.length},context:{eventId:eventMeta?.id||"",kickoff:eventMeta?.date||fixtureDate||"",competition:eventMeta?.competitionName||fbEspnPrettySlug(slug),season:eventMeta?.season||"",venue:eventMeta?.venue||"",competitionType:eventMeta?.competitionType||"",tournamentId:slug},A:dataA,B:dataB,h2h,market:odds};
-        document.getElementById("ssTournamentId").value=slug;document.getElementById("ssTournamentName").textContent=window.__fbAutoData.context.competition;
-        document.getElementById("aFTScored").value=dataA.scored.join(",");document.getElementById("aFTAllowed").value=dataA.allowed.join(",");document.getElementById("a1HScored").value=dataA.h1Scored.join(",");document.getElementById("a1HAllowed").value=dataA.h1Allowed.join(",");document.getElementById("aFixtureLoad7d").value=String(dataA.matchesLast7d);
-        document.getElementById("bFTScored").value=dataB.scored.join(",");document.getElementById("bFTAllowed").value=dataB.allowed.join(",");document.getElementById("b1HScored").value=dataB.h1Scored.join(",");document.getElementById("b1HAllowed").value=dataB.h1Allowed.join(",");document.getElementById("bFixtureLoad7d").value=String(dataB.matchesLast7d);
-        if(h2h.length>=2){
-          const ha=[],hb=[],h1a=[],h1b=[];
-          // Same fix as team history: schedule-derived e.homeLines/awayLines
-          // are unreliable for soccer, so pull 1H goals from each H2H game's
-          // summary instead. fbEspnFetchSummary is cached, so games already
-          // fetched above for team history cost nothing extra here.
-          const h2hSummaries=await Promise.all(h2h.map(e=>fbEspnFetchSummary(slug,e.id).catch(()=>null)));
-          h2h.forEach((e,i)=>{
-            const aHome=e.homeId===teamA.id;
-            ha.push(aHome?e.homeScore:e.awayScore);hb.push(aHome?e.awayScore:e.homeScore);
-            const fromSummary=h2hSummaries[i]?fbEspnHalfGoalsFromSummary(h2hSummaries[i],teamA.id):null;
-            if(fromSummary){h1a.push(fromSummary.my);h1b.push(fromSummary.opp);return;}
-            if(e.homeLines.length){const x=aHome?e.homeLines:e.awayLines,y=aHome?e.awayLines:e.homeLines;if(Number.isFinite(x[0])&&Number.isFinite(y[0])){h1a.push(x[0]);h1b.push(y[0]);}}
-          });
-          document.getElementById("aFTH2H").value=ha.join(",");document.getElementById("bFTH2H").value=hb.join(",");document.getElementById("useFTH2H").checked=true;
-          if(h1a.length>=2){document.getElementById("a1HH2H").value=h1a.join(",");document.getElementById("b1HH2H").value=h1b.join(",");document.getElementById("use1HH2H").checked=true;}
-          document.getElementById("h2hAutoTag").style.display="inline";
-        }
-        if(eventMeta?.date){const d=new Date(eventMeta.date);if(Number.isFinite(d.getTime())){const iso=d.toISOString().slice(0,16);const el=document.getElementById("fixtureKickoff");if(el)el.value=iso;}}
-        const advA=dataA.advanced||{},advB=dataB.advanced||{}; window.__fbAutoData.A=Object.assign(dataA,{...advA});window.__fbAutoData.B=Object.assign(dataB,{...advB});
-        if(Number.isFinite(prior.homeAvg)){window.__fbAutoData.context.homeAvg=prior.homeAvg;window.__fbAutoData.context.awayAvg=prior.awayAvg;}
-        if(Number.isFinite(odds.ftLine)){const el=document.getElementById("ftMarket");if(el&&!el.value)el.value=String(odds.ftLine);}
-        Object.keys(odds).forEach(k=>{if(k.startsWith("odds"))window.__fbAutoData.market[k]=odds[k];});
-        if(Number.isFinite(odds.ahLine))window.__fbAutoData.market.ahLine=odds.ahLine;
-        document.getElementById("aAutoTag").style.display="inline";document.getElementById("bAutoTag").style.display="inline";
-        fbEspnSetStatus(`${dataA.scored.length} ${nameA} matches · ${dataB.scored.length} ${nameB} matches · H2H ${h2h.length} · ESPN auto-fill complete.`,"ok");
-        engineDebug("ESPN football auto-fetch complete",window.__fbAutoData.coverage);
-        return true;
-      }catch(e){fbEspnSetStatus("ESPN auto-fetch failed: "+(e?.message||String(e)),"error");engineDebug("ESPN football auto-fetch failed",{league:slug,error:e?.message||String(e)});return false;}
-      finally{if(btn)btn.disabled=false;}
+      if (typeof engineDebug === "function") engineDebug("ESPN auto-fetch disabled");
+      return false;
     }
     window.FB_ESPN=FB_ESPN;
     // ESPN auto-fetch retired — SofaScore manual is the sole ingest path (basketball-engine pattern).
@@ -2223,7 +2148,6 @@ H
       const idEl = document.getElementById(side === "A" ? "ssTeamAId" : "ssTeamBId");
       const idVal = (idEl && idEl.value || "").trim();
       const prefix = side === "A" ? "ssTeamA" : "ssTeamB";
-      const main = document.getElementById(prefix + "Link");
       const pages = [0, 1, 2, 3].map(function(p) {
         return document.getElementById(prefix + (p === 0 ? "Link" : "Link" + p));
       });
@@ -2237,11 +2161,9 @@ H
       }
       pages.forEach(function(el, idx) {
         if (!el) return;
-        const page = idx; // 0..3
-        el.href = "https://api.sofascore.com/api/v1/team/" + idVal + "/events/last/" + page;
+        el.href = "https://api.sofascore.com/api/v1/team/" + idVal + "/events/last/" + idx;
         el.style.display = "inline-block";
-        if (page === 0) el.textContent = "🔗 Open JSON " + side;
-        else el.textContent = "p" + page;
+        el.textContent = "🔗 p" + idx;
       });
     };
     window.clearPasteJSON = function(side){
@@ -2268,28 +2190,43 @@ H
     window.searchSofascorePlayer = window.searchSofascoreTeam;
     // ---- H2H auto-fill: raw event cache + opponent-match extraction ----
     window.__ssRawEvents = window.__ssRawEvents || { A: null, B: null };
-    function ssExtractH2HFromEvents(events, myTeamId, oppTeamId) {
-      const ftMine = [], ftOpp = [], h1Mine = [], h1Opp = [];
-      (events || []).forEach(function(ev) {
-        const finished = ev.status?.type === "finished" || ev.status?.finished === true;
-        if (!finished || !window.ssIsFootballEvent(ev)) return;
-        const isHome = String(ev.homeTeam?.id) === String(myTeamId);
-        const isAway = String(ev.awayTeam?.id) === String(myTeamId);
-        if (!isHome && !isAway) return;
-        const oppId = isHome ? ev.awayTeam?.id : ev.homeTeam?.id;
-        if (String(oppId) !== String(oppTeamId)) return;
-        const myScore = isHome ? ev.homeScore : ev.awayScore;
-        const oppScore = isHome ? ev.awayScore : ev.homeScore;
-        if (!myScore || !oppScore) return;
-        const myFT = ssSumHalfGoals(myScore);
-        const oppFT = ssSumHalfGoals(oppScore);
-        if (myFT != null && oppFT != null) { ftMine.push(myFT); ftOpp.push(oppFT); }
-        const myQ1 = myScore.period1 != null ? Number(myScore.period1) : NaN;
-        const oppQ1 = oppScore.period1 != null ? Number(oppScore.period1) : NaN;
-        if (isFinite(myQ1) && isFinite(oppQ1)) { h1Mine.push(myQ1); h1Opp.push(oppQ1); }
-      });
-      return { ftMine, ftOpp, h1Mine, h1Opp };
-    }
+    window.__lastEventsA = window.__lastEventsA || null;
+    window.__lastEventsB = window.__lastEventsB || null;
+    window.__fixtureTournamentId = window.__fixtureTournamentId != null ? window.__fixtureTournamentId : null;
+    window.__h2hEntryCache = window.__h2hEntryCache || [];
+
+    window.getFixtureTournamentId = function() {
+      const manualVal = (document.getElementById("ssTournamentId")?.value || "").trim();
+      if (manualVal && /^\d+$/.test(manualVal)) return manualVal;
+      return window.__fixtureTournamentId != null ? String(window.__fixtureTournamentId) : null;
+    };
+
+    window.updateTeamUIFromStats = function(side, stats) {
+      if (!stats) return;
+      const prefix = side === "A" ? "a" : "b";
+      const setVal = function(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+      };
+      if (stats.scoredList && stats.scoredList.length) {
+        setVal(prefix + "FTScored", stats.scoredList.slice(0, 10).join(","));
+        setVal(prefix + "FTAllowed", (stats.allowedList || []).slice(0, 10).join(","));
+      }
+      if (stats.h1ScoredList && stats.h1ScoredList.length) {
+        setVal(prefix + "1HScored", stats.h1ScoredList.slice(0, 10).join(","));
+        setVal(prefix + "1HAllowed", (stats.h1AllowedList || []).slice(0, 10).join(","));
+      }
+      const fatigueEl = document.getElementById(prefix + "FixtureLoad7d");
+      if (fatigueEl && !String(fatigueEl.value || "").trim() && isFinite(stats.matchesLast7d)) {
+        fatigueEl.value = stats.matchesLast7d;
+        fatigueEl.title = "Auto-filled from completed matches in the last 7 days in the pasted feed — edit if you know better.";
+      }
+      const tag = document.getElementById(prefix + "AutoTag");
+      if (tag) tag.style.display = "inline";
+      const formSection = document.getElementById(side === "A" ? "teamASection" : "teamBSection");
+      if (formSection) formSection.classList.remove("collapsed");
+    };
+
     window.ssTryAutoFillH2H = function() {
       const idA = (document.getElementById("ssTeamAId")?.value || "").trim();
       const idB = (document.getElementById("ssTeamBId")?.value || "").trim();
@@ -2328,15 +2265,92 @@ H
         }
       }
     };
+
+    window.reprocessBothTeamsFromEvents = function() {
+      const tid = window.getFixtureTournamentId();
+      if (window.__lastEventsA && window.__lastEventsA.length) {
+        const idA = (document.getElementById("ssTeamAId")?.value || "").trim();
+        if (idA) {
+          const statsA = window.ssProcessTeamEvents(window.__lastEventsA, idA, "Team A", tid);
+          window.updateTeamUIFromStats("A", statsA);
+        }
+      }
+      if (window.__lastEventsB && window.__lastEventsB.length) {
+        const idB = (document.getElementById("ssTeamBId")?.value || "").trim();
+        if (idB) {
+          const statsB = window.ssProcessTeamEvents(window.__lastEventsB, idB, "Team B", tid);
+          window.updateTeamUIFromStats("B", statsB);
+        }
+      }
+      if (typeof window.ssTryAutoFillH2H === "function") window.ssTryAutoFillH2H();
+    };
+
+    window.validateTournamentSample = function(manualId) {
+      const evA = window.__lastEventsA || [];
+      const evB = window.__lastEventsB || [];
+      if (!evA.length && !evB.length) return;
+      function countCompletedForTournament(events, tid) {
+        let count = 0;
+        (events || []).forEach(function(ev) {
+          if (!window.ssIsFootballEvent(ev)) return;
+          const sType = ev.status?.type ?? "";
+          const done = sType === "finished" || sType === "afterExtraTime" || sType === "afterPenalties" || ev.status?.finished === true;
+          if (!done) return;
+          const evTid = ev?.tournament?.uniqueTournament?.id != null ? ev.tournament.uniqueTournament.id : ev?.tournament?.id;
+          if (evTid != null && String(evTid) === String(tid)) count++;
+        });
+        return count;
+      }
+      const countA = countCompletedForTournament(evA, manualId);
+      const countB = countCompletedForTournament(evB, manualId);
+      const combined = countA + countB;
+      if (combined <= 0) return;
+      const nameEl = document.getElementById("ssTournamentName");
+      const statusEl = document.getElementById("ssFetchStatus");
+      if (combined < 3) {
+        if (nameEl) nameEl.textContent = "⚠ thin match (" + combined + " games) — verify manually";
+        if (statusEl) {
+          statusEl.style.color = "#d98a00";
+          statusEl.textContent = "⚠ Manual Tournament ID is thin (" + combined + " games combined). Verify this is the correct competition.";
+        }
+      } else if (nameEl && !nameEl.textContent) {
+        nameEl.textContent = "Tournament filter active (" + combined + " games in feed)";
+      }
+    };
+
+    window.clearPasteJSON = function(side){
+      const el = document.getElementById(side==='A'?'ssPasteA':'ssPasteB');
+      if (el) el.value = "";
+    };
+
+    window.searchSofascoreTeam = function(side){
+      const nameEl = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName");
+      const rawName = (nameEl && nameEl.value || "").trim();
+      if (!rawName) { alert("Enter a team name first."); return; }
+      const searchName = rawName.split(",")[0].trim();
+      const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=football";
+      window.open(searchUrl, "_blank");
+      const st = document.getElementById("ssFetchStatus");
+      if (st) {
+        st.style.color = "#d98a00";
+        st.textContent = "🔍 Football team search opened for " + side + " — find the team ID in the JSON, paste it above, then open 🔗 p0–p3 and paste events JSON.";
+      }
+    };
+    window.searchSofascorePlayer = window.searchSofascoreTeam;
+
     window.parseSofascoreTeam = function(side){
       const pasteEl = document.getElementById(side==='A'?'ssPasteA':'ssPasteB');
       const raw = (pasteEl?.value||"").trim();
       if(!raw) return;
+      const st = document.getElementById("ssFetchStatus");
       try {
         const parsed = JSON.parse(raw);
         const events = parsed.events || [];
         if(!events.length) throw new Error("No events found in JSON.");
         window.__ssRawEvents[side] = events;
+        if (side === "A") window.__lastEventsA = events;
+        else window.__lastEventsB = events;
+
         let idVal = (document.getElementById(side==='A'?'ssTeamAId':'ssTeamBId')?.value||"").trim();
         if(!idVal) {
           const nameInput=(document.getElementById(side==='A'?'ssTeamAName':'ssTeamBName')?.value||"").trim().toLowerCase();
@@ -2358,15 +2372,14 @@ H
         }
         if (!idVal) throw new Error("Could not resolve team ID — enter Numerical ID manually.");
 
-        // Competition detection is conservative. Never use the first event's
-        // tournament as a hard filter: team feeds commonly mix league, cup,
-        // friendly and continental fixtures. Auto-select only when every
-        // usable event belongs to the same competition.
+        // Competition detection (basketball parity): only auto-set tournament when
+        // every usable finished football event shares one competition.
         const tidEl = document.getElementById("ssTournamentId");
         const nameEl = document.getElementById("ssTournamentName");
         let tournamentId = (tidEl && tidEl.value.trim()) || "";
         const tournamentMap = {};
         events.forEach(function(e) {
+          if (!window.ssIsFootballEvent(e)) return;
           const tid = String(e.tournament?.uniqueTournament?.id || e.tournament?.id || "").trim();
           if (!tid) return;
           const tname = e.tournament?.uniqueTournament?.name || e.tournament?.name || "";
@@ -2378,56 +2391,62 @@ H
           tournamentId = tournamentChoices[0].id;
           if (tidEl) tidEl.value = tournamentId;
           if (nameEl) nameEl.textContent = tournamentChoices[0].name || "";
+          window.__fixtureTournamentId = tournamentId;
+          window.__fbAutoData = window.__fbAutoData || {};
+          window.__fbAutoData.context = window.__fbAutoData.context || {};
+          window.__fbAutoData.context.competition = tournamentChoices[0].name || "";
+          window.__fbAutoData.context.tournamentId = tournamentId;
         } else if (nameEl && tournamentId) {
           const match = tournamentChoices.find(x => x.id === tournamentId);
-          if (match) nameEl.textContent = match.name || "";
-        } else if (nameEl && tournamentChoices.length > 1) {
+          if (match) {
+            nameEl.textContent = match.name || "";
+            window.__fbAutoData = window.__fbAutoData || {};
+            window.__fbAutoData.context = window.__fbAutoData.context || {};
+            window.__fbAutoData.context.competition = match.name || "";
+            window.__fbAutoData.context.tournamentId = tournamentId;
+          }
+        } else if (nameEl && tournamentChoices.length > 1 && !tournamentId) {
           nameEl.textContent = "Multiple competitions in feed — enter Tournament ID manually";
         }
 
-        const stats = window.ssProcessTeamEvents(events, idVal, side, tournamentId || null);
-        const prefix = side==='A'?'a':'b';
-        const setVal = function(id, val) { const el=document.getElementById(id); if(el) el.value=val; };
-        if(stats.scoredList.length) {
-          setVal(prefix+"FTScored", stats.scoredList.slice(0,10).join(","));
-          setVal(prefix+"FTAllowed", stats.allowedList.slice(0,10).join(","));
+        // Sync SofaScore name into main engine name fields when present
+        const ssName = (document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName")?.value || "").trim();
+        if (ssName) {
+          const main = document.getElementById(side === "A" ? "teamAName" : "teamBName");
+          if (main && !String(main.value || "").trim()) main.value = ssName;
         }
-        if(stats.h1ScoredList.length) {
-          setVal(prefix+"1HScored", stats.h1ScoredList.slice(0,10).join(","));
-          setVal(prefix+"1HAllowed", stats.h1AllowedList.slice(0,10).join(","));
-        }
-        const fatigueEl = document.getElementById(prefix+"FixtureLoad7d");
-        if (fatigueEl && !fatigueEl.value.trim() && isFinite(stats.matchesLast7d)) {
-          fatigueEl.value = stats.matchesLast7d;
-          fatigueEl.title = "Auto-filled from completed matches in the last 7 days in the pasted feed — edit if you know better.";
-        }
-        const tag = document.getElementById(prefix+"AutoTag");
-        if(tag) tag.style.display = "inline";
-        const formSectionId = side === "A" ? "teamASection" : "teamBSection";
-        const formSection = document.getElementById(formSectionId);
-        if (formSection) formSection.classList.remove("collapsed");
-        const st = document.getElementById("ssFetchStatus");
-        if(st) {
+
+        window.reprocessBothTeamsFromEvents();
+        const stats = window.ssProcessTeamEvents(events, idVal, side, window.getFixtureTournamentId());
+        if (st) {
           st.style.color = stats.scoredList.length ? "#2f8f4a" : "#d98a00";
           st.textContent = stats.scoredList.length
-            ? ("✅ Team " + side + ": " + stats.matchesUsed + " full-time totals, " + stats.h1MatchesUsed + " 1st-half rows, " + stats.matchesLast7d + " played in the last 7 days" +
-               (tournamentId ? " (tournament " + tournamentId + ")" : "") + ".")
+            ? ("✅ Team " + side + ": " + stats.matchesUsed + " FT rows, " + stats.h1MatchesUsed + " 1H rows, " + stats.matchesLast7d + " in last 7d" +
+               (window.getFixtureTournamentId() ? " (tournament " + window.getFixtureTournamentId() + ")" : "") + ".")
             : ("⚠️ Team " + side + ": JSON parsed but no usable goal rows (check ID / tournament filter).");
         }
-        window.ssTryAutoFillH2H();
         pasteEl.value = "";
       } catch(err) {
-        const st = document.getElementById("ssFetchStatus");
         if(st) { st.style.color="#d92d2a"; st.textContent="❌ Parse failed: "+err.message; }
+        if (typeof engineDebug === "function") engineDebug("parseSofascoreTeam failed", { side: side, error: err.message });
       }
     };
+    // Alias for basketball-style call sites
+    window.parseSofascoreIndividual = window.parseSofascoreTeam;
+
     window.onTournamentIdInput = function(){
-      const tidEl = document.getElementById("ssTournamentId");
       const nameEl = document.getElementById("ssTournamentName");
-      if (!tidEl) return;
-      const tid = tidEl.value.trim();
-      if (!tid && nameEl) nameEl.textContent = "";
-      // Name is filled on next paste; field is used as a hard filter in ssProcessTeamEvents
+      if (nameEl) nameEl.textContent = "";
+      const val = (document.getElementById("ssTournamentId")?.value || "").trim();
+      if (!val) {
+        window.__fixtureTournamentId = null;
+        window.reprocessBothTeamsFromEvents();
+        return;
+      }
+      if (!/^\d+$/.test(val)) return;
+      window.__fixtureTournamentId = val;
+      window.validateTournamentSample(val);
+      window.reprocessBothTeamsFromEvents();
     };
 
     // ---------- Tracker (minimal) ----------
@@ -3721,12 +3740,12 @@ H
       [A,B].forEach((t,i)=>{ const p=i===0?"a":"b",src=i===0?(auto.A||{}):(auto.B||{}); t.xg=Number.isFinite(src.xg)?src.xg:fb2_num(p+"XG",null);t.xga=Number.isFinite(src.xga)?src.xga:fb2_num(p+"XGA",null);t.shots=Number.isFinite(src.shots)?src.shots:fb2_num(p+"Shots",null);t.sot=Number.isFinite(src.sot)?src.sot:fb2_num(p+"SOT",null);t.big=Number.isFinite(src.big)?src.big:fb2_num(p+"BigChances",null);t.injury=Number.isFinite(src.injury)?src.injury:(fb2_num(p+"InjuryImpact",0)||0);t.susp=Number.isFinite(src.susp)?src.susp:(fb2_num(p+"SuspensionImpact",0)||0);t.lineup=Number.isFinite(src.lineup)?src.lineup:fb2_num(p+"LineupStrength",100);t.rotation=Number.isFinite(src.rotation)?src.rotation:(fb2_num(p+"RotationPenalty",0)||0);t.rest=Number.isFinite(src.restDays)?src.restDays:fb2_num(p+"RestDays",null);t.travel=Number.isFinite(src.travel)?src.travel:(fb2_num(p+"TravelKm",0)||0);t.manager=Number.isFinite(src.manager)?src.manager:(fb2_num(p+"ManagerChange",0)||0);t.motivation=Number.isFinite(src.motivation)?src.motivation:fb2_pct(p+"Motivation",50);t.spa=Number.isFinite(src.spa)?src.spa:fb2_pct(p+"SetPieceAttack",50);t.spd=Number.isFinite(src.spd)?src.spd:fb2_pct(p+"SetPieceDefense",50);t.ta=Number.isFinite(src.ta)?src.ta:fb2_pct(p+"TacticalAttack",50);t.td=Number.isFinite(src.td)?src.td:fb2_pct(p+"TacticalDefense",50);t.load7=Number.isFinite(src.matchesLast7d)?src.matchesLast7d:(fb2_num(p+"FixtureLoad7d",0)||0); });
       return {A,B};
     }
-    function fb2_competitionLabel(){
-      const auto=window.__fbAutoData||{};
-      const detected=String(auto.context?.competition||fb2_text("ssTournamentName")||"").trim();
-      if(detected && !/^Multiple competitions in feed/i.test(detected)) return detected;
-      const tournament=String(auto.context?.tournamentId||fb2_text("ssTournamentId")||"").trim();
-      return tournament ? tournament : "Unknown competition";
+    function fb2_competitionLabel() {
+      const fromSs = (document.getElementById("ssTournamentName")?.textContent || "").trim();
+      if (fromSs && fromSs.indexOf("Multiple") === -1 && fromSs.indexOf("thin") === -1) return fromSs;
+      const tid = (document.getElementById("ssTournamentId")?.value || "").trim();
+      if (tid) return "Tournament " + tid;
+      return "Unknown competition";
     }
     function fb2_context(){
       const auto=window.__fbAutoData||{}; const comp=fb2_competitionLabel();
@@ -5118,44 +5137,8 @@ H
       document.getElementById("runBtn").addEventListener("click", runEngine);
       document.getElementById("clearBtn").addEventListener("click", clearAll);
 
-      // ESPN football auto-fetch is the primary data path. The registry is loaded
-      // dynamically, so every competition currently exposed by ESPN is available
-      // without maintaining a brittle hand-written league list.
-      const fbLeagueSelect=document.getElementById("leagueSelect");
-      const fbFixtureSelect=document.getElementById("fbEspnFixtureSelect");
-      // ESPN auto-fetch UI removed — SofaScore manual is the sole ingest path.
-      const fbLeagueSelect = document.getElementById("leagueSelect");
-      if (fbLeagueSelect) {
-        fbLeagueSelect.addEventListener("change", function() {
-          const st = document.getElementById("ssFetchStatus");
-          if (st) {
-            st.style.color = "var(--muted)";
-            st.textContent = "League selected. Use SofaScore team search + paste JSON to fill form.";
-          }
-        });
-      }
-if (typeof fbEspnAutoFetch === "function") {
-          setTimeout(function(){ try { fbEspnAutoFetch(); } catch (e) { if (typeof engineDebug === "function") engineDebug("Auto-fetch on select failed", String(e && e.message ? e.message : e)); } }, 50);
-        }
-      });
-      async function fbBindTeamAutocomplete(inputId,dropId,side){
-        const input=document.getElementById(inputId),drop=document.getElementById(dropId); if(!input||!drop)return;
-        let timer=null;
-        input.addEventListener("input",()=>{
-          clearTimeout(timer); const q=input.value.trim(); const slug=fbEspnGetLeague(); if(!slug||q.length<2){drop.style.display="none";return;}
-          timer=setTimeout(async()=>{
-            try{const data=await fbEspnSearchTeam(slug,q); if(!data){drop.style.display="none";return;}
-              drop.innerHTML=`<div class="active" data-id="${String(data.id).replace(/"/g,"&quot;")}" data-name="${String(data.name).replace(/"/g,"&quot;")}">${String(data.name).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</div>`;
-              drop.style.display="block";
-              const row=drop.firstElementChild; row.onclick=()=>{input.value=data.name;document.getElementById(side==="A"?"ssTeamAId":"ssTeamBId").value=data.id;drop.style.display="none";};
-            }catch(e){drop.style.display="none";}
-          },250);
-        });
-        document.addEventListener("click",e=>{if(e.target!==input&&!drop.contains(e.target))drop.style.display="none";});
-      }
-      fbBindTeamAutocomplete("ssTeamAName","fbDropA","A");
-      fbBindTeamAutocomplete("ssTeamBName","fbDropB","B");
-      fbEspnLoadRegistry().then(()=>{ if(fbLeagueSelect?.value) fbEspnLoadFixtures(0); });
+      // ESPN auto-fetch boot wiring removed — SofaScore manual is the sole ingest path.
+      // Competition / matchup are detected from pasted SofaScore tournament context.
 
       // Audit copy button
       document.getElementById("auditCopyBtn").addEventListener("click", function() {
@@ -6256,7 +6239,7 @@ const EngineAuditor = (function () {
     const src = getConcatenatedScriptSource();
 
     tally(); pass();
-    const criticalIds = ['afdbOverlay', 'afdbPanel', 'afdbBtn', 'leagueSelect', 'teamAName', 'teamBName'];
+    const criticalIds = ['afdbOverlay', 'afdbPanel', 'afdbBtn', 'sofascoreManualSection', 'ssTeamAName', 'ssTeamBName'];
     const missing = criticalIds.filter(id => !document.getElementById(id));
     if (missing.length) {
       add('CRITICAL', AREA, 'Critical DOM node(s) missing', 'document.getElementById() found none of: ' + missing.join(', ') + '.', 'These are core, always-present UI elements the engine and debug tooling both depend on by id; if any is missing, whatever reads it will silently no-op or throw.', 'Confirm the element id was not renamed in the HTML without updating the matching getElementById() call sites.', 'Critical DOM node presence check');
