@@ -1,4 +1,3 @@
-A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2290,18 +2289,17 @@ A
     window.ssExtractH2HFromEvents = function(events, teamId, opponentId) {
       const ftMine = [], ftOpp = [], h1Mine = [], h1Opp = [];
       const seen = new Set();
-      const tidFilter = (typeof window.getFixtureTournamentId === "function")
-        ? window.getFixtureTournamentId()
-        : null;
+      // NOTE: deliberately NOT filtering by the "Tournament filter ID" box here.
+      // That field is documented as limiting the recent-FORM arrays (Team A/B -
+      // Last 10 Overall) to one competition; head-to-head history between two
+      // teams should include every competition they've met in (league + cup),
+      // otherwise a cup meeting or an out-of-filter league season silently
+      // disappears from H2H even though it's genuine head-to-head history.
       const list = (events || []).slice().filter(function(ev) {
         if (!ev || !window.ssIsFootballEvent(ev)) return false;
         const sType = String(ev.status?.type || "");
         const done = sType === "finished" || sType === "afterExtraTime" || sType === "afterPenalties" || ev.status?.finished === true;
         if (!done) return false;
-        if (tidFilter) {
-          const evTid = String(ev.tournament?.uniqueTournament?.id || ev.tournament?.id || "");
-          if (evTid && evTid !== String(tidFilter)) return false;
-        }
         const h = String(ev.homeTeam?.id || "");
         const a = String(ev.awayTeam?.id || "");
         const me = String(teamId);
@@ -2357,14 +2355,27 @@ A
           }
           return;
         }
-        const fromA = eventsA ? window.ssExtractH2HFromEvents(eventsA, idA, idB) : null;
-        const fromB = eventsB ? window.ssExtractH2HFromEvents(eventsB, idB, idA) : null;
-        // Merge both feeds (dedupe by meeting counts already inside extractor via seen set per feed)
-        // Prefer the side that found more meetings when one feed misses the H2H.
-        const ftA = (fromA && fromA.ftMine.length) ? fromA.ftMine : (fromB ? fromB.ftOpp : []);
-        const ftB = (fromA && fromA.ftOpp.length) ? fromA.ftOpp : (fromB ? fromB.ftMine : []);
-        const h1A = (fromA && fromA.h1Mine.length) ? fromA.h1Mine : (fromB ? fromB.h1Opp : []);
-        const h1B = (fromA && fromA.h1Opp.length) ? fromA.h1Opp : (fromB ? fromB.h1Mine : []);
+        // Union the two teams' pasted schedules (deduped by event id) BEFORE
+        // extracting H2H, instead of extracting from each feed separately and
+        // then picking one over the other. Each team's pasted JSON is only a
+        // single page of THAT team's own recent matches — a head-to-head
+        // meeting can easily show up in one team's page but have scrolled out
+        // of the other's, or the two pastes can cover slightly different date
+        // ranges. Picking "whichever feed found more" (the old approach)
+        // meant a meeting only visible from the other team's page was silently
+        // dropped instead of counted. A straight union captures everything
+        // either paste actually contains.
+        const combined = [];
+        const seenIds = new Set();
+        (eventsA || []).concat(eventsB || []).forEach(function(ev) {
+          if (!ev) return;
+          const key = String(ev.id || ((ev.startTimestamp || "") + "|" + (ev.homeTeam && ev.homeTeam.id) + "|" + (ev.awayTeam && ev.awayTeam.id)));
+          if (seenIds.has(key)) return;
+          seenIds.add(key);
+          combined.push(ev);
+        });
+        const h2h = window.ssExtractH2HFromEvents(combined, idA, idB);
+        const ftA = h2h.ftMine, ftB = h2h.ftOpp, h1A = h2h.h1Mine, h1B = h2h.h1Opp;
         const setVal = function(id, val) { const el = document.getElementById(id); if (el) el.value = val; };
         let filledAny = false;
         if (ftA.length >= 2 && ftB.length >= 2) {
@@ -2386,9 +2397,25 @@ A
         if (filledAny) {
           const h2hSection = document.getElementById("h2hSection");
           if (h2hSection) h2hSection.classList.remove("collapsed");
+          window.__lastH2HInfoMsg = "";
           if (typeof engineDebug === "function") {
-            engineDebug("H2H auto-filled", { ftGames: ftA.length, h1Games: h1A.length });
+            engineDebug("H2H auto-filled", { meetings: h2h.meetings, ftGames: ftA.length, h1Games: h1A.length });
           }
+        } else if (h2h.meetings > 0) {
+          // Transparency fix: this branch used to do nothing visible, so a
+          // genuine "only 1 meeting found in the pasted data" case looked
+          // identical to a silent failure. Stash a message (rather than
+          // writing to ssFetchStatus directly) because this function runs via
+          // reprocessBothTeamsFromEvents() BEFORE parseSofascoreTeam() sets
+          // its own "✅ Team X: N rows..." status text — writing here directly
+          // would just get overwritten a few lines later. parseSofascoreTeam
+          // appends this after it sets its own message.
+          window.__lastH2HInfoMsg = "ℹ️ Found " + h2h.meetings + " head-to-head meeting(s) in the pasted data (need 2+ to auto-fill H2H) — paste more match history, or fill H2H in manually.";
+          if (typeof engineDebug === "function") {
+            engineDebug("H2H not auto-filled (below 2-meeting minimum)", { meetings: h2h.meetings });
+          }
+        } else {
+          window.__lastH2HInfoMsg = "";
         }
       } catch (h2hErr) {
         // Swallow + log. A failed H2H auto-fill should never block team parsing,
@@ -2598,6 +2625,13 @@ A
             ? ("✅ Team " + side + ": " + stats.matchesUsed + " FT rows, " + stats.h1MatchesUsed + " 1H rows, " + stats.matchesLast7d + " in last 7d" +
                (window.getFixtureTournamentId() ? " (tournament " + window.getFixtureTournamentId() + ")" : "") + ".")
             : ("⚠️ Team " + side + ": JSON parsed but no usable goal rows (check ID / tournament filter).");
+          // Append any H2H status stashed by ssTryAutoFillH2H (see comment
+          // there for why it can't write to ssFetchStatus directly) so the
+          // user sees BOTH "team parsed OK" and "here's what happened with
+          // H2H" instead of the H2H info getting silently overwritten.
+          if (window.__lastH2HInfoMsg) {
+            st.textContent += " " + window.__lastH2HInfoMsg;
+          }
         }
         pasteEl.value = "";
       } catch(err) {
