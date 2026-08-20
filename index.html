@@ -1,3 +1,4 @@
+A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: football_engine_v2_tier12_patch1 — bump this string on every deploy.
+  <!-- BUILD_MARKER: football_engine_v2_tier12_patch2_h2h_links — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon. -->
@@ -445,10 +446,7 @@
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
       <input id="ssTeamAId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('A')" style="margin-bottom:0;font-size:11px;padding:4px 6px;max-width:160px;" aria-label="Team A numerical ID" />
-      <a id="ssTeamALink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p0</a>
-      <a id="ssTeamALink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p1</a>
-      <a id="ssTeamALink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p2</a>
-      <a id="ssTeamALink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p3</a>
+      <a id="ssTeamALink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON A</a>
     </div>
   </div>
 
@@ -465,7 +463,6 @@
       <a id="ssTeamBLink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p0</a>
       <a id="ssTeamBLink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p1</a>
       <a id="ssTeamBLink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p2</a>
-      <a id="ssTeamBLink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 p3</a>
     </div>
   </div>
 
@@ -2205,23 +2202,30 @@
         window.updateSofascoreLinks = function(side) {
       const idEl = document.getElementById(side === "A" ? "ssTeamAId" : "ssTeamBId");
       const idVal = (idEl && idEl.value || "").trim();
-      const prefix = side === "A" ? "ssTeamA" : "ssTeamB";
-      const pages = [0, 1, 2, 3].map(function(p) {
-        return document.getElementById(prefix + (p === 0 ? "Link" : "Link" + p));
-      });
+      // Team A: single "Open JSON A" link (page 0 only) — matches BB engine layout.
+      // Team B: p0, p1, p2 only (no p3).
+      const linkSpecs = side === "A"
+        ? [{ id: "ssTeamALink", page: 0, label: "🔗 Open JSON A" }]
+        : [
+            { id: "ssTeamBLink", page: 0, label: "🔗 p0" },
+            { id: "ssTeamBLink1", page: 1, label: "🔗 p1" },
+            { id: "ssTeamBLink2", page: 2, label: "🔗 p2" }
+          ];
       if (!idVal || !/^\d+$/.test(idVal)) {
-        pages.forEach(function(el) {
+        linkSpecs.forEach(function(spec) {
+          const el = document.getElementById(spec.id);
           if (!el) return;
           el.href = "#";
           el.style.display = "none";
         });
         return;
       }
-      pages.forEach(function(el, idx) {
+      linkSpecs.forEach(function(spec) {
+        const el = document.getElementById(spec.id);
         if (!el) return;
-        el.href = "https://api.sofascore.com/api/v1/team/" + idVal + "/events/last/" + idx;
+        el.href = "https://api.sofascore.com/api/v1/team/" + idVal + "/events/last/" + spec.page;
         el.style.display = "inline-block";
-        el.textContent = "🔗 p" + idx;
+        el.textContent = spec.label;
       });
     };
     window.clearPasteJSON = function(side){
@@ -2378,18 +2382,21 @@
         const ftA = h2h.ftMine, ftB = h2h.ftOpp, h1A = h2h.h1Mine, h1B = h2h.h1Opp;
         const setVal = function(id, val) { const el = document.getElementById(id); if (el) el.value = val; };
         let filledAny = false;
-        if (ftA.length >= 2 && ftB.length >= 2) {
+        // Fill score inputs even with a single H2H meeting so the user can see
+        // the data. Only auto-check "Use FT/1H H2H" when >= 2 games (engine
+        // still requires min 2 to actually weight H2H).
+        if (ftA.length >= 1 && ftB.length >= 1) {
           setVal("aFTH2H", ftA.slice(0, 10).join(","));
           setVal("bFTH2H", ftB.slice(0, 10).join(","));
           const cb = document.getElementById("useFTH2H");
-          if (cb) cb.checked = true;
+          if (cb) cb.checked = (ftA.length >= 2 && ftB.length >= 2);
           filledAny = true;
         }
-        if (h1A.length >= 2 && h1B.length >= 2) {
+        if (h1A.length >= 1 && h1B.length >= 1) {
           setVal("a1HH2H", h1A.slice(0, 10).join(","));
           setVal("b1HH2H", h1B.slice(0, 10).join(","));
           const cb1 = document.getElementById("use1HH2H");
-          if (cb1) cb1.checked = true;
+          if (cb1) cb1.checked = (h1A.length >= 2 && h1B.length >= 2);
           filledAny = true;
         }
         const tag = document.getElementById("h2hAutoTag");
@@ -2397,22 +2404,18 @@
         if (filledAny) {
           const h2hSection = document.getElementById("h2hSection");
           if (h2hSection) h2hSection.classList.remove("collapsed");
-          window.__lastH2HInfoMsg = "";
+          if (h2h.meetings >= 2) {
+            window.__lastH2HInfoMsg = "";
+          } else {
+            window.__lastH2HInfoMsg = "ℹ️ Found " + h2h.meetings + " head-to-head meeting(s) — scores filled; checkbox left off until 2+ games (or tick manually).";
+          }
           if (typeof engineDebug === "function") {
-            engineDebug("H2H auto-filled", { meetings: h2h.meetings, ftGames: ftA.length, h1Games: h1A.length });
+            engineDebug("H2H scores filled", { meetings: h2h.meetings, ftGames: ftA.length, h1Games: h1A.length, checkboxOn: (ftA.length >= 2) });
           }
         } else if (h2h.meetings > 0) {
-          // Transparency fix: this branch used to do nothing visible, so a
-          // genuine "only 1 meeting found in the pasted data" case looked
-          // identical to a silent failure. Stash a message (rather than
-          // writing to ssFetchStatus directly) because this function runs via
-          // reprocessBothTeamsFromEvents() BEFORE parseSofascoreTeam() sets
-          // its own "✅ Team X: N rows..." status text — writing here directly
-          // would just get overwritten a few lines later. parseSofascoreTeam
-          // appends this after it sets its own message.
-          window.__lastH2HInfoMsg = "ℹ️ Found " + h2h.meetings + " head-to-head meeting(s) in the pasted data (need 2+ to auto-fill H2H) — paste more match history, or fill H2H in manually.";
+          window.__lastH2HInfoMsg = "ℹ️ Found " + h2h.meetings + " head-to-head meeting(s) in the pasted data but could not extract scores — fill H2H in manually.";
           if (typeof engineDebug === "function") {
-            engineDebug("H2H not auto-filled (below 2-meeting minimum)", { meetings: h2h.meetings });
+            engineDebug("H2H meetings found but scores not extractable", { meetings: h2h.meetings });
           }
         } else {
           window.__lastH2HInfoMsg = "";
