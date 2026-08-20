@@ -1,3 +1,4 @@
+H
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -385,50 +386,64 @@
   <div id="leagueCoverage" style="font-size:10px;color:var(--muted);margin-top:2px;"></div>
 </div>
 
-  <div class="section" id="espnSection">
-  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(All ESPN Soccer Competitions)</span></h3>
+  <div class="section" id="sofascoreManualSection">
+  <h3>🔍 Team Lookup <span style="font-size:11px;color:#aaa;">(SofaScore manual — football)</span></h3>
 
-  <div class="fixture-toolbar">
-    <button type="button" class="fixture-day active" id="fbEspnTodayBtn">Today</button>
-    <button type="button" class="fixture-day" id="fbEspnTomorrowBtn">Tomorrow</button>
+  <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
+    <label>Team A Name (Home)</label>
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      <input id="ssTeamAName" placeholder="e.g. Manchester United" style="margin-bottom:0;flex:1;" aria-label="Team A name" autocomplete="off" />
+      <input id="ssPasteA" placeholder="Paste JSON A" oninput="parseSofascoreTeam('A')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" aria-label="Paste JSON A" />
+      <button type="button" onclick="searchSofascoreTeam('A')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team on SofaScore">🔍</button>
+      <button type="button" onclick="clearPasteJSON('A')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <input id="ssTeamAId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('A')" style="margin-bottom:0;font-size:11px;padding:4px 6px;max-width:160px;" aria-label="Team A numerical ID" />
+      <a id="ssTeamALink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON A</a>
+      <a id="ssTeamALink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p1</a>
+      <a id="ssTeamALink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p2</a>
+      <a id="ssTeamALink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p3</a>
+    </div>
   </div>
 
-  <label id="fbEspnFixtureLabel" style="font-size:12px;">Select match</label>
-  <select id="fbEspnFixtureSelect" class="league-box">
-    <option value="">- Select match -</option>
-  </select>
-
-  <label style="font-size:12px;">Team A Name (Home)</label>
-  <div class="autocomplete-wrap">
-    <input id="ssTeamAName" placeholder="e.g. Manchester United" autocomplete="off" />
-    <div class="autocomplete-list" id="fbDropA"></div>
+  <div style="margin-bottom:12px;border-bottom:1px dashed var(--panel-border);padding-bottom:10px;">
+    <label>Team B Name (Away)</label>
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      <input id="ssTeamBName" placeholder="e.g. Liverpool" style="margin-bottom:0;flex:1;" aria-label="Team B name" autocomplete="off" />
+      <input id="ssPasteB" placeholder="Paste JSON B" oninput="parseSofascoreTeam('B')" style="margin:0;padding:6px 8px;font-size:10px;width:100px;flex-shrink:0;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);" aria-label="Paste JSON B" />
+      <button type="button" onclick="searchSofascoreTeam('B')" style="background:#3a404c;margin:0;padding:4px 8px;font-size:12px;line-height:1;width:auto;flex-shrink:0;cursor:pointer;" title="Search football team on SofaScore">🔍</button>
+      <button type="button" onclick="clearPasteJSON('B')" title="Clear pasted JSON" style="background:#d91f26;color:#fff;border:none;margin:0;padding:4px 8px;font-size:12px;font-weight:900;cursor:pointer;flex-shrink:0;line-height:1;">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <input id="ssTeamBId" placeholder="Enter Numerical ID" oninput="updateSofascoreLinks('B')" style="margin-bottom:0;font-size:11px;padding:4px 6px;max-width:160px;" aria-label="Team B numerical ID" />
+      <a id="ssTeamBLink" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:12px;font-weight:800;text-decoration:underline;display:none;white-space:nowrap;">🔗 Open JSON B</a>
+      <a id="ssTeamBLink1" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p1</a>
+      <a id="ssTeamBLink2" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p2</a>
+      <a id="ssTeamBLink3" href="#" target="_blank" rel="noopener" style="color:#4ea9ff;font-size:11px;font-weight:700;text-decoration:underline;display:none;white-space:nowrap;">p3</a>
+    </div>
   </div>
-  <input id="ssTeamAId" type="hidden" />
 
-  <label style="font-size:12px;margin-top:6px;">Team B Name (Away)</label>
-  <div class="autocomplete-wrap">
-    <input id="ssTeamBName" placeholder="e.g. Liverpool" autocomplete="off" />
-    <div class="autocomplete-list" id="fbDropB"></div>
+  <div style="margin-bottom:8px;">
+    <label style="font-size:11px;">Tournament filter ID <span style="color:var(--muted);font-weight:600;">(optional — limits form to one competition)</span></label>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input id="ssTournamentId" placeholder="e.g. uniqueTournament id" oninput="onTournamentIdInput()" style="margin-bottom:0;font-size:11px;padding:4px 6px;max-width:200px;" aria-label="Tournament filter ID" />
+      <span id="ssTournamentName" style="font-size:10px;color:var(--muted);"></span>
+    </div>
   </div>
-  <input id="ssTeamBId" type="hidden" />
 
-  <button class="fetch-btn" id="fbEspnFetchBtn" type="button">📡 Fetch Stats</button>
-  <div id="fbEspnStatus" style="font-size:10px;min-height:16px;margin-top:6px;"></div>
-
-  <div class="injury-box" id="fbInjuryBoxA">
-    <div class="inj-title">Team A — Injury Report</div>
+  <div id="ssFetchStatus" style="font-size:10px;min-height:16px;margin-top:6px;color:var(--muted);">
+    Search team → open JSON pages → paste events JSON → form auto-fills FT / 1H goals.
+  </div>
+  <div class="injury-box" id="fbInjuryBoxA" style="display:none;">
+    <div class="inj-title">Team A — Notes</div>
     <div class="inj-body" id="fbInjuryContentA"></div>
   </div>
-  <div class="injury-box" id="fbInjuryBoxB">
-    <div class="inj-title">Team B — Injury Report</div>
+  <div class="injury-box" id="fbInjuryBoxB" style="display:none;">
+    <div class="inj-title">Team B — Notes</div>
     <div class="inj-body" id="fbInjuryContentB"></div>
   </div>
-
-  <div id="fbEspnCoverage" style="font-size:10px;color:var(--muted);margin-top:7px;"></div>
-  <input id="ssTournamentId" type="hidden" />
-  <span id="ssTournamentName" style="display:none;"></span>
 </div>
-  <div class="section" id="marketSection">
+<div class="section" id="marketSection">
     <h3>Market Lines</h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
       <div><label>Full-Time Total Goals</label><input id="ftMarket" placeholder="e.g. 2.5 or 2.5-3.5" /></div>
@@ -1459,9 +1474,7 @@
     }
     function fbEspnSetFixtureDay(offset) {
       fbEspnFixtureOffset = offset === 1 ? 1 : 0;
-      const t = document.getElementById("fbEspnTodayBtn");
-      const tm = document.getElementById("fbEspnTomorrowBtn");
-      if (t) t.classList.toggle("active", fbEspnFixtureOffset === 0);
+      const t =       const tm =       if (t) t.classList.toggle("active", fbEspnFixtureOffset === 0);
       if (tm) tm.classList.toggle("active", fbEspnFixtureOffset === 1);
     }
     function fbEspnGetLeague() {
@@ -2038,8 +2051,7 @@
         });
       }
       const slug=fbEspnGetLeague(); if(!slug){fbEspnSetStatus("Select an ESPN competition first.","error");return false;}
-      const btn=document.getElementById("fbEspnFetchBtn"); if(btn)btn.disabled=true;
-      try{
+      const btn=      try{
         const selected=fbEspnGetSelectedFixture();
         let nameA=(document.getElementById("ssTeamAName")?.value||"").trim(),nameB=(document.getElementById("ssTeamBName")?.value||"").trim();
         if(selected){nameA=selected.homeName;nameB=selected.awayName;document.getElementById("ssTeamAName").value=nameA;document.getElementById("ssTeamBName").value=nameB;}
@@ -2107,7 +2119,16 @@
       }catch(e){fbEspnSetStatus("ESPN auto-fetch failed: "+(e?.message||String(e)),"error");engineDebug("ESPN football auto-fetch failed",{league:slug,error:e?.message||String(e)});return false;}
       finally{if(btn)btn.disabled=false;}
     }
-    window.FB_ESPN=FB_ESPN;window.fbEspnAutoFetch=fbEspnAutoFetch;window.fbEspnLoadFixtures=fbEspnLoadFixtures;window.fbEspnLoadRegistry=fbEspnLoadRegistry;
+    window.FB_ESPN=FB_ESPN;
+    // ESPN auto-fetch retired — SofaScore manual is the sole ingest path (basketball-engine pattern).
+    window.fbEspnAutoFetch = async function() {
+      const st = document.getElementById("ssFetchStatus");
+      if (st) { st.style.color = "#d98a00"; st.textContent = "ESPN auto-fetch removed. Use SofaScore team search + paste JSON."; }
+      if (typeof engineDebug === "function") engineDebug("ESPN auto-fetch disabled — use SofaScore manual");
+      return false;
+    };
+    window.fbEspnLoadFixtures = async function() { return []; };
+    window.fbEspnLoadRegistry = async function() { return []; };
 
     // ---------- SofaScore manual paste helpers ----------
     window.ssIsFootballEvent = function(ev) {
@@ -2198,22 +2219,30 @@
           : ""
       };
     };
-    window.updateSofascoreLinks = function(side) {
-      const idInput = document.getElementById(side==="A" ? "ssTeamAId" : "ssTeamBId");
-      const linkEl = document.getElementById(side==="A" ? "ssTeamALink" : "ssTeamBLink");
-      if (!idInput || !linkEl) return;
-      const idVal = idInput.value.trim();
-      if (idVal && /^\d+$/.test(idVal)) {
-        linkEl.href = "https://api.sofascore.com/api/v1/team/" + idVal + "/events/last/0";
-        linkEl.style.display = "inline-block";
-        if (side==="B") {
-          ["ssTeamBLink1","ssTeamBLink2","ssTeamBLink3"].forEach((id, i) => {
-            const el=document.getElementById(id);
-            if(el){ el.href="https://api.sofascore.com/api/v1/team/"+idVal+"/events/last/"+(i+1); el.style.display="inline-block"; }
-          });
-        }
-        if (typeof window.ssTryAutoFillH2H === "function") window.ssTryAutoFillH2H();
-      } else { linkEl.style.display="none"; if(side==="B"){ ["ssTeamBLink1","ssTeamBLink2","ssTeamBLink3"].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display="none"; }); } }
+        window.updateSofascoreLinks = function(side) {
+      const idEl = document.getElementById(side === "A" ? "ssTeamAId" : "ssTeamBId");
+      const idVal = (idEl && idEl.value || "").trim();
+      const prefix = side === "A" ? "ssTeamA" : "ssTeamB";
+      const main = document.getElementById(prefix + "Link");
+      const pages = [0, 1, 2, 3].map(function(p) {
+        return document.getElementById(prefix + (p === 0 ? "Link" : "Link" + p));
+      });
+      if (!idVal || !/^\d+$/.test(idVal)) {
+        pages.forEach(function(el) {
+          if (!el) return;
+          el.href = "#";
+          el.style.display = "none";
+        });
+        return;
+      }
+      pages.forEach(function(el, idx) {
+        if (!el) return;
+        const page = idx; // 0..3
+        el.href = "https://api.sofascore.com/api/v1/team/" + idVal + "/events/last/" + page;
+        el.style.display = "inline-block";
+        if (page === 0) el.textContent = "🔗 Open JSON " + side;
+        else el.textContent = "p" + page;
+      });
     };
     window.clearPasteJSON = function(side){
       const el = document.getElementById(side==='A'?'ssPasteA':'ssPasteB');
@@ -2222,19 +2251,21 @@
     // Manual search only — no auto-resolve, no fetch, no proxy.
     // Opens the raw SofaScore search JSON so the user can find the football
     // entry and paste its numerical ID themselves.
-    window.searchSofascoreTeam = function(side){
-      const nameEl = document.getElementById(side==='A'?'ssTeamAName':'ssTeamBName');
-      const rawName = (nameEl?.value||"").trim();
-      if(!rawName){ alert("Enter a team name first."); return; }
-      const searchName = rawName.replace(/\s+/g, " ").trim();
-      const url = "https://api.sofascore.com/api/v1/search/all?q=" + encodeURIComponent(searchName);
-      window.open(url, "_blank");
+        window.searchSofascoreTeam = function(side){
+      const nameEl = document.getElementById(side === "A" ? "ssTeamAName" : "ssTeamBName");
+      const rawName = (nameEl && nameEl.value || "").trim();
+      if (!rawName) { alert("Enter a team name first."); return; }
+      const searchName = rawName.split(",")[0].trim();
+      // Football-only team search (mirrors basketball engine's sport-scoped search).
+      const searchUrl = "https://api.sofascore.com/api/v1/search/teams?q=" + encodeURIComponent(searchName) + "&sport=football";
+      window.open(searchUrl, "_blank");
       const st = document.getElementById("ssFetchStatus");
       if (st) {
         st.style.color = "#d98a00";
-        st.textContent = "🔍 Opened raw search for " + side + ". Find the football entry and paste its ID manually.";
+        st.textContent = "🔍 Football team search opened for " + side + " — copy the team id, paste JSON from events/last/0..3, form auto-fills.";
       }
     };
+    window.searchSofascorePlayer = window.searchSofascoreTeam;
     // ---- H2H auto-fill: raw event cache + opponent-match extraction ----
     window.__ssRawEvents = window.__ssRawEvents || { A: null, B: null };
     function ssExtractH2HFromEvents(events, myTeamId, oppTeamId) {
@@ -5092,52 +5123,18 @@
       // without maintaining a brittle hand-written league list.
       const fbLeagueSelect=document.getElementById("leagueSelect");
       const fbFixtureSelect=document.getElementById("fbEspnFixtureSelect");
-      const fbFetchBtn=document.getElementById("fbEspnFetchBtn");
-      const fbTodayBtn=document.getElementById("fbEspnTodayBtn");
-      const fbTomorrowBtn=document.getElementById("fbEspnTomorrowBtn");
-      if(fbLeagueSelect){
-        fbLeagueSelect.addEventListener("change",async function(){
-          const slug=this.value;
-          const fixtureSel=document.getElementById("fbEspnFixtureSelect");
-          if(fixtureSel)fixtureSel.innerHTML='<option value="">- Select match -</option>';
-          ["fbInjuryBoxA","fbInjuryBoxB"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none";});
-          document.getElementById("ssTeamAName").value="";document.getElementById("ssTeamBName").value="";
-          document.getElementById("ssTeamAId").value="";document.getElementById("ssTeamBId").value="";
-          if(!slug){fbEspnSetStatus("");return;}
-          fbEspnSetStatus("Competition selected. Loading ESPN fixtures…");
-          const name=await fbEspnLoadLeagueMeta(slug);
-          await fbEspnLoadFixtures(fbEspnFixtureOffset);
-          fbEspnSetStatus(name ? name+" selected. Choose a match or enter both team names." : "Competition selected. Choose a match or enter both team names.");
+      // ESPN auto-fetch UI removed — SofaScore manual is the sole ingest path.
+      const fbLeagueSelect = document.getElementById("leagueSelect");
+      if (fbLeagueSelect) {
+        fbLeagueSelect.addEventListener("change", function() {
+          const st = document.getElementById("ssFetchStatus");
+          if (st) {
+            st.style.color = "var(--muted)";
+            st.textContent = "League selected. Use SofaScore team search + paste JSON to fill form.";
+          }
         });
       }
-      if(fbTodayBtn)fbTodayBtn.addEventListener("click",()=>fbEspnLoadFixtures(0));
-      if(fbTomorrowBtn)fbTomorrowBtn.addEventListener("click",()=>fbEspnLoadFixtures(1));
-      if(fbFetchBtn)fbFetchBtn.addEventListener("click",fbEspnAutoFetch);
-      async function fbEspnShowTeamSuggestions(side){
-        const input=document.getElementById(side==="A"?"ssTeamAName":"ssTeamBName");
-        const drop=document.getElementById(side==="A"?"fbDropA":"fbDropB");
-        const slug=fbEspnGetLeague();
-        if(!input||!drop||!slug){if(drop)drop.style.display="none";return;}
-        const q=fbEspnNormalizeName(input.value);
-        if(q.length<2){drop.style.display="none";return;}
-        try{
-          const key="teams:"+slug; let teams=FB_ESPN.teamCache.get(key);
-          if(!teams){await fbEspnSearchTeam(slug,q);teams=FB_ESPN.teamCache.get(key)||[];}
-          const hits=teams.map(t=>{const n=fbEspnNormalizeName(t.name),sh=fbEspnNormalizeName(t.short),ab=fbEspnNormalizeName(t.abbr);let score=0;if(n===q)score=100;else{if(n.includes(q)||q.includes(n))score+=40;if(sh.includes(q)||q.includes(sh))score+=30;if(ab===q)score+=20;score+=q.split(" ").filter(w=>w.length>2&&n.includes(w)).length*5;}return {t,score};}).filter(x=>x.score>=10).sort((a,b)=>b.score-a.score).slice(0,8);
-          drop.innerHTML=hits.map(x=>`<div data-id="${String(x.t.id).replace(/"/g,"&quot;")}">${String(x.t.name).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}</div>`).join("");
-          drop.style.display=hits.length?"block":"none";
-          Array.from(drop.children).forEach(el=>el.addEventListener("mousedown",ev=>{ev.preventDefault();const t=hits.find(x=>String(x.t.id)===String(el.dataset.id))?.t;if(!t)return;input.value=t.name;document.getElementById(side==="A"?"ssTeamAId":"ssTeamBId").value=t.id;drop.style.display="none";}));
-        }catch(e){drop.style.display="none";}
-      }
-      ["A","B"].forEach(side=>{const input=document.getElementById(side==="A"?"ssTeamAName":"ssTeamBName");if(input){input.addEventListener("input",()=>fbEspnShowTeamSuggestions(side));input.addEventListener("focus",()=>fbEspnShowTeamSuggestions(side));input.addEventListener("blur",()=>setTimeout(()=>{const d=document.getElementById(side==="A"?"fbDropA":"fbDropB");if(d)d.style.display="none";},120));}});
-
-      if(fbFixtureSelect)fbFixtureSelect.addEventListener("change",function(){
-        const f=fbEspnGetSelectedFixture(); if(!f)return;
-        document.getElementById("ssTeamAName").value=f.homeName||"";document.getElementById("ssTeamBName").value=f.awayName||"";
-        document.getElementById("ssTeamAId").value=f.homeId||"";document.getElementById("ssTeamBId").value=f.awayId||"";
-        // Auto-fetch on match select (Fetch Stats button remains as manual fallback)
-        if (typeof engineDebug === "function") engineDebug("Fixture selected — auto-fetch starting", { home: f.homeName, away: f.awayName, homeId: f.homeId, awayId: f.awayId });
-        if (typeof fbEspnAutoFetch === "function") {
+if (typeof fbEspnAutoFetch === "function") {
           setTimeout(function(){ try { fbEspnAutoFetch(); } catch (e) { if (typeof engineDebug === "function") engineDebug("Auto-fetch on select failed", String(e && e.message ? e.message : e)); } }, 50);
         }
       });
