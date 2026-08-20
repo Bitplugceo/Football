@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -652,6 +653,7 @@
         '<button onclick="AFDB.clear()" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;">🗑️ Clear</button>' +
         '<button onclick="AFDB.runTestFetch()" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;box-shadow:0 0 8px rgba(217,31,38,0.4);">🚨 MILITARY RAID</button>' +
         '<button onclick="window.openVisualReportFromDebug()" style="background:#111;border:1px solid #333;color:#d4af37;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;">📊 Tracker Report</button>' +
+        '<button onclick="window.EngineAuditor ? EngineAuditor.open() : alert(\'Full Audit: EngineAuditor not loaded\')" style="background:#0a1f0a;border:1px solid #2f8f4a;color:#49ff7a;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;box-shadow:0 0 8px rgba(47,143,74,0.4);">🩺 Full Audit</button>' +
         '<button onclick="AFDB.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">✕ Close</button>';
 
       const emptyMsg = _showOnlyErrors ? 'No suspects arrested. The code is clean.' : 'No log entries yet. Run a prediction.';
@@ -813,6 +815,7 @@
   (function(){
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
+    window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
     const APP_BUILD_VERSION = "football_engine_v2_tier12";
     const ENGINE_MODEL_VERSION = "football_v2_core";
     const TRACKED_PICKS_LIMIT = 500;
@@ -3457,6 +3460,21 @@
       document.body.classList.remove("tracker-open");
     }
     // Expose for AFDB Tracker Report button (openVisualReportFromDebug lives outside this IIFE)
+    
+    // EngineAuditor surface — expose nested football helpers
+    try {
+      window.getPick = getPick;
+      window.getConfidenceGrade = getConfidenceGrade;
+      window.getSampleTier = getSampleTier;
+      window.getVolatilityRatio = getVolatilityRatio;
+      window.anchorProjection = anchorProjection;
+      window.computeGoalsModel = computeGoalsModel;
+      window.getPickSideFromText = getPickSideFromText;
+      window.detectTrap = detectTrap;
+      window.toggleTheme = toggleTheme;
+      window.fb2_runEngine = typeof fb2_runEngine === "function" ? fb2_runEngine : window.runEngine;
+    } catch (e) {}
+
     window.openTrackerModal = openTrackerModal;
     window.closeTrackerModal = closeTrackerModal;
     window.setTrackerModalView = setTrackerModalView;
@@ -5427,6 +5445,669 @@
 
   debug('Football advanced lifecycle layer ready',{version:NS,modelVersion:getVersion()});
 })();
+</script>
+
+
+<div id="auditorOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100000;background:rgba(0,0,0,0.97);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
+  <div id="auditorPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
+</div>
+<script>
+// EngineAuditor v2 — FOOTBALL-NATIVE audit module for the Football Prediction Engine.
+// Categories and probes target football helpers only (runEngine, getPick, thresholds,
+// ESPN/SofaScore football fetch, tracker settle). No basketball/tennis math probes.
+const EngineAuditor = (function () {
+  /*__ENGINE_AUDITOR_SELF_START__*/
+
+  const ACCEPTED_DESIGN_DECISIONS = {
+    SINGLE_FILE_MONOLITH: {
+      decidedOn: '2026-08-20',
+      note: 'Single-file deployment is deliberate for this football engine.'
+    },
+    LARGE_GLOBAL_STATE_SURFACE: {
+      decidedOn: '2026-08-20',
+      note: 'Wide global surface accepted for this monolith.'
+    },
+    GLOBAL_NAMING_CONVENTION: {
+      decidedOn: '2026-08-20',
+      note: 'Mixed top-level naming accepted technical debt.'
+    }
+  };
+
+  let _findings = [];
+  let _checksRun = 0;
+  let _checksTotal = 0;
+  let _isOpen = false;
+  let _lastRunMs = null;
+  let _running = false;
+  let _viewMode = 'severity';
+  let _categoryTimings = {};
+  let _categoryErrors = {};
+
+  function add(severity, area, title, what, why, fix, location) {
+    _findings.push({ severity, area, title, what, why, fix, location: location || '—' });
+  }
+  function tally() { _checksTotal++; }
+  function pass() { _checksRun++; }
+
+  function safeCall(fn) {
+    try {
+      const args = Array.prototype.slice.call(arguments, 1);
+      return { ok: true, value: fn.apply(null, args) };
+    } catch (e) {
+      return { ok: false, error: e };
+    }
+  }
+
+  function healthFromFindings(findings) {
+    let score = 100;
+    findings.forEach(function (f) {
+      if (f.severity === 'CRITICAL') score -= 25;
+      else if (f.severity === 'HIGH') score -= 12;
+      else if (f.severity === 'MEDIUM') score -= 6;
+      else if (f.severity === 'LOW') score -= 2;
+    });
+    score = Math.max(0, Math.min(100, score));
+    const label = score >= 90 ? 'HEALTHY' : score >= 70 ? 'NEEDS ATTENTION' : score >= 40 ? 'DEGRADED' : 'CRITICAL';
+    return { score: score, label: label };
+  }
+
+  function countsBySeverity() {
+    const c = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+    _findings.forEach(function (f) { if (c[f.severity] != null) c[f.severity]++; });
+    return c;
+  }
+
+  function getConcatenatedScriptSource() {
+    try {
+      const nodes = document.querySelectorAll('script');
+      let out = '';
+      nodes.forEach(function (n) {
+        if (n.src) return;
+        out += (n.textContent || '') + '\n';
+      });
+      return stripSelf(out);
+    } catch (e) { return ''; }
+  }
+
+  function stripSelf(src) {
+    const a = src.indexOf('/*__ENGINE_AUDITOR_SELF_START__*/');
+    const b = src.indexOf('/*__ENGINE_AUDITOR_SELF_END__*/');
+    if (a >= 0 && b > a) return src.slice(0, a) + src.slice(b + '/*__ENGINE_AUDITOR_SELF_END__*/'.length);
+    return src;
+  }
+
+  function srcHasFn(src, name) {
+    const re = new RegExp('function\\s+' + name + '\\s*\\(|' + name + '\\s*=\\s*(async\\s*)?function|' + name + '\\s*=\\s*async\\s*\\(');
+    return re.test(src || '');
+  }
+
+  function fnAvailable(name) {
+    return typeof window[name] === 'function' || srcHasFn(getConcatenatedScriptSource(), name);
+  }
+
+  // ---------- CATEGORIES (football only) ----------
+  function auditArchitecture() {
+    const AREA = 'ARCHITECTURE';
+    const src = getConcatenatedScriptSource() || '';
+    tally(); pass();
+    if (window.__FOOTBALL_ENGINE_BOOT_SEEN === false) {
+      add('CRITICAL', AREA, 'ENGINE FAILED TO BOOT', 'window.__FOOTBALL_ENGINE_BOOT_SEEN is false.', 'Main script did not complete boot.', 'Check console for SyntaxError.', 'window.__FOOTBALL_ENGINE_BOOT_SEEN');
+    } else if (window.__FOOTBALL_ENGINE_BOOT_SEEN === true) {
+      add('INFO', AREA, 'Engine boot marker present', 'window.__FOOTBALL_ENGINE_BOOT_SEEN is true.', 'Main script executed.', 'No action needed.', 'window.__FOOTBALL_ENGINE_BOOT_SEEN');
+    } else {
+      add('MEDIUM', AREA, 'Boot marker not set', 'window.__FOOTBALL_ENGINE_BOOT_SEEN is undefined.', 'Boot signal missing.', 'Set marker at end of main boot path.', 'window.__FOOTBALL_ENGINE_BOOT_SEEN');
+    }
+
+    tally(); pass();
+    const totalLines = src.split('\n').length;
+    const fnCount = (src.match(/function\s+[A-Za-z_$]/g) || []).length;
+    if (totalLines > 8000 && ACCEPTED_DESIGN_DECISIONS.SINGLE_FILE_MONOLITH) {
+      const dec = ACCEPTED_DESIGN_DECISIONS.SINGLE_FILE_MONOLITH;
+      add('INFO', AREA, 'Single-file monolith (accepted)', '~' + totalLines + ' lines / ~' + fnCount + ' functions.', 'Accepted on ' + dec.decidedOn + '. ' + dec.note, 'No action needed.', 'Whole-file size');
+    } else {
+      add('INFO', AREA, 'Source size', '~' + totalLines + ' product lines, ~' + fnCount + ' named functions.', 'Monolith inventory.', 'No action needed.', 'Whole-file size');
+    }
+
+    tally(); pass();
+    const gPrefixed = (src.match(/\blet\s+g_[A-Za-z0-9_]+/g) || []).length;
+    const varGlobals = (src.match(/\bvar\s+[A-Za-z_$]/g) || []).length;
+    const total = gPrefixed + varGlobals;
+    if (total > 25 && ACCEPTED_DESIGN_DECISIONS.LARGE_GLOBAL_STATE_SURFACE) {
+      const dec = ACCEPTED_DESIGN_DECISIONS.LARGE_GLOBAL_STATE_SURFACE;
+      add('INFO', AREA, 'Large global state (accepted)', '≈' + total + ' top-level declarations.', 'Accepted on ' + dec.decidedOn + '. ' + dec.note, 'No action needed.', 'Top-level globals');
+    } else {
+      add('INFO', AREA, 'Global state inventory', 'g_*=' + gPrefixed + ', var≈' + varGlobals + '.', 'State surface measured.', 'No action needed.', 'Top-level globals');
+    }
+  }
+
+  function auditSecurity() {
+    const AREA = 'SECURITY';
+    const src = getConcatenatedScriptSource() || '';
+    tally(); pass();
+    const dangerous = [];
+    src.split('\n').forEach(function (line) {
+      const t = line.trim();
+      if (/dangerous\.push|\/eval|match\(.*eval/.test(t)) return;
+      if (/(?:^|[^.\\w$])eval\s*\(/.test(t)) dangerous.push('eval(');
+      if (/new\s+Function\s*\(/.test(t)) dangerous.push('new Function(');
+      if (/document\.write\s*\(/.test(t)) dangerous.push('document.write(');
+    });
+    const uniq = Array.from(new Set(dangerous));
+    if (uniq.length) {
+      add('HIGH', AREA, 'Dangerous dynamic code pattern(s)', uniq.join(', '), 'Dynamic code execution is a security and auditability risk.', 'Remove or tightly sandbox.', 'Security scan');
+    } else {
+      add('INFO', AREA, 'No eval/new Function/document.write', 'Quick scan clean.', 'No action needed.', 'No action needed.', 'Security scan');
+    }
+
+    tally(); pass();
+    if (/innerHTML\s*=/.test(src)) {
+      add('INFO', AREA, 'innerHTML assignments present', 'Dynamic HTML is used; ensure user data is escaped.', 'Typical for this UI architecture.', 'Keep using htmlEscape/safe helpers on untrusted strings.', 'innerHTML usage');
+    } else {
+      add('INFO', AREA, 'No innerHTML assignments found', 'Static scan found none.', 'No action needed.', 'No action needed.', 'innerHTML usage');
+    }
+  }
+
+  function auditProjectionMath() {
+    const AREA = 'PROJECTION_MATH';
+    tally(); pass();
+    if (typeof window.getPick === 'function') {
+      const over = safeCall(window.getPick, 1.2, 2.5, 'ft');
+      const under = safeCall(window.getPick, -1.2, 2.5, 'ft');
+      const mid = safeCall(window.getPick, 0, 2.5, 'ft');
+      if (!over.ok || !under.ok || !mid.ok) {
+        add('HIGH', AREA, 'getPick threw', 'Smoke calls failed.', 'Pick polarity is core output.', 'Fix getPick().', 'getPick()');
+      } else {
+        add('INFO', AREA, 'getPick smoke OK', 'Strong+/strong-/zero edge resolved without throw.', 'Pick helper runs.', 'No action needed.', 'getPick()');
+      }
+    } else if (fnAvailable('getPick')) {
+      add('INFO', AREA, 'getPick present in source', 'Not on window but declared in product source.', 'Nested helper exists.', 'Optional: export to window for live probes.', 'getPick()');
+    } else {
+      add('CRITICAL', AREA, 'getPick missing', 'Not found on window or in source.', 'Cannot form OVER/UNDER/NO PLAY.', 'Restore getPick().', 'getPick()');
+    }
+
+    tally(); pass();
+    if (typeof window.computeGoalsModel === 'function') {
+      const r = safeCall(window.computeGoalsModel, 1.4, 2.6);
+      if (!r.ok) add('HIGH', AREA, 'computeGoalsModel threw', String(r.error && r.error.message || r.error), 'Goals model feeds FT/H1 projections.', 'Fix computeGoalsModel().', 'computeGoalsModel()');
+      else add('INFO', AREA, 'computeGoalsModel smoke OK', 'Returned without throw.', 'No action needed.', 'No action needed.', 'computeGoalsModel()');
+    } else if (fnAvailable('computeGoalsModel')) {
+      add('INFO', AREA, 'computeGoalsModel present in source', 'Declared in product source.', 'No action needed.', 'No action needed.', 'computeGoalsModel()');
+    } else {
+      add('HIGH', AREA, 'computeGoalsModel missing', 'Not found.', 'Core goals math unavailable.', 'Restore computeGoalsModel().', 'computeGoalsModel()');
+    }
+
+    tally(); pass();
+    if (typeof window.anchorProjection === 'function') {
+      const r = safeCall(window.anchorProjection, 2.7, 8, 2.5);
+      if (!r.ok || !Number.isFinite(r.value)) add('MEDIUM', AREA, 'anchorProjection non-finite', 'Expected finite anchored projection.', 'Small samples need shrinkage.', 'Fix anchorProjection().', 'anchorProjection()');
+      else add('INFO', AREA, 'anchorProjection OK', 'Returned ' + r.value, 'No action needed.', 'No action needed.', 'anchorProjection()');
+    } else if (fnAvailable('anchorProjection')) {
+      add('INFO', AREA, 'anchorProjection present in source', 'Declared in product source.', 'No action needed.', 'No action needed.', 'anchorProjection()');
+    } else {
+      add('LOW', AREA, 'anchorProjection missing', 'Not found.', 'May be inlined elsewhere.', 'Confirm intentional.', 'anchorProjection()');
+    }
+
+    tally(); pass();
+    const th = window.__fbThresholds;
+    if (th && Number.isFinite(Number(th.ft)) && Number.isFinite(Number(th.h1))) {
+      add('INFO', AREA, 'Live FT/H1 thresholds present', 'ft=' + th.ft + ', h1=' + th.h1, 'Pick thresholds available.', 'No action needed.', 'window.__fbThresholds');
+    } else {
+      add('HIGH', AREA, 'Live thresholds missing/non-finite', 'window.__fbThresholds incomplete.', 'getPick depends on FT/H1 thresholds.', 'Restore default thresholds on boot.', 'window.__fbThresholds');
+    }
+  }
+
+  function auditConfidence() {
+    const AREA = 'CONFIDENCE';
+    tally(); pass();
+    if (typeof window.getConfidenceGrade === 'function') {
+      const strong = safeCall(window.getConfidenceGrade, 1.5, 2.5, 'high', {});
+      const weak = safeCall(window.getConfidenceGrade, 0.05, 2.5, 'low', {});
+      if (!strong.ok || !weak.ok) {
+        add('HIGH', AREA, 'getConfidenceGrade threw', 'Smoke failed.', 'Grades drive locks and tracker.', 'Fix getConfidenceGrade().', 'getConfidenceGrade()');
+      } else {
+        add('INFO', AREA, 'getConfidenceGrade smoke OK', 'Strong→' + strong.value + ', weak→' + weak.value, 'Confidence path runs.', 'No action needed.', 'getConfidenceGrade()');
+      }
+    } else if (fnAvailable('getConfidenceGrade')) {
+      add('INFO', AREA, 'getConfidenceGrade present in source', 'Declared in product source.', 'No action needed.', 'No action needed.', 'getConfidenceGrade()');
+    } else {
+      add('CRITICAL', AREA, 'getConfidenceGrade missing', 'Not found.', 'No confidence grades.', 'Restore getConfidenceGrade().', 'getConfidenceGrade()');
+    }
+
+    tally(); pass();
+    if (typeof window.getSampleTier === 'function' || fnAvailable('getSampleTier')) {
+      add('INFO', AREA, 'getSampleTier available', 'Sample-tier helper present.', 'No action needed.', 'No action needed.', 'getSampleTier()');
+    } else {
+      add('LOW', AREA, 'getSampleTier missing', 'Not found.', 'Sample sizing may be hardcoded.', 'Confirm intentional.', 'getSampleTier()');
+    }
+
+    tally(); pass();
+    if (typeof window.detectTrap === 'function' || fnAvailable('detectTrap')) {
+      add('INFO', AREA, 'detectTrap available', 'Trap/no-play detector present.', 'No action needed.', 'No action needed.', 'detectTrap()');
+    } else {
+      add('LOW', AREA, 'detectTrap missing', 'Not found.', 'Trap filter may be inline.', 'Confirm intentional.', 'detectTrap()');
+    }
+  }
+
+  function auditVolatility() {
+    const AREA = 'VOLATILITY';
+    tally(); pass();
+    if (typeof window.getVolatilityRatio === 'function') {
+      const r = safeCall(window.getVolatilityRatio, [1, 2, 1, 2, 3], 1.2);
+      if (!r.ok || !Number.isFinite(r.value)) add('MEDIUM', AREA, 'getVolatilityRatio non-finite', 'Expected finite ratio.', 'Vol gates confidence.', 'Fix getVolatilityRatio().', 'getVolatilityRatio()');
+      else add('INFO', AREA, 'getVolatilityRatio OK', 'Returned ' + r.value, 'No action needed.', 'No action needed.', 'getVolatilityRatio()');
+    } else if (fnAvailable('getVolatilityRatio')) {
+      add('INFO', AREA, 'getVolatilityRatio present in source', 'Declared in product source.', 'No action needed.', 'No action needed.', 'getVolatilityRatio()');
+    } else {
+      add('LOW', AREA, 'getVolatilityRatio missing', 'Not found.', 'Vol may be computed inline.', 'Confirm intentional.', 'getVolatilityRatio()');
+    }
+  }
+
+  function auditStorage() {
+    const AREA = 'STORAGE';
+    tally(); pass();
+    try {
+      const k = '__FB_AUDITOR_SELFTEST__';
+      const payload = JSON.stringify({ t: Date.now(), n: Math.random() });
+      localStorage.setItem(k, payload);
+      const back = localStorage.getItem(k);
+      localStorage.removeItem(k);
+      if (back === payload) add('INFO', AREA, 'localStorage round-trip OK', 'Write/read/remove succeeded.', 'No action needed.', 'No action needed.', 'localStorage');
+      else add('HIGH', AREA, 'localStorage round-trip mismatch', 'Read-back differed.', 'Persistence unreliable.', 'Check storage quotas/private mode.', 'localStorage');
+    } catch (e) {
+      add('HIGH', AREA, 'localStorage unavailable', String(e && e.message || e), 'Tracker/config cannot persist.', 'Allow storage or degrade gracefully.', 'localStorage');
+    }
+
+    tally(); pass();
+    if (typeof window.exportFootballEngineState === 'function') {
+      add('INFO', AREA, 'exportFootballEngineState present', 'State export surface available.', 'No action needed.', 'No action needed.', 'exportFootballEngineState()');
+    } else {
+      add('LOW', AREA, 'exportFootballEngineState missing', 'Not found.', 'Backup/export path unavailable.', 'Restore export helper.', 'exportFootballEngineState()');
+    }
+  }
+
+  function auditTracker() {
+    const AREA = 'TRACKER';
+    tally(); pass();
+    if (typeof window.openTrackerModal === 'function') {
+      add('INFO', AREA, 'openTrackerModal present', 'Tracker UI entry point available.', 'No action needed.', 'No action needed.', 'openTrackerModal()');
+    } else {
+      add('HIGH', AREA, 'openTrackerModal missing', 'Not found.', 'Tracker panel cannot open.', 'Restore openTrackerModal().', 'openTrackerModal()');
+    }
+
+    tally(); pass();
+    if (typeof window.fbCheckAndSettleActivePicks === 'function' || typeof window.settleTrackedPickFromScore === 'function') {
+      add('INFO', AREA, 'Settlement API present', 'Settle helpers available on window.', 'No action needed.', 'No action needed.', 'settle APIs');
+    } else if (fnAvailable('fbCheckAndSettleActivePicks') || fnAvailable('settleTrackedPickFromScore')) {
+      add('INFO', AREA, 'Settlement API in source', 'Settle helpers declared in product source.', 'No action needed.', 'No action needed.', 'settle APIs');
+    } else {
+      add('HIGH', AREA, 'Settlement API missing', 'No settle helpers found.', 'Tracked picks cannot auto-settle.', 'Restore settlement functions.', 'settle APIs');
+    }
+
+    tally(); pass();
+    const st = window.g_trackerState;
+    if (st && (Array.isArray(st.activePicks) || Array.isArray(st.archivedPicks) || Array.isArray(st.items))) {
+      const n = (st.activePicks || st.items || []).length;
+      add('INFO', AREA, 'Tracker state object present', 'active/items count ≈ ' + n, 'In-memory tracker available.', 'No action needed.', 'g_trackerState');
+    } else {
+      add('INFO', AREA, 'Tracker state not yet hydrated', 'g_trackerState missing or empty shape.', 'May be normal before first load.', 'No action needed if loads on open.', 'g_trackerState');
+    }
+  }
+
+  function auditFetchLayer() {
+    const AREA = 'FETCH';
+    const src = getConcatenatedScriptSource() || '';
+    tally(); pass();
+    if (typeof window.fbEspnFetchJSON === 'function' || /function\s+fbEspnFetchJSON\s*\(/.test(src)) {
+      add('INFO', AREA, 'fbEspnFetchJSON present', 'ESPN football fetch helper available.', 'No action needed.', 'No action needed.', 'fbEspnFetchJSON()');
+    } else {
+      add('MEDIUM', AREA, 'fbEspnFetchJSON missing', 'Not found.', 'ESPN auto-fetch may be broken.', 'Restore fbEspnFetchJSON().', 'fbEspnFetchJSON()');
+    }
+
+    tally(); pass();
+    if (typeof window.searchSofascoreTeam === 'function' || typeof window.parseSofascoreTeam === 'function') {
+      add('INFO', AREA, 'SofaScore team helpers present', 'Manual/secondary football ingest available.', 'No action needed.', 'No action needed.', 'SofaScore helpers');
+    } else {
+      add('LOW', AREA, 'SofaScore helpers missing', 'Not found on window.', 'Secondary ingest path unavailable.', 'Confirm intentional.', 'SofaScore helpers');
+    }
+
+    tally(); pass();
+    if (/AbortController/.test(src) && /timeoutMs|setTimeout/.test(src)) {
+      add('INFO', AREA, 'Fetch timeout/abort patterns present', 'Resilience markers found in source.', 'No action needed.', 'No action needed.', 'Fetch resilience');
+    } else {
+      add('LOW', AREA, 'Fetch resilience markers weak', 'Could not confirm AbortController + timeout pairing.', 'Hung requests may stall UI.', 'Ensure timeouts on network helpers.', 'Fetch resilience');
+    }
+  }
+
+  function auditUIDom() {
+    const AREA = 'UI_DOM';
+    tally(); pass();
+    const critical = ['afdbOverlay', 'afdbBtn', 'runBtn', 'clearBtn'];
+    const missing = critical.filter(function (id) { return !document.getElementById(id); });
+    if (missing.length) {
+      add('CRITICAL', AREA, 'Critical DOM nodes missing', missing.join(', '), 'Core UI ids missing.', 'Restore markup ids.', 'DOM presence');
+    } else {
+      add('INFO', AREA, 'Critical DOM nodes present', critical.join(', '), 'Shell intact.', 'No action needed.', 'DOM presence');
+    }
+
+    tally(); pass();
+    if (typeof window.toggleTheme === 'function' || fnAvailable('toggleTheme')) {
+      add('INFO', AREA, 'toggleTheme available', 'Theme toggle helper present.', 'No action needed.', 'No action needed.', 'toggleTheme()');
+    } else {
+      add('LOW', AREA, 'toggleTheme missing', 'Not found.', 'Dark mode may be stuck.', 'Restore toggleTheme().', 'toggleTheme()');
+    }
+
+    tally(); pass();
+    const htmlOnly = (document.documentElement.outerHTML || '').split(/<script/i)[0];
+    const inputCount = (htmlOnly.match(/<input\b/gi) || []).length;
+    const ariaCount = (htmlOnly.match(/aria-label=/gi) || []).length;
+    if (inputCount > 0 && ariaCount < inputCount * 0.5) {
+      add('LOW', AREA, 'Many inputs lack aria-label', inputCount + ' inputs / ' + ariaCount + ' aria-labels.', 'Accessibility gap.', 'Add aria-label or linked labels.', 'Static HTML a11y');
+    } else {
+      add('INFO', AREA, 'Input labeling looks reasonable', inputCount + ' inputs / ' + ariaCount + ' aria-labels.', 'No action needed.', 'No action needed.', 'Static HTML a11y');
+    }
+  }
+
+  function auditCodeQuality() {
+    const AREA = 'CODE_QUALITY';
+    const src = getConcatenatedScriptSource() || '';
+    tally(); pass();
+    const logs = (src.match(/\bconsole\.log\s*\(/g) || []).length;
+    if (logs > 0) {
+      add('LOW', AREA, 'console.log in product source', 'Found ' + logs + ' console.log call(s).', 'Prefer engineDebug.', 'Route or remove.', 'console.log');
+    } else {
+      add('INFO', AREA, 'No console.log in product source', 'Logging appears routed.', 'No action needed.', 'No action needed.', 'console.log');
+    }
+
+    tally(); pass();
+    if (ACCEPTED_DESIGN_DECISIONS.GLOBAL_NAMING_CONVENTION) {
+      const dec = ACCEPTED_DESIGN_DECISIONS.GLOBAL_NAMING_CONVENTION;
+      add('INFO', AREA, 'Naming convention mixed (accepted)', 'Accepted on ' + dec.decidedOn + '. ' + dec.note, 'Architectural debt accepted.', 'No action needed.', 'Naming');
+    }
+  }
+
+  function auditFeatureWalkthrough() {
+    const AREA = 'FEATURE_WALKTHROUGH';
+    const features = [
+      { name: 'Boot marker', fn: '__FOOTBALL_ENGINE_BOOT_SEEN', critical: true, kind: 'flag' },
+      { name: 'Run engine', fn: 'runEngine', critical: true },
+      { name: 'getPick', fn: 'getPick', critical: true },
+      { name: 'getConfidenceGrade', fn: 'getConfidenceGrade', critical: true },
+      { name: 'Open tracker', fn: 'openTrackerModal', critical: true },
+      { name: 'Settle active picks', fn: 'fbCheckAndSettleActivePicks', critical: false },
+      { name: 'Settle from score', fn: 'settleTrackedPickFromScore', critical: false },
+      { name: 'Config proposals', fn: 'proposeFbConfigUpgrades', critical: false },
+      { name: 'Lifecycle layer', fn: 'FB_ENGINE_LIFECYCLE', critical: false, kind: 'object' },
+      { name: 'engineDebug', fn: 'engineDebug', critical: false },
+      { name: 'AFDB', fn: 'AFDB', critical: false, kind: 'object' },
+      { name: 'ESPN fetch JSON', fn: 'fbEspnFetchJSON', critical: false }
+    ];
+    features.forEach(function (f) {
+      tally(); pass();
+      let ok = false;
+      if (f.kind === 'flag') ok = window[f.fn] === true;
+      else if (f.kind === 'object') ok = typeof window[f.fn] === 'object' && window[f.fn] != null;
+      else ok = typeof window[f.fn] === 'function' || fnAvailable(f.fn);
+      if (ok) {
+        add('INFO', AREA, f.name + ' available', f.fn + ' resolved.', 'Feature entry point present.', 'No action needed.', f.fn);
+      } else if (f.critical) {
+        add('CRITICAL', AREA, f.name + ' missing', f.fn + ' not found.', 'Core football feature unavailable.', 'Restore ' + f.fn, f.fn);
+      } else {
+        add('LOW', AREA, f.name + ' missing', f.fn + ' not found.', 'Optional surface missing.', 'Restore if still used.', f.fn);
+      }
+    });
+  }
+
+  function auditRegressionLocks() {
+    const AREA = 'REGRESSION_LOCKS';
+    tally(); pass();
+    if (typeof window.runEngine === 'function') {
+      add('INFO', AREA, 'LOCK OK: runEngine exported', 'window.runEngine is a function.', 'Primary prediction entry point is wired.', 'No action needed.', 'window.runEngine');
+    } else {
+      add('CRITICAL', AREA, 'REGRESSION: runEngine not exported', 'window.runEngine missing.', 'UI Run button cannot invoke engine.', 'Export fb2_runEngine as window.runEngine.', 'window.runEngine');
+    }
+
+    tally(); pass();
+    const th = window.__fbThresholds || {};
+    if (Number.isFinite(Number(th.ft)) && Number.isFinite(Number(th.h1))) {
+      add('INFO', AREA, 'LOCK OK: thresholds finite', 'ft/h1 thresholds finite.', 'No action needed.', 'No action needed.', '__fbThresholds');
+    } else {
+      add('HIGH', AREA, 'REGRESSION: thresholds broken', 'ft/h1 missing or non-finite.', 'Picks cannot threshold correctly.', 'Restore default __fbThresholds on boot.', '__fbThresholds');
+    }
+
+    tally(); pass();
+    if (typeof window.FB_ENGINE_LIFECYCLE === 'object' && window.FB_ENGINE_LIFECYCLE) {
+      add('INFO', AREA, 'LOCK OK: lifecycle layer present', 'FB_ENGINE_LIFECYCLE attached.', 'Canary/health layer available.', 'No action needed.', 'FB_ENGINE_LIFECYCLE');
+    } else {
+      add('LOW', AREA, 'Lifecycle layer not attached', 'FB_ENGINE_LIFECYCLE missing.', 'Advanced validation layer absent.', 'Confirm lifecycle script loaded.', 'FB_ENGINE_LIFECYCLE');
+    }
+
+    tally(); pass();
+    const src = getConcatenatedScriptSource() || '';
+    if (src.indexOf('/*__ENGINE_AUDITOR_SELF_START__*/') === -1) {
+      add('INFO', AREA, 'Auditor self-strip markers active', 'Product scan strips auditor body.', 'No action needed.', 'No action needed.', 'stripSelf');
+    }
+  }
+
+  function auditLifecycle() {
+    const AREA = 'LIFECYCLE';
+    tally(); pass();
+    if (typeof window.getFootballEngineHealth === 'function') {
+      const r = safeCall(window.getFootballEngineHealth);
+      if (r.ok && r.value && r.value.ok) add('INFO', AREA, 'Lifecycle health OK', 'getFootballEngineHealth().ok === true', 'No action needed.', 'No action needed.', 'getFootballEngineHealth()');
+      else if (r.ok && r.value) add('MEDIUM', AREA, 'Lifecycle health reported issues', JSON.stringify(r.value.issues || []).slice(0, 200), 'Lifecycle layer flagged problems.', 'Inspect issues array.', 'getFootballEngineHealth()');
+      else add('LOW', AREA, 'Lifecycle health call failed', String(r.error && r.error.message || r.error || 'unknown'), 'Health probe threw.', 'Inspect lifecycle module.', 'getFootballEngineHealth()');
+    } else {
+      add('INFO', AREA, 'Lifecycle health API not exported', 'getFootballEngineHealth missing.', 'Optional layer.', 'No action needed if unused.', 'getFootballEngineHealth()');
+    }
+  }
+
+  const CATEGORIES = [
+    { id: 'ARCHITECTURE', letter: 'A', label: 'Architecture & Boot', fn: auditArchitecture },
+    { id: 'SECURITY', letter: 'B', label: 'Security', fn: auditSecurity },
+    { id: 'PROJECTION_MATH', letter: 'C', label: 'Football Projection & Picks', fn: auditProjectionMath },
+    { id: 'CONFIDENCE', letter: 'D', label: 'Confidence & Traps', fn: auditConfidence },
+    { id: 'VOLATILITY', letter: 'E', label: 'Volatility', fn: auditVolatility },
+    { id: 'STORAGE', letter: 'F', label: 'Storage', fn: auditStorage },
+    { id: 'TRACKER', letter: 'G', label: 'Tracker & Settlement', fn: auditTracker },
+    { id: 'FETCH', letter: 'H', label: 'ESPN / SofaScore Fetch', fn: auditFetchLayer },
+    { id: 'UI_DOM', letter: 'I', label: 'UI & DOM', fn: auditUIDom },
+    { id: 'CODE_QUALITY', letter: 'J', label: 'Code Quality', fn: auditCodeQuality },
+    { id: 'FEATURE_WALKTHROUGH', letter: 'K', label: 'Feature Walkthrough', fn: auditFeatureWalkthrough },
+    { id: 'REGRESSION_LOCKS', letter: 'L', label: 'Regression Locks', fn: auditRegressionLocks },
+    { id: 'LIFECYCLE', letter: 'M', label: 'Lifecycle / Canary', fn: auditLifecycle }
+  ];
+
+  async function runFullAudit() {
+    if (_running) return;
+    _running = true;
+    _findings = [];
+    _checksRun = 0;
+    _checksTotal = 0;
+    _categoryTimings = {};
+    _categoryErrors = {};
+    const t0 = performance.now();
+    for (let i = 0; i < CATEGORIES.length; i++) {
+      const cat = CATEGORIES[i];
+      const c0 = performance.now();
+      try { cat.fn(); }
+      catch (e) { _categoryErrors[cat.id] = e && e.message ? e.message : String(e); add('HIGH', cat.id, 'Category threw', _categoryErrors[cat.id], 'Audit category crashed.', 'Inspect category implementation.', cat.id); }
+      _categoryTimings[cat.id] = Math.round(performance.now() - c0);
+    }
+    _lastRunMs = Math.round(performance.now() - t0);
+    _running = false;
+    render();
+  }
+
+  function buildHeaderLines() {
+    const h = healthFromFindings(_findings);
+    const c = countsBySeverity();
+    const lines = [];
+    lines.push('====================================================');
+    lines.push('  FOOTBALL ENGINE — AUDIT REPORT');
+    lines.push('====================================================');
+    lines.push('Generated    : ' + new Date().toLocaleString());
+    lines.push('Health       : ' + h.score + '/100 — ' + h.label);
+    lines.push('Checks       : ' + _checksRun + '/' + _checksTotal + ' live checks across ' + CATEGORIES.length + ' categories');
+    lines.push('Findings     : ' + _findings.length + ' total — ' + c.CRITICAL + ' CRITICAL, ' + c.HIGH + ' HIGH, ' + c.MEDIUM + ' MEDIUM, ' + c.LOW + ' LOW, ' + c.INFO + ' INFO');
+    lines.push('Run time     : ' + (_lastRunMs != null ? _lastRunMs + ' ms' : '—'));
+    lines.push('');
+    const actionable = _findings.filter(function (f) { return f.severity !== 'INFO'; });
+    if (actionable.length) {
+      lines.push('--- PRIORITIZED REMEDIATION ROADMAP (top ' + Math.min(9, actionable.length) + ') ---');
+      const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+      actionable.sort(function (a, b) { return (order[a.severity] - order[b.severity]); }).slice(0, 9).forEach(function (f, i) {
+        lines.push((i + 1) + '. [' + f.severity + '] (' + f.area + ') ' + f.title);
+        lines.push('   FIX: ' + f.fix);
+      });
+      lines.push('');
+    }
+    return lines;
+  }
+
+  function buildSeverityViewText() {
+    const lines = buildHeaderLines();
+    lines.push('====================================================');
+    lines.push('  GROUP BY SEVERITY');
+    lines.push('====================================================');
+    lines.push('');
+    const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+    let any = false;
+    order.forEach(function (sev) {
+      const group = _findings.filter(function (f) { return f.severity === sev; });
+      if (!group.length) return;
+      any = true;
+      lines.push('--- ' + sev + ' (' + group.length + ') ---');
+      group.forEach(function (f) {
+        lines.push('[' + f.severity + '] ' + f.title);
+        lines.push('  Location: ' + f.location);
+        lines.push('  WHAT: ' + f.what);
+        lines.push('  WHY:  ' + f.why);
+        lines.push('  FIX:  ' + f.fix);
+        lines.push('');
+      });
+    });
+    if (!any) lines.push('No CRITICAL / HIGH / MEDIUM / LOW findings.');
+    return lines.join('\n');
+  }
+
+  function buildInfoViewText() {
+    const lines = buildHeaderLines();
+    lines.push('====================================================');
+    lines.push('  INFO ONLY');
+    lines.push('====================================================');
+    lines.push('');
+    const group = _findings.filter(function (f) { return f.severity === 'INFO'; });
+    if (!group.length) lines.push('No INFO findings.');
+    group.forEach(function (f) {
+      lines.push('[INFO] ' + f.title);
+      lines.push('  Location: ' + f.location);
+      lines.push('  WHAT: ' + f.what);
+      lines.push('');
+    });
+    return lines.join('\n');
+  }
+
+  async function copyCurrentView() {
+    const text = _viewMode === 'info' ? buildInfoViewText() : buildSeverityViewText();
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        return true;
+      } catch (e2) { return false; }
+    }
+  }
+
+  function setViewMode(mode) {
+    _viewMode = mode === 'info' ? 'info' : 'severity';
+    render();
+  }
+
+  function render() {
+    const panel = document.getElementById('auditorPanel');
+    if (!panel) return;
+    const h = healthFromFindings(_findings);
+    const c = countsBySeverity();
+    const healthColor = h.score >= 90 ? '#49d45f' : h.score >= 70 ? '#ffcf73' : '#ff5c61';
+    const groups = _viewMode === 'info'
+      ? [['INFO', _findings.filter(function (f) { return f.severity === 'INFO'; })]]
+      : ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(function (sev) {
+          return [sev, _findings.filter(function (f) { return f.severity === sev; })];
+        });
+    const sevColor = { CRITICAL: '#ff5c61', HIGH: '#ff8f5c', MEDIUM: '#ffcf73', LOW: '#8fd3ff', INFO: '#9aa0a8' };
+    let body = '';
+    groups.forEach(function (pair) {
+      const sev = pair[0], items = pair[1];
+      if (!items.length && _viewMode !== 'info') return;
+      body += '<div style="padding:10px 12px;color:' + (sevColor[sev] || '#ccc') + ';font-weight:900;font-size:12px;border-bottom:1px solid #222;">' + sev + ' (' + items.length + ')</div>';
+      if (!items.length) {
+        body += '<div style="padding:12px;color:#666;font-size:11px;">None</div>';
+        return;
+      }
+      items.forEach(function (f) {
+        body += '<div style="padding:10px 12px;border-bottom:1px solid #151515;">' +
+          '<div style="color:' + (sevColor[f.severity] || '#ccc') + ';font-weight:900;font-size:12px;">' + f.title + '</div>' +
+          '<div style="color:#777;font-size:10px;margin-top:2px;">' + f.location + '</div>' +
+          '<div style="color:#bbb;font-size:11px;margin-top:4px;">' + f.what + '</div>' +
+          '<div style="color:#888;font-size:10px;margin-top:4px;">WHY: ' + f.why + '</div>' +
+          '<div style="color:#9ecbff;font-size:10px;margin-top:2px;">FIX: ' + f.fix + '</div>' +
+          '</div>';
+      });
+    });
+    if (!body) body = '<div style="padding:20px;color:#666;text-align:center;">No findings in this view.</div>';
+
+    panel.innerHTML =
+      '<div style="background:#080808;border-bottom:1px solid #222;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;flex-shrink:0;">' +
+        '<div style="color:#d4af37;font-size:14px;font-weight:900;letter-spacing:1px;">🩺 FOOTBALL ENGINE AUDITOR</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button onclick="EngineAuditor.copyCurrentView()" style="background:#1a1206;border:1px solid #d4af37;color:#ffd75e;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">' + (_viewMode === 'info' ? '📋 Copy Info' : '📋 Copy Severity View') + '</button>' +
+          '<button onclick="EngineAuditor.run()" style="background:#0a1f0a;border:1px solid #2f8f4a;color:#49ff7a;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">↻ Re-run All</button>' +
+          '<button onclick="EngineAuditor.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">✕ Close</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:10px 12px;background:#0c0c0c;border-bottom:1px solid #222;flex-shrink:0;">' +
+        '<div style="color:' + healthColor + ';font-size:18px;font-weight:900;">Health ' + h.score + '/100 — ' + h.label + '</div>' +
+        '<div style="color:#888;font-size:11px;margin-top:4px;">' + _checksRun + '/' + _checksTotal + ' checks · ' + (_lastRunMs != null ? _lastRunMs + ' ms' : '—') + ' · C' + c.CRITICAL + ' H' + c.HIGH + ' M' + c.MEDIUM + ' L' + c.LOW + ' I' + c.INFO + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:0;border-bottom:1px solid #222;flex-shrink:0;">' +
+        '<button onclick="EngineAuditor.setViewMode(\'severity\')" style="flex:1;background:' + (_viewMode === 'severity' ? '#1a1a1a' : '#0a0a0a') + ';border:1px solid ' + (_viewMode === 'severity' ? '#d4af37' : '#333') + ';color:' + (_viewMode === 'severity' ? '#d4af37' : '#888') + ';padding:6px;font-size:10px;font-weight:900;cursor:pointer;">GROUP BY SEVERITY</button>' +
+        '<button onclick="EngineAuditor.setViewMode(\'info\')" style="flex:1;background:' + (_viewMode === 'info' ? '#1a1a1a' : '#0a0a0a') + ';border:1px solid ' + (_viewMode === 'info' ? '#d4af37' : '#333') + ';color:' + (_viewMode === 'info' ? '#d4af37' : '#888') + ';padding:6px;font-size:10px;font-weight:900;cursor:pointer;">INFO (' + c.INFO + ')</button>' +
+      '</div>' +
+      '<div style="flex:1;overflow-y:auto;background:#0a0a0a;">' + body + '</div>';
+  }
+
+  function open() {
+    const ov = document.getElementById('auditorOverlay');
+    if (!ov) {
+      alert('Full Audit did not open: #auditorOverlay missing.');
+      return;
+    }
+    _isOpen = true;
+    ov.style.display = 'flex';
+    runFullAudit();
+  }
+  function close() {
+    _isOpen = false;
+    const ov = document.getElementById('auditorOverlay');
+    if (ov) ov.style.display = 'none';
+  }
+
+  /*__ENGINE_AUDITOR_SELF_END__*/
+  return {
+    open: open,
+    close: close,
+    run: runFullAudit,
+    setViewMode: setViewMode,
+    copyCurrentView: copyCurrentView,
+    get isOpen() { return _isOpen; },
+    get findings() { return _findings.slice(); },
+    get health() { return healthFromFindings(_findings); }
+  };
+})();
+window.EngineAuditor = EngineAuditor;
 </script>
 
 </body>
