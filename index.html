@@ -1,3 +1,4 @@
+A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,6 +8,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Football Engine" />
   <meta name="theme-color" content="#c91920" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <!-- BUILD_MARKER: football_engine_v2_tier12_patch1 — bump this string on every deploy.
+       If the value shown in the on-page footer/console does not match this file,
+       the browser (iOS home-screen apps in particular) is serving a stale cached
+       copy of the JS — force a hard refresh / remove & re-add the home-screen icon. -->
   <title>Football Prediction Engine</title>
   <style>
     :root {
@@ -337,9 +345,9 @@
   <div class="engine-lock-card">
     <div class="engine-lock-title">🔒 TheBetCeo ⚡</div>
     <div class="engine-lock-sub">Enter PIN to unlock</div>
-    <input type="tel" inputmode="numeric" autocomplete="off" maxlength="6" id="engineLockInput" class="engine-lock-input" placeholder="••••">
+    <input type="tel" inputmode="numeric" autocomplete="off" maxlength="6" id="engineLockInput" class="engine-lock-input" placeholder="••••" aria-label="Engine unlock PIN">
     <button type="button" class="engine-lock-btn" id="engineLockBtn">Unlock</button>
-    <div class="engine-lock-error" id="engineLockError"></div>
+    <div class="engine-lock-error" id="engineLockError" aria-live="polite"></div>
   </div>
 </div>
 <script>
@@ -347,20 +355,69 @@
     var ENGINE_LOCK_PIN = "349137";
     var overlay = document.getElementById('engineLockOverlay');
     if (localStorage.getItem('engineUnlocked') === 'yes') overlay.classList.add('hidden');
+
+    // ---- Failed-attempt backoff ----
+    // Not a real security boundary (the PIN check is client-side regardless,
+    // so anyone with devtools can bypass it entirely) — this just throttles
+    // accidental/careless rapid-fire wrong-PIN submissions via the UI.
+    var FAIL_LIMIT = 5;
+    var LOCKOUT_MS = 30000;
+    var failCount = 0;
+    var lockoutUntil = 0;
+    var lockoutTimer = null;
+    var inputEl = document.getElementById('engineLockInput');
+    var btnEl = document.getElementById('engineLockBtn');
+    var errEl = document.getElementById('engineLockError');
+
+    function remainingLockoutSeconds() {
+      return Math.max(0, Math.ceil((lockoutUntil - Date.now()) / 1000));
+    }
+    function setLockedUi(locked) {
+      inputEl.disabled = locked;
+      btnEl.disabled = locked;
+    }
+    function tickLockoutMessage() {
+      var secs = remainingLockoutSeconds();
+      if (secs <= 0) {
+        clearInterval(lockoutTimer);
+        lockoutTimer = null;
+        failCount = 0;
+        setLockedUi(false);
+        errEl.textContent = '';
+        inputEl.focus();
+        return;
+      }
+      errEl.textContent = 'Too many attempts — try again in ' + secs + 's';
+    }
+    function startLockout() {
+      lockoutUntil = Date.now() + LOCKOUT_MS;
+      setLockedUi(true);
+      tickLockoutMessage();
+      if (lockoutTimer) clearInterval(lockoutTimer);
+      lockoutTimer = setInterval(tickLockoutMessage, 500);
+    }
     function tryUnlock(){
-      var val = document.getElementById('engineLockInput').value;
-      var err = document.getElementById('engineLockError');
+      // Failed-attempt backoff: after FAIL_LIMIT wrong PINs, lock the UI out
+      // for LOCKOUT_MS before another attempt is accepted.
+      if (Date.now() < lockoutUntil) { tickLockoutMessage(); return; }
+      var val = inputEl.value;
       if (val === ENGINE_LOCK_PIN) {
         localStorage.setItem('engineUnlocked', 'yes');
         overlay.classList.add('hidden');
-        err.textContent = '';
+        errEl.textContent = '';
+        failCount = 0;
       } else {
-        err.textContent = 'Wrong PIN';
-        document.getElementById('engineLockInput').value = '';
+        failCount++;
+        inputEl.value = '';
+        if (failCount >= FAIL_LIMIT) {
+          startLockout();
+        } else {
+          errEl.textContent = 'Wrong PIN (' + (FAIL_LIMIT - failCount) + ' attempt(s) left before a short lockout)';
+        }
       }
     }
-    document.getElementById('engineLockBtn').addEventListener('click', tryUnlock);
-    document.getElementById('engineLockInput').addEventListener('keydown', function(e){ if (e.key === 'Enter') tryUnlock(); });
+    btnEl.addEventListener('click', tryUnlock);
+    inputEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') tryUnlock(); });
   })();
 </script>
 <header class="app-header">
@@ -436,9 +493,9 @@
 <div class="section" id="marketSection">
     <h3>Market Lines</h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-      <div><label>Full-Time Total Goals</label><input id="ftMarket" placeholder="e.g. 2.5 or 2.5-3.5" /></div>
-      <div><label>1st Half Total Goals</label><input id="h1Market" placeholder="e.g. 1.5 or 1.5-2.5" /></div>
-      <div><label>2nd Half Total Goals</label><input id="h2Market" placeholder="e.g. 1.0 or 1.25" /></div>
+      <div><label>Full-Time Total Goals</label><input id="ftMarket" placeholder="e.g. 2.5 or 2.5-3.5" aria-label="Full-Time Total Goals line" /></div>
+      <div><label>1st Half Total Goals</label><input id="h1Market" placeholder="e.g. 1.5 or 1.5-2.5" aria-label="1st Half Total Goals line" /></div>
+      <div><label>2nd Half Total Goals</label><input id="h2Market" placeholder="e.g. 1.0 or 1.25" aria-label="2nd Half Total Goals line" /></div>
     </div>
   </div>
   <div class="section" id="teamASection">
@@ -446,26 +503,26 @@
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
       <div>
         <label>FT Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-        <input id="aFTScored" placeholder="e.g. 2,1,3,0,2" />
+        <input id="aFTScored" placeholder="e.g. 2,1,3,0,2" aria-label="Team A full-time goals scored, last 10 (recent to oldest)" />
       </div>
       <div>
         <label>FT Allowed</label>
-        <input id="aFTAllowed" placeholder="e.g. 1,2,0,3,1" />
+        <input id="aFTAllowed" placeholder="e.g. 1,2,0,3,1" aria-label="Team A full-time goals allowed, last 10 (recent to oldest)" />
       </div>
     </div>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
       <div>
         <label>1st Half Goals Scored</label>
-        <input id="a1HScored" placeholder="e.g. 1,0,2,1,0" />
+        <input id="a1HScored" placeholder="e.g. 1,0,2,1,0" aria-label="Team A 1st-half goals scored, last 10 (recent to oldest)" />
       </div>
       <div>
         <label>1st Half Goals Allowed</label>
-        <input id="a1HAllowed" placeholder="e.g. 0,1,1,0,2" />
+        <input id="a1HAllowed" placeholder="e.g. 0,1,1,0,2" aria-label="Team A 1st-half goals allowed, last 10 (recent to oldest)" />
       </div>
     </div>
     <div style="margin-top:6px;">
       <label>Matches in Last 7 Days <span style="font-size:10px;color:#888;">(fixture-congestion signal)</span></label>
-      <input id="aFixtureLoad7d" type="number" min="0" step="1" placeholder="e.g. 2" style="max-width:120px;" />
+      <input id="aFixtureLoad7d" type="number" min="0" step="1" placeholder="e.g. 2" style="max-width:120px;" aria-label="Team A matches played in last 7 days" />
     </div>
   </div>
   <div class="section" id="teamBSection">
@@ -473,40 +530,40 @@
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
       <div>
         <label>FT Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-        <input id="bFTScored" placeholder="e.g. 1,2,1,0,3" />
+        <input id="bFTScored" placeholder="e.g. 1,2,1,0,3" aria-label="Team B full-time goals scored, last 10 (recent to oldest)" />
       </div>
       <div>
         <label>FT Allowed</label>
-        <input id="bFTAllowed" placeholder="e.g. 2,1,3,1,0" />
+        <input id="bFTAllowed" placeholder="e.g. 2,1,3,1,0" aria-label="Team B full-time goals allowed, last 10 (recent to oldest)" />
       </div>
     </div>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
       <div>
         <label>1st Half Goals Scored</label>
-        <input id="b1HScored" placeholder="e.g. 0,1,1,2,0" />
+        <input id="b1HScored" placeholder="e.g. 0,1,1,2,0" aria-label="Team B 1st-half goals scored, last 10 (recent to oldest)" />
       </div>
       <div>
         <label>1st Half Goals Allowed</label>
-        <input id="b1HAllowed" placeholder="e.g. 1,0,2,1,1" />
+        <input id="b1HAllowed" placeholder="e.g. 1,0,2,1,1" aria-label="Team B 1st-half goals allowed, last 10 (recent to oldest)" />
       </div>
     </div>
     <div style="margin-top:6px;">
       <label>Matches in Last 7 Days <span style="font-size:10px;color:#888;">(fixture-congestion signal)</span></label>
-      <input id="bFixtureLoad7d" type="number" min="0" step="1" placeholder="e.g. 0" style="max-width:120px;" />
+      <input id="bFixtureLoad7d" type="number" min="0" step="1" placeholder="e.g. 0" style="max-width:120px;" aria-label="Team B matches played in last 7 days" />
     </div>
   </div>
   <div class="section" id="h2hSection">
     <h3>H2H <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled</span></h3>
     <label><input type="checkbox" id="useFTH2H" /> Use FT H2H (min 2 games)</label>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-      <input id="aFTH2H" placeholder="Team A full-time goals vs B" />
-      <input id="bFTH2H" placeholder="Team B full-time goals vs A" />
+      <input id="aFTH2H" placeholder="Team A full-time goals vs B" aria-label="Team A full-time goals scored in head-to-head meetings vs Team B" />
+      <input id="bFTH2H" placeholder="Team B full-time goals vs A" aria-label="Team B full-time goals scored in head-to-head meetings vs Team A" />
     </div>
     <div style="margin-top: 6px;">
       <label><input type="checkbox" id="use1HH2H" /> Use 1H H2H (min 2 games)</label>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-        <input id="a1HH2H" placeholder="Team A 1st-half goals vs B" />
-        <input id="b1HH2H" placeholder="Team B 1st-half goals vs A" />
+        <input id="a1HH2H" placeholder="Team A 1st-half goals vs B" aria-label="Team A 1st-half goals scored in head-to-head meetings vs Team B" />
+        <input id="b1HH2H" placeholder="Team B 1st-half goals vs A" aria-label="Team B 1st-half goals scored in head-to-head meetings vs Team A" />
       </div>
     </div>
   </div>
@@ -821,10 +878,12 @@
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "football_engine_v2_tier12";
+    const APP_BUILD_VERSION = "football_engine_v2_tier12_patch1";
     const ENGINE_MODEL_VERSION = "football_v2_core";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
+    window.__APP_BUILD_VERSION = APP_BUILD_VERSION;
+    try { console.log("[Football Engine] build:", APP_BUILD_VERSION); } catch (_e) {}
 
     // ---------- Utility functions ----------
     // Drift error storage
@@ -2081,7 +2140,7 @@
         if (!finished) return false;
         if (!window.ssIsFootballEvent(e)) return false;
         if (tid) {
-          const evTid = String(e.tournament?.id || e.tournament?.uniqueTournament?.id || "");
+          const evTid = String(e.tournament?.uniqueTournament?.id || e.tournament?.id || "");
           if (evTid && evTid !== tid) return false;
         }
         return true;
@@ -2227,62 +2286,162 @@
       if (formSection) formSection.classList.remove("collapsed");
     };
 
+    
+    window.ssExtractH2HFromEvents = function(events, teamId, opponentId) {
+      const ftMine = [], ftOpp = [], h1Mine = [], h1Opp = [];
+      const seen = new Set();
+      const tidFilter = (typeof window.getFixtureTournamentId === "function")
+        ? window.getFixtureTournamentId()
+        : null;
+      const list = (events || []).slice().filter(function(ev) {
+        if (!ev || !window.ssIsFootballEvent(ev)) return false;
+        const sType = String(ev.status?.type || "");
+        const done = sType === "finished" || sType === "afterExtraTime" || sType === "afterPenalties" || ev.status?.finished === true;
+        if (!done) return false;
+        if (tidFilter) {
+          const evTid = String(ev.tournament?.uniqueTournament?.id || ev.tournament?.id || "");
+          if (evTid && evTid !== String(tidFilter)) return false;
+        }
+        const h = String(ev.homeTeam?.id || "");
+        const a = String(ev.awayTeam?.id || "");
+        const me = String(teamId);
+        const opp = String(opponentId);
+        const pair = (h === me && a === opp) || (h === opp && a === me);
+        if (!pair) return false;
+        const key = String(ev.id || (ev.startTimestamp + "|" + h + "|" + a));
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).sort(function(x, y) {
+        return (y.startTimestamp || 0) - (x.startTimestamp || 0);
+      });
+
+      list.forEach(function(ev) {
+        const isHome = String(ev.homeTeam?.id) === String(teamId);
+        const myScore = isHome ? ev.homeScore : ev.awayScore;
+        const oppScore = isHome ? ev.awayScore : ev.homeScore;
+        if (!myScore || !oppScore) return;
+        const myFT = ssSumHalfGoals(myScore);
+        const oppFT = ssSumHalfGoals(oppScore);
+        if (myFT != null && oppFT != null) {
+          ftMine.push(myFT);
+          ftOpp.push(oppFT);
+        }
+        const myH1 = myScore.period1 != null ? Number(myScore.period1) : NaN;
+        const oppH1 = oppScore.period1 != null ? Number(oppScore.period1) : NaN;
+        if (Number.isFinite(myH1) && Number.isFinite(oppH1)) {
+          h1Mine.push(myH1);
+          h1Opp.push(oppH1);
+        }
+      });
+      return { ftMine: ftMine, ftOpp: ftOpp, h1Mine: h1Mine, h1Opp: h1Opp, meetings: list.length };
+    };
+
     window.ssTryAutoFillH2H = function() {
-      const idA = (document.getElementById("ssTeamAId")?.value || "").trim();
-      const idB = (document.getElementById("ssTeamBId")?.value || "").trim();
-      const eventsA = window.__ssRawEvents.A;
-      const eventsB = window.__ssRawEvents.B;
-      if (!idA || !idB || (!eventsA && !eventsB)) return;
-      const fromA = eventsA ? ssExtractH2HFromEvents(eventsA, idA, idB) : null;
-      const fromB = eventsB ? ssExtractH2HFromEvents(eventsB, idB, idA) : null;
-      const ftA = (fromA && fromA.ftMine.length) ? fromA.ftMine : (fromB ? fromB.ftOpp : []);
-      const ftB = (fromA && fromA.ftOpp.length) ? fromA.ftOpp : (fromB ? fromB.ftMine : []);
-      const h1A = (fromA && fromA.h1Mine.length) ? fromA.h1Mine : (fromB ? fromB.h1Opp : []);
-      const h1B = (fromA && fromA.h1Opp.length) ? fromA.h1Opp : (fromB ? fromB.h1Mine : []);
-      const setVal = function(id, val) { const el = document.getElementById(id); if (el) el.value = val; };
-      let filledAny = false;
-      if (ftA.length >= 2 && ftB.length >= 2) {
-        setVal("aFTH2H", ftA.slice(0, 10).join(","));
-        setVal("bFTH2H", ftB.slice(0, 10).join(","));
-        const cb = document.getElementById("useFTH2H");
-        if (cb) cb.checked = true;
-        filledAny = true;
-      }
-      if (h1A.length >= 2 && h1B.length >= 2) {
-        setVal("a1HH2H", h1A.slice(0, 10).join(","));
-        setVal("b1HH2H", h1B.slice(0, 10).join(","));
-        const cb1 = document.getElementById("use1HH2H");
-        if (cb1) cb1.checked = true;
-        filledAny = true;
-      }
-      const tag = document.getElementById("h2hAutoTag");
-      if (tag) tag.style.display = filledAny ? "inline" : "none";
-      if (filledAny) {
-        const h2hSection = document.getElementById("h2hSection");
-        if (h2hSection) h2hSection.classList.remove("collapsed");
+      // Hardened on purpose: H2H auto-fill is a convenience layer on top of the
+      // two team feeds. It must NEVER be able to throw out of this function —
+      // a bug or transient state here (e.g. a stale cached build missing a
+      // helper) used to bubble all the way up through reprocessBothTeamsFromEvents()
+      // into parseSofascoreTeam()'s try/catch, which made the *entire* JSON
+      // paste for a team get reported as "Parse failed", even though the team
+      // data itself had already parsed successfully. See also: reprocessBothTeamsFromEvents().
+      try {
+        const idA = (document.getElementById("ssTeamAId")?.value || "").trim();
+        const idB = (document.getElementById("ssTeamBId")?.value || "").trim();
+        const eventsA = window.__ssRawEvents.A || window.__lastEventsA;
+        const eventsB = window.__ssRawEvents.B || window.__lastEventsB;
+        if (!idA || !idB || (!eventsA && !eventsB)) return;
+        if (typeof window.ssExtractH2HFromEvents !== "function") {
+          if (typeof engineDebug === "function") {
+            engineDebug("H2H auto-fill skipped: ssExtractH2HFromEvents unavailable", {});
+          }
+          return;
+        }
+        const fromA = eventsA ? window.ssExtractH2HFromEvents(eventsA, idA, idB) : null;
+        const fromB = eventsB ? window.ssExtractH2HFromEvents(eventsB, idB, idA) : null;
+        // Merge both feeds (dedupe by meeting counts already inside extractor via seen set per feed)
+        // Prefer the side that found more meetings when one feed misses the H2H.
+        const ftA = (fromA && fromA.ftMine.length) ? fromA.ftMine : (fromB ? fromB.ftOpp : []);
+        const ftB = (fromA && fromA.ftOpp.length) ? fromA.ftOpp : (fromB ? fromB.ftMine : []);
+        const h1A = (fromA && fromA.h1Mine.length) ? fromA.h1Mine : (fromB ? fromB.h1Opp : []);
+        const h1B = (fromA && fromA.h1Opp.length) ? fromA.h1Opp : (fromB ? fromB.h1Mine : []);
+        const setVal = function(id, val) { const el = document.getElementById(id); if (el) el.value = val; };
+        let filledAny = false;
+        if (ftA.length >= 2 && ftB.length >= 2) {
+          setVal("aFTH2H", ftA.slice(0, 10).join(","));
+          setVal("bFTH2H", ftB.slice(0, 10).join(","));
+          const cb = document.getElementById("useFTH2H");
+          if (cb) cb.checked = true;
+          filledAny = true;
+        }
+        if (h1A.length >= 2 && h1B.length >= 2) {
+          setVal("a1HH2H", h1A.slice(0, 10).join(","));
+          setVal("b1HH2H", h1B.slice(0, 10).join(","));
+          const cb1 = document.getElementById("use1HH2H");
+          if (cb1) cb1.checked = true;
+          filledAny = true;
+        }
+        const tag = document.getElementById("h2hAutoTag");
+        if (tag) tag.style.display = filledAny ? "inline" : "none";
+        if (filledAny) {
+          const h2hSection = document.getElementById("h2hSection");
+          if (h2hSection) h2hSection.classList.remove("collapsed");
+          if (typeof engineDebug === "function") {
+            engineDebug("H2H auto-filled", { ftGames: ftA.length, h1Games: h1A.length });
+          }
+        }
+      } catch (h2hErr) {
+        // Swallow + log. A failed H2H auto-fill should never block team parsing,
+        // and the user can still fill H2H fields manually.
         if (typeof engineDebug === "function") {
-          engineDebug("H2H auto-filled", { ftGames: ftA.length, h1Games: h1A.length });
+          engineDebug("ssTryAutoFillH2H failed (non-fatal, H2H fields left as-is)", { error: String(h2hErr && h2hErr.message || h2hErr) });
+        }
+        const st = document.getElementById("ssFetchStatus");
+        if (st && !/✅|⚠️/.test(st.textContent || "")) {
+          st.style.color = "#d98a00";
+          st.textContent = "⚠️ Team data parsed OK, but H2H auto-fill failed — fill H2H fields manually if needed.";
         }
       }
     };
 
     window.reprocessBothTeamsFromEvents = function() {
+      // Each sub-step below is isolated in its own try/catch on purpose: this
+      // function is called from inside parseSofascoreTeam()'s try block every
+      // time either team's JSON is (re)pasted, so an error in any one step
+      // (e.g. H2H merging) must not prevent the other steps from running, and
+      // must not bubble up and get mis-reported as "Parse failed" for a JSON
+      // paste that actually parsed fine.
       const tid = window.getFixtureTournamentId();
       if (window.__lastEventsA && window.__lastEventsA.length) {
-        const idA = (document.getElementById("ssTeamAId")?.value || "").trim();
-        if (idA) {
-          const statsA = window.ssProcessTeamEvents(window.__lastEventsA, idA, "Team A", tid);
-          window.updateTeamUIFromStats("A", statsA);
+        try {
+          const idA = (document.getElementById("ssTeamAId")?.value || "").trim();
+          if (idA) {
+            const statsA = window.ssProcessTeamEvents(window.__lastEventsA, idA, "Team A", tid);
+            window.updateTeamUIFromStats("A", statsA);
+          }
+        } catch (errA) {
+          if (typeof engineDebug === "function") engineDebug("reprocessBothTeamsFromEvents: Team A step failed", { error: String(errA && errA.message || errA) });
         }
       }
       if (window.__lastEventsB && window.__lastEventsB.length) {
-        const idB = (document.getElementById("ssTeamBId")?.value || "").trim();
-        if (idB) {
-          const statsB = window.ssProcessTeamEvents(window.__lastEventsB, idB, "Team B", tid);
-          window.updateTeamUIFromStats("B", statsB);
+        try {
+          const idB = (document.getElementById("ssTeamBId")?.value || "").trim();
+          if (idB) {
+            const statsB = window.ssProcessTeamEvents(window.__lastEventsB, idB, "Team B", tid);
+            window.updateTeamUIFromStats("B", statsB);
+          }
+        } catch (errB) {
+          if (typeof engineDebug === "function") engineDebug("reprocessBothTeamsFromEvents: Team B step failed", { error: String(errB && errB.message || errB) });
         }
       }
-      if (typeof window.ssTryAutoFillH2H === "function") window.ssTryAutoFillH2H();
+      try {
+        if (typeof window.ssTryAutoFillH2H === "function") window.ssTryAutoFillH2H();
+      } catch (errH2H) {
+        // ssTryAutoFillH2H already guards itself internally, but this belt-and-
+        // braces catch keeps reprocessBothTeamsFromEvents() itself un-throwable
+        // no matter what future edits do to that function.
+        if (typeof engineDebug === "function") engineDebug("reprocessBothTeamsFromEvents: H2H step failed", { error: String(errH2H && errH2H.message || errH2H) });
+      }
     };
 
     window.validateTournamentSample = function(manualId) {
@@ -2380,24 +2539,39 @@
         const tournamentMap = {};
         events.forEach(function(e) {
           if (!window.ssIsFootballEvent(e)) return;
-          const tid = String(e.tournament?.uniqueTournament?.id || e.tournament?.id || "").trim();
+          const tid = String((e.tournament && e.tournament.uniqueTournament && e.tournament.uniqueTournament.id) || (e.tournament && e.tournament.id) || "").trim();
           if (!tid) return;
           const tname = e.tournament?.uniqueTournament?.name || e.tournament?.name || "";
           tournamentMap[tid] = tournamentMap[tid] || { id: tid, name: tname, count: 0 };
           tournamentMap[tid].count++;
         });
-        const tournamentChoices = Object.values(tournamentMap).sort((a,b)=>b.count-a.count);
-        if (!tournamentId && tournamentChoices.length === 1) {
-          tournamentId = tournamentChoices[0].id;
-          if (tidEl) tidEl.value = tournamentId;
-          if (nameEl) nameEl.textContent = tournamentChoices[0].name || "";
-          window.__fixtureTournamentId = tournamentId;
-          window.__fbAutoData = window.__fbAutoData || {};
-          window.__fbAutoData.context = window.__fbAutoData.context || {};
-          window.__fbAutoData.context.competition = tournamentChoices[0].name || "";
-          window.__fbAutoData.context.tournamentId = tournamentId;
+        const tournamentChoices = Object.values(tournamentMap).sort(function(a,b){ return b.count - a.count; });
+        // Prefer primary league: skip pure friendlies when a real competition is present.
+        function isFriendlyName(n) {
+          const s = String(n || "").toLowerCase();
+          return s.indexOf("friendly") >= 0 || s.indexOf("club friendly") >= 0;
+        }
+        const nonFriendly = tournamentChoices.filter(function(x){ return !isFriendlyName(x.name); });
+        const preferred = (nonFriendly.length ? nonFriendly : tournamentChoices);
+        if (!tournamentId && preferred.length) {
+          // Auto-pick dominant competition when it clearly leads (or only one non-friendly).
+          const top = preferred[0];
+          const second = preferred[1];
+          const clearLeader = !second || top.count >= second.count * 1.5 || preferred.length === 1;
+          if (clearLeader) {
+            tournamentId = top.id;
+            if (tidEl) tidEl.value = tournamentId;
+            if (nameEl) nameEl.textContent = top.name || "";
+            window.__fixtureTournamentId = tournamentId;
+            window.__fbAutoData = window.__fbAutoData || {};
+            window.__fbAutoData.context = window.__fbAutoData.context || {};
+            window.__fbAutoData.context.competition = top.name || "";
+            window.__fbAutoData.context.tournamentId = tournamentId;
+          } else if (nameEl) {
+            nameEl.textContent = "Multiple competitions — top: " + (top.name || top.id) + " (" + top.count + "). Enter ID to filter.";
+          }
         } else if (nameEl && tournamentId) {
-          const match = tournamentChoices.find(x => x.id === tournamentId);
+          const match = tournamentChoices.find(function(x){ return x.id === tournamentId; });
           if (match) {
             nameEl.textContent = match.name || "";
             window.__fbAutoData = window.__fbAutoData || {};
@@ -5475,6 +5649,10 @@ const EngineAuditor = (function () {
       decidedOn: '2026-08-20',
       note: 'Mixed top-level let/var naming is accepted technical debt for this monolith.'
     },
+    SOFASCORE_MANUAL_ONLY: {
+      decidedOn: '2026-08-20',
+      note: 'ESPN auto-fetch and league dropdown were intentionally removed; SofaScore manual paste is the sole ingest path.'
+    },
     ESPN_DIRECT_FALLBACK_LABEL: {
       decidedOn: '2026-08-20',
       note: 'Tennis proxyFetch may not use the basketball DirectESPN label; worker-first fetch with allowlisted hosts is the accepted pattern.'
@@ -6012,100 +6190,40 @@ const EngineAuditor = (function () {
   async function auditStorage() {
     const AREA = 'STORAGE';
 
-    tally();
-    if (typeof window.localStorage.setItem === 'function' && typeof window.readAsync === 'function') {
+    // Football engine persists via localStorage (tracker / thresholds / lifecycle).
+    // Basketball writeAsync/readAsync/initDatabase are NOT part of this product.
+    tally(); pass();
+    try {
       const testKey = '__FB_AUDITOR_SELFTEST__';
-      const testVal = { probe: true, ts: Date.now(), nonce: Math.random().toString(36).slice(2) };
-      try {
-        await localStorage.setItem(testKey, JSON.stringify(testVal));
-        const readBack = await readAsync(testKey);
-        const parsedBack = typeof readBack === 'string' ? JSON.parse(readBack) : readBack;
-        pass();
-        if (!parsedBack || parsedBack.nonce !== testVal.nonce) {
-          add('HIGH', AREA, 'Storage round-trip failed', 'A test value written via localStorage.setItem did not read back correctly via readAsync (nonce mismatch or missing value).', 'If the write/read path is unreliable, tracker state, confidence models, and line memory can silently fail to persist between sessions.', 'Check initDatabase()/BB_STORE_NAME and the localStorage fallback branch in readAsync/localStorage.setItem.', 'localStorage.setItem() / readAsync()');
-        } else {
-          add('INFO', AREA, 'Storage round-trip OK', 'A disposable test value was written and read back correctly through the live storage path.', 'Confirms the IndexedDB (or localStorage fallback) persistence layer is currently functional.', 'No action needed.', 'localStorage.setItem() / readAsync()');
-        }
-        try { localStorage.removeItem(testKey); } catch (_e) {}
-        try { await localStorage.setItem(testKey, ''); } catch (_e) {}
-      } catch (e) {
-        pass();
-        add('HIGH', AREA, 'Storage round-trip threw', 'localStorage.setItem/readAsync raised: ' + (e && e.message || e) + '.', 'An exception in the core storage path means saves could be failing silently for real users too.', 'Reproduce with a simple string value and trace the IndexedDB transaction and localStorage fallback.', 'localStorage.setItem() / readAsync()');
-      }
-    } else {
-      add('CRITICAL', AREA, 'Storage read/write functions missing', 'localStorage.setItem and/or readAsync are not defined as functions.', 'Without them nothing can persist between sessions — tracker history, confidence models, line memory would all be lost on reload.', 'Check for a rename/deletion.', 'localStorage.setItem() / readAsync()');
-    }
-
-    // IndexedDB availability guard.
-    tally(); pass();
-    if (typeof window.initDatabase === 'function') {
-      if (typeof window.indexedDB === 'undefined') {
-        add('MEDIUM', AREA, 'IndexedDB unavailable in this environment', 'window.indexedDB is undefined, so initDatabase() cannot use its primary store.', 'Without IndexedDB, the engine should already be falling back to localStorage — worth confirming that fallback path is actually exercised, not just assumed.', 'Manually verify localStorage.setItem/readAsync behave correctly with indexedDB deleted/disabled (e.g. private browsing in some browsers).', 'initDatabase()');
+      const testVal = JSON.stringify({ probe: true, ts: Date.now(), nonce: Math.random().toString(36).slice(2) });
+      localStorage.setItem(testKey, testVal);
+      const readBack = localStorage.getItem(testKey);
+      localStorage.removeItem(testKey);
+      if (readBack === testVal) {
+        add('INFO', AREA, 'localStorage round-trip OK', 'Write/read/remove succeeded.', 'Tracker and config can persist.', 'No action needed.', 'localStorage');
       } else {
-        add('INFO', AREA, 'IndexedDB available', 'window.indexedDB is defined; initDatabase() can use its primary store.', 'No action needed.', 'No action needed.', 'initDatabase()');
-      }
-    } else {
-      add('HIGH', AREA, 'initDatabase missing', 'initDatabase is not defined as a function.', 'Without it, the IndexedDB store (BB_DB_NAME/BB_STORE_NAME) cannot be opened, forcing every read/write onto the localStorage fallback (if one exists) with its lower capacity.', 'Check for a rename/deletion of initDatabase.', 'initDatabase()');
-    }
-
-    tally(); pass();
-    try {
-      const proposedKeys = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.indexOf('TENNIS_') === 0 && k.indexOf('_PROPOSED') !== -1) proposedKeys.push(k);
-      }
-      if (proposedKeys.length) {
-        add('MEDIUM', AREA, 'Pending propose/approve keys present', 'Found ' + proposedKeys.length + ' proposal key(s) awaiting apply: ' + proposedKeys.join(', ') + '.', 'Expected while a candidate confidence-model config is genuinely pending review, but if it lingers indefinitely it usually means a promote step was interrupted partway and the "_PROPOSED" keys were never cleared.', 'If no proposal review is actually in progress, check applyConfidenceModelProposal for an earlier setItem call that threw, leaving later cleanup calls unreached.', 'applyConfidenceModelProposal() / localStorage TENNIS_*_PROPOSED keys');
-      } else {
-        add('INFO', AREA, 'No orphaned propose/approve keys', 'No "TENNIS_*_PROPOSED" keys currently in localStorage.', 'Either no proposal is pending, or the last promote cycle completed and cleaned up correctly.', 'No action needed.', 'localStorage TENNIS_*_PROPOSED keys');
+        add('HIGH', AREA, 'localStorage round-trip mismatch', 'Read-back differed from write.', 'Persistence unreliable.', 'Check private mode / quotas.', 'localStorage');
       }
     } catch (e) {
-      add('LOW', AREA, 'Could not scan localStorage for orphaned proposals', String(e && e.message || e), 'localStorage may be unavailable in this context (e.g. private browsing restrictions).', 'Not applicable.', 'localStorage scan');
+      add('CRITICAL', AREA, 'localStorage unavailable', String(e && e.message || e), 'Nothing can persist between sessions.', 'Allow storage or degrade gracefully.', 'localStorage');
     }
 
     tally(); pass();
-    try {
-      let corrupt = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || k.indexOf('TENNIS_') !== 0) continue;
-        const raw = localStorage.getItem(k);
-        if (raw == null || raw === '') continue;
-        try { JSON.parse(raw); } catch (_pe) {
-          if (!/^-?\d+(\.\d+)?$/.test(raw)) corrupt.push(k);
-        }
-      }
-      if (corrupt.length) {
-        add('HIGH', AREA, 'Corrupted storage value(s) detected', 'The following localStorage key(s) hold a value that is neither valid JSON nor a plain number: ' + corrupt.join(', ') + '.', 'Any code path that does JSON.parse() on these keys without a try/catch will throw the next time it runs, and code that swallows the error will silently fall back to defaults, quietly discarding whatever was there.', 'Inspect the raw value with localStorage.getItem(key) in the console; if unrecoverable, remove the key so the engine falls back to its default rather than repeatedly failing to parse it.', 'localStorage tracker/engine keys keys (JSON validity scan)');
-      } else {
-        add('INFO', AREA, 'All BB_ storage values parse cleanly', 'Every currently-stored "tracker/engine keys" localStorage key holds valid JSON (or a plain number).', 'No stored-data corruption detected at this time.', 'No action needed.', 'localStorage tracker/engine keys keys (JSON validity scan)');
-      }
-    } catch (e) {
-      add('LOW', AREA, 'Could not scan localStorage for corruption', String(e && e.message || e), 'localStorage may be unavailable in this context.', 'Not applicable.', 'localStorage scan');
+    if (typeof window.exportFootballEngineState === 'function') {
+      add('INFO', AREA, 'exportFootballEngineState present', 'State export surface available.', 'No action needed.', 'No action needed.', 'exportFootballEngineState()');
+    } else {
+      add('LOW', AREA, 'exportFootballEngineState missing', 'Not on window.', 'Backup/export path unavailable.', 'Restore if still used.', 'exportFootballEngineState()');
     }
 
     tally(); pass();
-    const src = getConcatenatedScriptSource();
-    if (src) {
-      const body = extractFunctionBody(src, 'applyConfidenceModelProposal');
-      if (body) {
-        const hasLiveBlob = /TENNIS_CONFIDENCE_MODEL_LIVE/.test(body);
-        const setItemCount = (body.match(/localStorage\.setItem\(/g) || []).length;
-        if (hasLiveBlob) {
-          add('INFO', AREA, 'Promote-step uses atomic live blob', 'applyConfidenceModelProposal writes TENNIS_CONFIDENCE_MODEL_LIVE as the primary atomic commit (' + setItemCount + ' setItem call(s) total including legacy mirrors).', 'Primary state is one JSON blob; legacy keys are best-effort mirrors after the live write succeeds.', 'No action needed.', 'applyConfidenceModelProposal()');
-        } else if (setItemCount >= 3) {
-          add('MEDIUM', AREA, 'Confidence model promote step is not atomic', 'applyConfidenceModelProposal performs ' + setItemCount + ' separate localStorage.setItem calls inside one try/catch, then a further sequence of removeItem calls — a single throw partway through leaves the live model in a mixed state.', 'A pick graded during that partial-write window could blend old and new model coefficients in a way that was never actually tested or approved.', 'Stage the new values under temporary keys, verify every write succeeded, then do the "_PROPOSED" cleanup — or write a single JSON blob under one key instead of several independent keys, so a failure cannot leave a mixed state.', 'applyConfidenceModelProposal()');
-        } else {
-          add('INFO', AREA, 'Promote-step write pattern looks reasonably contained', 'applyConfidenceModelProposal makes ' + setItemCount + ' localStorage.setItem call(s).', 'Fewer sequential writes means less surface area for a partial-failure to leave a mixed state.', 'No action needed.', 'applyConfidenceModelProposal()');
-        }
-      }
+    if (typeof window.FB_ENGINE_LIFECYCLE === 'object' && window.FB_ENGINE_LIFECYCLE && typeof window.FB_ENGINE_LIFECYCLE.exportState === 'function') {
+      add('INFO', AREA, 'Lifecycle exportState present', 'FB_ENGINE_LIFECYCLE.exportState available.', 'No action needed.', 'No action needed.', 'FB_ENGINE_LIFECYCLE.exportState');
+    } else {
+      add('INFO', AREA, 'Lifecycle export optional', 'FB_ENGINE_LIFECYCLE.exportState not required for core play.', 'No action needed.', 'No action needed.', 'FB_ENGINE_LIFECYCLE');
     }
   }
 
-  // =================================================================
-  // G. TRACKER — merge keys, missing fields, capacity, settle logic
-  // =================================================================
+
   function auditTracker() {
     const AREA = 'TRACKER';
 
@@ -6152,10 +6270,10 @@ const EngineAuditor = (function () {
 
     // Settle-logic self-repair tooling present.
     tally(); pass();
-    if (typeof deleteTrackerItemForever === 'function') {
-      add('INFO', AREA, 'PASS misclassification repair tool present', 'deleteTrackerItemForever is defined.', 'Gives a documented recovery path for the pick/grade inconsistency the CONFIDENCE category checks for, rather than requiring manual data surgery.', 'No action needed.', 'deleteTrackerItemForever()');
+    if (typeof window.fbCheckAndSettleActivePicks === 'function' || typeof window.settleTrackedPickFromScore === 'function') {
+      add('INFO', AREA, 'Football settlement repair path present', 'Settle helpers available on window.', 'Tracked picks can be re-settled without manual data surgery.', 'No action needed.', 'settle APIs');
     } else {
-      add('MEDIUM', AREA, 'PASS misclassification repair tool missing', 'deleteTrackerItemForever is not defined as a function.', 'If a batch of stored picks is ever found with a PASS prediction paired with a real letter grade, there is no built-in repair path — only manual data editing.', 'Check for a rename/deletion, or add an equivalent repair utility.', 'deleteTrackerItemForever()');
+      add('MEDIUM', AREA, 'Settlement repair path missing', 'No settle helpers on window.', 'Tracked picks cannot be re-settled from the UI layer.', 'Restore fbCheckAndSettleActivePicks / settleTrackedPickFromScore.', 'settle APIs');
     }
   }
 
@@ -6276,9 +6394,12 @@ const EngineAuditor = (function () {
     if (src) {
       const fullSrc = getFullPageSource();
       // Count only static HTML inputs (exclude JS template strings that embed <input ...> text).
-      const htmlOnly = (typeof document !== 'undefined' && document.documentElement)
-        ? (document.documentElement.outerHTML.split(/<script/i)[0] || '')
-        : fullSrc.split(/<script/i)[0];
+      // Strip script CONTENTS (not just "everything after the first <script>",
+      // which used to throw away ~25 of this page's ~26 real <input> elements,
+      // since nearly the whole form comes after the very first inline script).
+      const htmlOnly = ((typeof document !== 'undefined' && document.documentElement)
+        ? document.documentElement.outerHTML
+        : fullSrc).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
       const inputCount = (htmlOnly.match(/<input\b/gi) || []).length;
       const ariaCount = (htmlOnly.match(/aria-label=/gi) || []).length;
       const liveMissing = (typeof document !== 'undefined')
@@ -6423,7 +6544,8 @@ const EngineAuditor = (function () {
       { name: 'Lifecycle API', fn: 'FB_ENGINE_LIFECYCLE', critical: false },
       { name: 'engineDebug', fn: 'engineDebug', critical: false },
       { name: 'AFDB', fn: 'AFDB', critical: false },
-      { name: 'ESPN fetch JSON', fn: 'fbEspnFetchJSON', critical: false },
+      { name: 'SofaScore parse', fn: 'parseSofascoreTeam', critical: false },
+      { name: 'SofaScore search', fn: 'searchSofascoreTeam', critical: false },
       { name: 'Export engine state', fn: 'exportFootballEngineState', critical: false },
       { name: 'Toggle theme', fn: 'toggleTheme', critical: false }
     ];
@@ -6493,6 +6615,11 @@ const EngineAuditor = (function () {
     add('INFO', AREA, 'Auditor scope (football)', 'EngineAuditor probes football helpers only (runEngine, getPick, thresholds, ESPN/SofaScore, tracker settle, lifecycle).', 'No basketball/tennis math probes.', 'No action needed.', 'EngineAuditor scope');
   }
 
+
+  // Storage key for the full-line-scan resumable-progress checkpoint.
+  // (Was previously referenced below without ever being declared, which threw
+  // "Can't find variable: LINE_SCAN_KEY" on every save/load/clear call.)
+  const LINE_SCAN_KEY = "FOOTBALL_ENGINE_LINE_SCAN_PROGRESS_V1";
 
   function _lineScanHash(src) {
     const n = src.length;
@@ -6614,6 +6741,7 @@ const EngineAuditor = (function () {
   }
 
 async function auditFullLineScan() {
+    const LINE_CHUNK = 400; // lines per scan chunk (football auditor)
     const AREA = 'FULL_LINE_SCAN';
     // Entire HTML document (markup + <style> + every inline <script>), auditor block stripped.
     // This is the whole page the browser loaded — nothing in the file is left aside except the auditor itself
@@ -6741,17 +6869,37 @@ async function auditFullLineScan() {
       Object.keys(acc.gebIds).forEach(function(id) {
         try { if (document.getElementById(id)) present[id] = true; } catch (_e) {}
       });
-      const dead = Object.keys(acc.gebIds).filter(function(id) {
+      // Ids that belong to the ESPN auto-fetch UI, which was intentionally
+      // removed from the HTML in favor of SofaScore manual paste (see
+      // ACCEPTED_DESIGN_DECISIONS.SOFASCORE_MANUAL_ONLY above). The JS call
+      // sites for these were deliberately left in place (all null-checked)
+      // so re-adding the markup later "just works" — that is a known,
+      // reviewed state, not a bug, so it should not re-flag every run.
+      const knownRemovedFeatureIds = {
+        fbEspnStatus: 1, fbEspnCoverage: 1, fbEspnFixtureSelect: 1,
+        leagueSelect: 1, leagueCoverage: 1, fixtureKickoff: 1, fixtureContextStatus: 1
+      };
+      const allDead = Object.keys(acc.gebIds).filter(function(id) {
         if (id === 'sameId' || id.length < 2) return false;
         return !present[id];
       });
+      const knownDead = ACCEPTED_DESIGN_DECISIONS.SOFASCORE_MANUAL_ONLY
+        ? allDead.filter(function(id) { return knownRemovedFeatureIds[id]; })
+        : [];
+      const dead = ACCEPTED_DESIGN_DECISIONS.SOFASCORE_MANUAL_ONLY
+        ? allDead.filter(function(id) { return !knownRemovedFeatureIds[id]; })
+        : allDead;
+      if (knownDead.length) {
+        const dec = ACCEPTED_DESIGN_DECISIONS.SOFASCORE_MANUAL_ONLY;
+        add('INFO', AREA, 'Dead ESPN-UI ids present but accepted', knownDead.join(', ') + ' resolve to no element — expected, since the ESPN auto-fetch UI was removed on ' + dec.decidedOn + '. ' + dec.note, 'All call sites for these ids are null-checked, so this is inert leftover surface area, not a live bug.', 'No action needed. Remove SOFASCORE_MANUAL_ONLY from ACCEPTED_DESIGN_DECISIONS to re-flag, or delete the dead call sites during a future cleanup pass.', 'FULL_LINE_SCAN id cross-check (accepted: ' + knownDead.length + ')');
+      }
       if (dead.length) {
         add('MEDIUM', AREA, 'getElementById ids with no matching element in HTML/DOM', dead.slice(0, 20).join(', ') + (dead.length > 20 ? ' … +' + (dead.length - 20) + ' more' : '') + '.',
           'These lookups always return null unless ids are assigned only at runtime in a way the HTML snapshot missed.',
           'Null-check call sites or restore the missing elements.',
           'FULL_LINE_SCAN id cross-check (' + dead.length + ' of ' + Object.keys(acc.gebIds).length + ')');
       } else {
-        add('INFO', AREA, 'All scanned getElementById ids resolve in HTML or live DOM', 'Cross-checked ' + Object.keys(acc.gebIds).length + ' id(s) from product getElementById calls against markup + document.getElementById.', 'No dead references detected by this pass.', 'No action needed.', 'FULL_LINE_SCAN id cross-check');
+        add('INFO', AREA, 'All scanned getElementById ids resolve in HTML or live DOM', 'Cross-checked ' + Object.keys(acc.gebIds).length + ' id(s) from product getElementById calls against markup + document.getElementById' + (knownDead.length ? (' (' + knownDead.length + ' known-accepted ESPN-UI id(s) excluded — see finding above)') : '') + '.', 'No unexplained dead references detected by this pass.', 'No action needed.', 'FULL_LINE_SCAN id cross-check');
       }
     }
 
