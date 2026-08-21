@@ -592,11 +592,11 @@
         <button type="button" id="trackerCloseBtn" class="tracker-close">✕</button>
       </div>
     </div>
-    <div class="tracker-summary" id="trackerSummary">0 saved • 0 settled • 0 wins</div>
+    <div class="tracker-summary" id="trackerSummary">0 live/recent • 0 pending • 0 wins • 0 losses</div>
     <div class="tracker-market-summary" id="trackerMarketSummary"></div>
     <div class="tracker-body-scroll" id="trackedPicksWrap">
       <div id="trackerAnalyticsPanel" class="tracker-analytics-panel"></div>
-      <div id="trackerEmpty" class="tracker-empty">No tracked picks saved yet.</div>
+      <div id="trackerEmpty" class="tracker-empty">No live/recent picks. Older picks moved to record.</div>
       <div class="table-wrap tracker-table-wrap">
         <table id="trackedPicksTable">
           <thead><tr><th>Date</th><th>League</th><th>Match</th><th>Market</th><th>Line</th><th>Pick</th><th>Grade</th><th>Status</th></tr></thead>
@@ -4205,21 +4205,92 @@
     }
     function fbTrackerStatusClass(st){return st==='win'?'track-win':st==='loss'?'track-loss':st==='push'?'track-push':'track-pending';}
     function fbTrackerEsc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+    function formatTrackedDate(iso){
+      if(!iso) return "—";
+      const d=new Date(iso);
+      if(isNaN(d.getTime())) return "—";
+      return d.toLocaleString(undefined,{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+    }
     function renderTrackedPicks(){
       const body=document.getElementById('trackedPicksBody'), empty=document.getElementById('trackerEmpty'), summary=document.getElementById('trackerSummary');
-      if(!body)return; const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])].slice().reverse();
-      body.innerHTML=all.map(function(p){
-        const date=p.eventDate||p.createdAt||''; const when=date?new Date(date).toLocaleDateString():'';
-        const match=(p.homeTeam||'A')+' vs '+(p.awayTeam||'B'); const st=p.resultStatus||'pending';
-        const sig=encodeURIComponent(p.signature||'');
-        return '<tr><td>'+fbTrackerEsc(when)+'</td><td>'+fbTrackerEsc(p.league||'')+'</td><td>'+fbTrackerEsc(match)+'</td><td>'+fbTrackerEsc(p.marketName||p.marketKey||'')+'</td><td>'+fbTrackerEsc(displayLine(p.line))+'</td><td>'+fbTrackerEsc(p.predictionText||'')+(p.isLock?' 🔒':'')+'</td><td class="'+getConfidenceClass(p.confidenceGrade)+'">'+fbTrackerEsc(p.confidenceGrade||'—')+'</td><td><div class="tracker-status-stack"><span class="'+fbTrackerStatusClass(st)+'">'+fbTrackerEsc(st.toUpperCase())+'</span><div class="tracker-manual-settle"><button type="button" class="tracker-manual-btn tracker-settle-btn" data-sig="'+sig+'" data-manual-settle="win">W</button><button type="button" class="tracker-manual-btn tracker-settle-btn" data-sig="'+sig+'" data-manual-settle="loss">L</button><button type="button" class="tracker-manual-btn tracker-settle-btn" data-sig="'+sig+'" data-manual-settle="push">P</button><button type="button" class="tracker-manual-btn tracker-delete-pick-btn" data-sig="'+sig+'">×</button></div></div></td></tr>';
-      }).join('');
-      if(empty) empty.style.display=all.length?'none':'block';
-      if(summary) summary.textContent=all.length+' saved • '+g_trackerState.stats.settled+' settled • '+g_trackerState.stats.wins+' wins';
-      const ms=document.getElementById('trackerMarketSummary');
+      if(!body)return;
+      const active=Array.isArray(g_trackerState.activePicks)?g_trackerState.activePicks:[];
+      const archived=Array.isArray(g_trackerState.archivedPicks)?g_trackerState.archivedPicks:[];
+      // Live/recent = active picks only (BB style). Older settled live in archive/record.
+      const visible=active.slice();
+      const pendingCount=visible.filter(p=>String(p.resultStatus||"pending").toLowerCase()==="pending").length;
+      const stats=g_trackerState.stats||{wins:0,losses:0,settled:0,pushes:0};
+      // Sort: pending first (newest), then settled by time
+      visible.sort(function(a,b){
+        const aP=String(a.resultStatus||"pending").toLowerCase()==="pending";
+        const bP=String(b.resultStatus||"pending").toLowerCase()==="pending";
+        if(aP&&!bP)return -1; if(!aP&&bP)return 1;
+        const at=Date.parse(a.createdAt||a.eventDate||0)||0;
+        const bt=Date.parse(b.createdAt||b.eventDate||0)||0;
+        return bt-at;
+      });
+      window.__trackerRenderLimit=window.__trackerRenderLimit||50;
+      const display=visible.slice(0,window.__trackerRenderLimit);
+      body.innerHTML=display.map(function(p){
+        const when=formatTrackedDate(p.eventDate||p.createdAt);
+        const match=(p.homeTeam&&p.homeTeam!=="—"?p.homeTeam:"A")+" vs "+(p.awayTeam&&p.awayTeam!=="—"?p.awayTeam:"B");
+        const st=String(p.resultStatus||"pending").toLowerCase();
+        const sig=encodeURIComponent(p.signature||"");
+        const pId=(p.signature||Math.random().toString(36).slice(2)).replace(/[^a-zA-Z0-9]/g,"").slice(0,16);
+        let statusClass="track-pending";
+        if(st==="win")statusClass="track-win";
+        else if(st==="loss")statusClass="track-loss";
+        else if(st==="push")statusClass="track-push";
+        let statusHtml="";
+        if(st==="pending"){
+          statusHtml='<div class="tracker-disp-toggle" data-pid="'+pId+'" style="font-weight:900;font-size:10px;cursor:pointer;text-decoration:underline dotted #ccc;" title="Click to settle">PENDING</div>'+
+            '<div id="act-'+pId+'" style="display:none;flex-direction:column;align-items:center;gap:2px;margin-top:-2px;">'+
+            '<div style="font-size:8px;font-weight:900;opacity:0.6;margin-bottom:1px;">SETTLE</div>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">W</button>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">L</button>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">P</button>'+
+            '</div>';
+        } else {
+          statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to edit">'+st.toUpperCase()+'</div>';
+          if(p.actualScore||p.actual!=null) statusHtml+='<div style="font-size:6px;font-weight:800;line-height:1.1;margin-top:1px;color:#fff;">'+fbTrackerEsc(String(p.actualScore||p.actual))+'</div>';
+        }
+        // Pick text is the delete button (BB style)
+        const pickCell='<span class="tracker-delete-pick-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to permanently delete this pick">'+fbTrackerEsc(p.predictionText||"—")+'</span>'+(p.isLock?' <span class="lock">🔒</span>':'');
+        return '<tr>'+
+          '<td>'+fbTrackerEsc(when)+'</td>'+
+          '<td style="font-weight:800;text-transform:uppercase;font-size:10px;">'+fbTrackerEsc(String(p.league||"—").toUpperCase())+'</td>'+
+          '<td style="font-weight:900;text-transform:uppercase;">'+fbTrackerEsc(match)+'</td>'+
+          '<td style="font-weight:800;">'+fbTrackerEsc(String(p.marketName||p.marketKey||"—").split("<")[0].trim())+'</td>'+
+          '<td>'+fbTrackerEsc(typeof displayLine==="function"?displayLine(p.line):String(p.line||"—"))+'</td>'+
+          '<td style="white-space:nowrap;font-size:11px;">'+pickCell+'</td>'+
+          '<td class="conf-none">'+fbTrackerEsc(p.confidenceGrade||"—")+'</td>'+
+          '<td class="'+statusClass+'"><div class="tracker-status-stack">'+statusHtml+'</div></td>'+
+          '</tr>';
+      }).join("");
+      if(visible.length>window.__trackerRenderLimit){
+        body.innerHTML+='<tr><td colspan="8" style="padding:10px;text-align:center;"><button type="button" onclick="window.__trackerRenderLimit+=50;renderTrackedPicks();" style="background:#3a404c;color:#fff;border:none;padding:8px 16px;font-weight:bold;cursor:pointer;">Load More</button></td></tr>';
+      }
+      if(empty){
+        empty.style.display=display.length?"none":"block";
+        empty.textContent="No live/recent picks. Older picks moved to record.";
+      }
+      if(summary){
+        summary.textContent=display.length+" live/recent • "+pendingCount+" pending • "+(stats.wins||0)+" wins • "+(stats.losses||0)+" losses";
+      }
+      const ms=document.getElementById("trackerMarketSummary");
       if(ms){
-        const map={}; all.forEach(p=>{const k=p.marketKey||'other';map[k]=map[k]||{n:0,w:0};map[k].n++;if(p.resultStatus==='win')map[k].w++;});
-        ms.innerHTML=Object.keys(map).map(k=>'<span class="tracker-market-chip">'+fbTrackerEsc(k.toUpperCase())+' · '+map[k].n+' · '+(map[k].n?((map[k].w/map[k].n)*100).toFixed(1):'0')+'%</span>').join('');
+        // BB style: only pending counts, short labels
+        const pendingByMarket={};
+        visible.forEach(function(p){
+          if(String(p.resultStatus||"pending").toLowerCase()!=="pending")return;
+          const k=p.marketKey||p.marketName||"other";
+          pendingByMarket[k]=(pendingByMarket[k]||0)+1;
+        });
+        const chips=Object.keys(pendingByMarket).map(function(k){
+          return '<div class="tracker-market-chip">'+fbTrackerEsc(String(k).toUpperCase())+" "+pendingByMarket[k]+"</div>";
+        });
+        ms.innerHTML=chips.join("");
+        ms.style.display=chips.length?"flex":"none";
       }
     }
     var __fbTrackerView='picks';
@@ -4231,11 +4302,53 @@
       if(wrap) wrap.style.display=__fbTrackerView==='report'?'none':'table';
       const title=document.getElementById('trackerHeadTitle'); if(title) title.textContent=__fbTrackerView==='report'?'Football Engine Report':'Tracked Picks';
       if(__fbTrackerView==='report' && panel){
-        const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])]; const settled=all.filter(p=>['win','loss','push'].includes(p.resultStatus));
-        const wr=settled.length?settled.filter(p=>p.resultStatus==='win').length/settled.length*100:null;
-        const avgEdge=all.length?all.reduce((s,p)=>s+(Number(p.edge)||0),0)/all.length:null;
-        panel.innerHTML='<div class="tracker-analytics-shell"><div class="tracker-analytics-topbar"><div class="tracker-analytics-heading"><div class="tracker-analytics-kicker">FOOTBALL MODEL</div><div class="tracker-analytics-title">Performance report</div><div class="tracker-analytics-subtitle">Persistent tracker statistics; pushes excluded from win/loss rate.</div></div></div><div class="tracker-kpi-grid"><div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Win rate</div><div class="tracker-kpi-value">'+(wr==null?'—':wr.toFixed(1)+'%')+'</div><div class="tracker-kpi-sub">'+settled.length+' settled</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Active</div><div class="tracker-kpi-value">'+g_trackerState.activePicks.length+'</div><div class="tracker-kpi-sub">pending picks</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Average edge</div><div class="tracker-kpi-value">'+(avgEdge==null?'—':avgEdge.toFixed(2))+'</div><div class="tracker-kpi-sub">goals</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Losses</div><div class="tracker-kpi-value">'+g_trackerState.stats.losses+'</div><div class="tracker-kpi-sub">tracked</div></div></div></div>';
+        const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])];
+        const settledList=all.filter(p=>["win","loss","push"].includes(String(p.resultStatus||"").toLowerCase()));
+        const wins=settledList.filter(p=>p.resultStatus==="win").length;
+        const losses=settledList.filter(p=>p.resultStatus==="loss").length;
+        const pushes=settledList.filter(p=>p.resultStatus==="push").length;
+        const settledN=settledList.length;
+        const wr=settledN?(wins/settledN*100):null;
+        const activeCount=(g_trackerState.activePicks||[]).length;
+        const trackerMin=50;
+        const checkpointStatus=settledN>=trackerMin?"Review ready":"Building";
+        const byMarket={};
+        settledList.forEach(p=>{
+          const k=p.marketName||p.marketKey||"other";
+          byMarket[k]=byMarket[k]||{w:0,l:0};
+          if(p.resultStatus==="win")byMarket[k].w++; else if(p.resultStatus==="loss")byMarket[k].l++;
+        });
+        let bestMarket=null,bestRate=-1;
+        Object.keys(byMarket).forEach(k=>{
+          const d=byMarket[k]; const n=d.w+d.l; if(n>=3){const r=d.w/n; if(r>bestRate){bestRate=r;bestMarket={name:k,w:d.w,l:d.l,r:r};}}
+        });
+        const reviewRows=[];
+        if(bestMarket){
+          reviewRows.push({area:"Best market",status:"CONFIRMED STRENGTH",decision:"KEEP",review:bestMarket.name+" is leading at "+(bestMarket.r*100).toFixed(1)+"% with "+bestMarket.w+" wins and "+bestMarket.l+" losses.",action:"Keep this market logic as it is. Do not weaken it from one bad day."});
+        }
+        if(settledN<trackerMin){
+          reviewRows.push({area:"Checkpoint",status:"WATCHING",decision:"COLLECT MORE",review:settledN+"/"+trackerMin+" settled picks collected so far.",action:(trackerMin-settledN)+" more settled picks are needed before the tracker can give a full review."});
+        } else {
+          reviewRows.push({area:"Overall",status:"WATCHING",decision:"KEEP",review:"Win rate "+(wr!=null?wr.toFixed(1)+"%":"—")+" across "+settledN+" settled.",action:"Continue collecting evidence. Do not force global edits from short samples."});
+        }
+        const reviewHtml=reviewRows.map(row=>'<div class="tracker-review-row"><div class="tracker-review-top"><div class="tracker-review-area">'+fbTrackerEsc(row.area)+'</div><div class="tracker-review-status">'+fbTrackerEsc(row.status)+'</div></div><div class="tracker-review-text"><strong>'+fbTrackerEsc(row.decision)+'</strong> — '+fbTrackerEsc(row.review)+'</div><div class="tracker-review-action">'+fbTrackerEsc(row.action)+'</div></div>').join("");
+        panel.innerHTML=
+          '<div class="tracker-analytics-shell">'+
+          '<div class="tracker-analytics-topbar"><div class="tracker-analytics-heading"><div class="tracker-analytics-kicker">ENGINE REPORT</div><div class="tracker-analytics-title">Tracked results and learning</div><div class="tracker-analytics-subtitle">Pick record, feedback, and post-checkpoint suggestions live here.</div></div></div>'+
+          '<div class="tracker-kpi-grid">'+
+            '<div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall</div><div class="tracker-kpi-value">'+wins+'W</div><div class="tracker-kpi-sub">Losses '+losses+' • Pushes '+pushes+' • Win rate '+(wr==null?"—":wr.toFixed(1)+"%")+'</div></div>'+
+            '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">'+activeCount+'</div><div class="tracker-kpi-sub">Current model football_v2_core</div></div>'+
+            '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks</div><div class="tracker-kpi-value">'+settledN+'</div><div class="tracker-kpi-sub">Checkpoint target '+trackerMin+'</div></div>'+
+            '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Review status</div><div class="tracker-kpi-value">'+fbTrackerEsc(checkpointStatus)+'</div><div class="tracker-kpi-sub">Current version only</div></div>'+
+          '</div>'+
+          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Out-of-sample validation</div><div class="tracker-analytics-card-meta">Not yet available</div></div><div class="tracker-analytics-card-body"><div class="tracker-empty-note">No out-of-sample check yet for this league. This runs automatically once enough settled picks exist (needs 30+ settled picks with a valid createdAt) and refreshes periodically during the retraining pipeline.</div></div></div>'+
+          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Checkpoint review</div><div class="tracker-analytics-card-meta">'+fbTrackerEsc(checkpointStatus)+'</div></div><div class="tracker-analytics-card-body"><div class="tracker-review-list">'+reviewHtml+'</div></div></div>'+
+          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Measurement lab</div><div class="tracker-analytics-card-meta">Tracked-pick evidence only</div></div><div class="tracker-analytics-card-body"><div class="tracker-report-subtitle">This layer measures what the engine actually saved to tracker.</div><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Experiment</th><th class="num">Games</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th><th class="num">Net wins</th></tr></thead><tbody>'+
+          '<tr><td>All tracked picks</td><td class="num">'+all.length+'</td><td class="num">'+settledN+'</td><td class="num">'+wins+'</td><td class="num">'+losses+'</td><td class="num">'+pushes+'</td><td class="rate">'+(wr==null?"—":wr.toFixed(1)+"%")+'</td><td class="num">'+(wins-losses)+'</td></tr>'+
+          '</tbody></table></div></div></div>'+
+          '</div>';
       }
+
     }
     function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView(__fbTrackerView);}
     function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}}
@@ -4246,7 +4359,17 @@
       if(status!=='pending' && g_trackerState.activePicks.includes(found)){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p!==found);g_trackerState.archivedPicks.push(found);}
       fbTrackerRecount();fbTrackerSave();renderTrackedPicks();return true;
     }
-    function deleteTrackedPickBySignature(signature){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p.signature!==signature);g_trackerState.archivedPicks=g_trackerState.archivedPicks.filter(p=>p.signature!==signature);fbTrackerRecount();fbTrackerSave();renderTrackedPicks();}
+    function deleteTrackedPickBySignature(signature){
+      if(!signature)return false;
+      let pick=(g_trackerState.activePicks||[]).find(p=>p.signature===signature)||(g_trackerState.archivedPicks||[]).find(p=>p.signature===signature);
+      const pickName=pick?(pick.predictionText||"this prediction"):"this prediction";
+      const matchName=pick?((pick.homeTeam||"A")+" vs "+(pick.awayTeam||"B")):"this match";
+      if(!confirm('Are you sure you want to permanently delete "'+pickName+'" for '+matchName+'?')) return false;
+      g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p.signature!==signature);
+      g_trackerState.archivedPicks=g_trackerState.archivedPicks.filter(p=>p.signature!==signature);
+      fbTrackerRecount();fbTrackerSave();renderTrackedPicks();
+      return true;
+    }
     function copyTrackerData(){
       const text=JSON.stringify({exportedAt:new Date().toISOString(),state:g_trackerState},null,2);
       const done=()=>{const b=document.getElementById('trackerCopyDataBtn');if(b){const o=b.textContent;b.textContent='✅';setTimeout(()=>b.textContent=o,1200);}};
