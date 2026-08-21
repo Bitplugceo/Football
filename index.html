@@ -1,4 +1,3 @@
-k
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -569,7 +568,6 @@ k
   <button id="auditCopyBtn" type="button" title="Copy Audit" style="background: #d4af37 !important; color: #111 !important; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.35) !important; font-weight: 700 !important; border: none !important; padding: 5px 14px !important; font-size: 12px !important; cursor: pointer !important; width: auto !important; min-width: 0 !important;">📋</button>
   <button id="inputsCopyBtn" type="button" title="Copy Inputs &amp; Market Lines" style="background: #d4af37 !important; color: #111 !important; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.35) !important; font-weight: 700 !important; border: none !important; padding: 5px 14px !important; font-size: 12px !important; cursor: pointer !important; width: auto !important; min-width: 0 !important;">🗒️</button>
 </div>
-<div id="buildTag" style="text-align:center;font-size:10px;color:#999;margin:10px 0 4px;">&nbsp;</div>
 <div class="table-wrap">
   <table id="results" style="display:none;">
     <tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>
@@ -880,10 +878,6 @@ k
     // whether the site you're looking at is actually running this build or
     // a stale cached copy. If this text doesn't match the file you deployed,
     // hard-refresh / clear the site data / re-add the home-screen icon.
-    document.addEventListener("DOMContentLoaded", function() {
-      const tag = document.getElementById("buildTag");
-      if (tag) tag.textContent = "Build: " + APP_BUILD_VERSION;
-    });
 
     // ---------- Utility functions ----------
     // Drift error storage
@@ -4378,7 +4372,7 @@ k
           '</td></tr></tbody></table></div></div></div></div>';
       }
     }
-    function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView(__fbTrackerView);}
+    function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView('picks');}
     function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}}
     function applyManualSettlementToTrackedPick(signature,status){
       const all=[g_trackerState.activePicks,g_trackerState.archivedPicks]; let found=null;
@@ -4603,7 +4597,10 @@ k
       document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
       if(localStorage.getItem("theme")==="dark") document.body.classList.add("dark-mode");
 
-      document.getElementById("trackerToggleBtn").addEventListener("click", openTrackerModal);
+      document.getElementById("trackerToggleBtn").addEventListener("click", function() {
+        setTrackerModalView("picks");
+        openTrackerModal();
+      });
       document.getElementById("trackerCloseBtn").addEventListener("click", closeTrackerModal);
       const _raidBtn = document.getElementById("trackerMilitaryRaidBtn");
       if (_raidBtn) _raidBtn.addEventListener("click", function() {
