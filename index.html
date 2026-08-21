@@ -1,3 +1,4 @@
+k
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,6 +47,7 @@
       --tracker-mini-head-bg: #eceff3;
       --tracker-mini-head-text: #2a2f38;
     }
+    #espnAutoSection.fb-espn-hidden { display: none !important; }
     body.tracker-open { position: fixed; width: 100%; left: 0; right: 0; overflow: hidden; }
     body.dark-mode {
       --bg: #0c0c0c;
@@ -76,12 +78,13 @@
     }
     button, input, select, .section, table, th, td, .tracker-panel, .fixture-day, .autocomplete-list, .league-box { border-radius: 0; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html { -webkit-text-size-adjust: 100%; background: var(--bg); }
+    html { -webkit-text-size-adjust: 100%; background: var(--bg); height: 100%; }
+    html, body { background-color: var(--bg); }
+    body.dark-mode, body.dark-mode html { background-color: #0c0c0c; }
     body {
       margin: 0; padding: 0; background: var(--bg); color: var(--text);
       font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      -webkit-text-size-adjust: 100%; min-height: 100vh; min-height: -webkit-fill-available;
-      padding-bottom: env(safe-area-inset-bottom, 0px);
+      -webkit-text-size-adjust: 100%; min-height: 100%; min-height: 100vh; min-height: -webkit-fill-available;
     }
     body::before {
       content: ""; position: fixed; top: 0; left: 0; right: 0;
@@ -106,8 +109,8 @@
     .engine-battery-shell::after { content: ''; position: absolute; right: -3px; top: 3px; width: 2px; height: 5px; background: rgba(255,255,255,0.85); border-radius: 0 1px 1px 0; }
     .engine-battery-fill { height: 100%; border-radius: 1px; background: #49d45f; transition: width 0.4s ease, background-color 0.4s ease; }
     .engine-battery-pct { min-width: 26px; text-align: left; }
-    .wrapper { max-width: 760px; margin: 10px auto; padding: 0 10px; }
-    .section { border: 1px solid var(--panel-border); background: var(--panel); margin: 8px auto; box-shadow: var(--shadow); color: var(--text); }
+    .wrapper { max-width: 760px; margin: 10px auto; padding: 0 10px; width: 100%; box-sizing: border-box; }
+    .section { border: 1px solid var(--panel-border); background: var(--panel); margin: 8px 0; width: 100%; box-sizing: border-box; box-shadow: var(--shadow); color: var(--text); }
     .section-toggle { width: 100%; background: none !important; border: none; padding: 12px 10px; margin: 0 !important; color: var(--section-toggle-text) !important; display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
     .section-toggle .toggle-title { display: block; font-weight: 800; color: var(--section-toggle-text) !important; }
     .section-toggle .toggle-icon { font-size: 15px; line-height: 1; transition: transform 0.2s ease; color: var(--section-toggle-icon) !important; }
@@ -2579,7 +2582,10 @@
         if(section.id!=='leagueSection') section.classList.add('collapsed');
       });
       const espn=document.getElementById('espnAutoSection');
-      if(espn) espn.classList.remove('collapsed');
+      if(espn){
+        if(slug){ espn.classList.remove('fb-espn-hidden'); espn.classList.remove('collapsed'); }
+        else { espn.classList.add('fb-espn-hidden'); espn.classList.add('collapsed'); }
+      }
       if(!slug){
         const fixtureSel=document.getElementById('fbEspnFixtureSelect');
         if(fixtureSel) fixtureSel.innerHTML='<option value="">- Select match -</option>';
@@ -4094,7 +4100,7 @@
       if(today) today.classList.add('active');
       if(tomorrow) tomorrow.classList.remove('active');
       const espn=document.getElementById('espnAutoSection');
-      if(espn) espn.classList.add('collapsed');
+      if(espn){ espn.classList.add('collapsed'); espn.classList.add('fb-espn-hidden'); }
       if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('', 'info');
       if(typeof fbEspnSetCoverage==='function') fbEspnSetCoverage((FB_ESPN.registry||[]).length+' ESPN soccer competitions stored locally · Fixtures: Today + Tomorrow only');
     }
@@ -6779,6 +6785,7 @@ document.addEventListener("DOMContentLoaded", function() {
   // Exact BB startup state: League Tier is open; all other sections are collapsed.
   if (typeof fbResetUiToFreshPage === "function") fbResetUiToFreshPage();
   var _tcx=document.getElementById("teamContextSection"); if(_tcx) _tcx.style.display="none";
+  var _espn=document.getElementById("espnAutoSection"); if(_espn){ _espn.classList.add("fb-espn-hidden"); _espn.classList.add("collapsed"); }
   if (typeof fbEspnLoadRegistry === "function") {
     fbEspnLoadRegistry().then(async function() {
       try {
