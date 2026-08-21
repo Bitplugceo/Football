@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,7 +122,7 @@
     .section.locked .section-toggle .toggle-icon { display: none; }
     h3 { margin: 0; font-size: 16px; font-weight: 800; }
     label { display: block; font-size: 12px; margin-bottom: 4px; color: var(--text); font-weight: 600; }
-    input, .league-box, .autocomplete-wrap { width: 100%; max-width: 260px; box-sizing: border-box; }
+    input, .league-box, .autocomplete-wrap, select.league-box { width: 100%; max-width: 100%; box-sizing: border-box; }
     input, .league-box { display: block; padding: 6px 8px; font-size: 12px; background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border); margin-bottom: 6px; appearance: none; -webkit-appearance: none; -moz-appearance: none; }
     input::placeholder { color: var(--muted); opacity: 0.75; }
     input:focus { outline: none; border-color: #4aa346; box-shadow: 0 0 0 2px rgba(74, 163, 70, 0.12); }
@@ -229,7 +230,7 @@
     .tracker-close, .tracker-insights-btn { background: none !important; border: none !important; box-shadow: none !important; color: var(--tracker-head-text) !important; font-size: 18px !important; line-height: 1 !important; padding: 0 !important; margin: 0 !important; cursor: pointer !important; }
     .tracker-insights-btn { font-size: 18px !important; opacity: 0.88; }
     .tracker-summary { padding: 14px 16px; background: var(--tracker-summary-bg); color: var(--tracker-strong); border-bottom: 1px solid var(--panel-border); font-size: 12px; font-weight: 800; }
-    .tracker-market-summary { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; border-bottom: 1px solid var(--panel-border); }
+    .tracker-market-summary { display: none; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--panel-border); }
     .tracker-market-chip { display: inline-flex; align-items: center; justify-content: center; padding: 9px 11px; background: linear-gradient(180deg, #ffffff 0%, #f6f7f9 100%); border: 1px solid #d9dee5; color: var(--tracker-strong); font-size: 10px; font-weight: 800; box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
     body.dark-mode .tracker-market-chip { background: linear-gradient(180deg, #171717 0%, #121212 100%); border-color: #2f3338; }
     .tracker-empty { padding: 18px 16px; color: var(--tracker-subtext); font-size: 12px; font-weight: 700; }
@@ -1973,9 +1974,13 @@
           }
         }
         if(token!==fbEspnFixtureLoadToken) return events||[];
-        fixtureSel.innerHTML='<option value="">- Select match -</option>'+(events||[]).map(function(e){
-          const when=e.date?new Date(e.date).toLocaleString():"time unavailable";
-          const label=(e.homeName||"Home")+" vs "+(e.awayName||"Away")+" · "+(e.competitionName||fbEspnPrettySlug(e.leagueSlug))+" · "+when;
+        fixtureSel.innerHTML='<option value="">— Select match —</option>'+(events||[]).map(function(e){
+          var when="";
+          if(e.date){
+            var d=new Date(e.date);
+            if(!isNaN(d.getTime())) when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+          }
+          var label=(when?when+" — ":"")+(e.homeName||"Home")+" vs "+(e.awayName||"Away");
           return "<option value='"+JSON.stringify(e).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";
         }).join("");
         fbEspnSetStatus((events&&events.length?events.length+" matches loaded for "+dayLabel:"No matches found for "+dayLabel)+" · world feed",events&&events.length?"ok":"info");
@@ -1985,7 +1990,7 @@
         const stored=await fbWorldLoadFixtures();
         let events=stored.filter(function(x){return (x.dateKey||fbWorldDateKeyFromDate(x.date))===dateKey;});
         if(slug) events=events.filter(function(x){return String(x.leagueSlug||"").toLowerCase()===slug.toLowerCase();});
-        fixtureSel.innerHTML='<option value="">'+(events.length?"Stored matches available":"Fixture refresh failed")+'</option>'+(events||[]).map(function(x){return "<option value='"+JSON.stringify(x).replace(/'/g,"&#39;")+"'>"+safeText((x.homeName||"")+" vs "+(x.awayName||"")+" · "+(x.competitionName||x.leagueSlug||"Soccer"))+"</option>";}).join("");
+        fixtureSel.innerHTML='<option value="">'+(events.length?"— Select match —":"Fixture refresh failed")+'</option>'+(events||[]).map(function(x){var when="";if(x.date){var d=new Date(x.date);if(!isNaN(d.getTime()))when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}var label=(when?when+" — ":"")+(x.homeName||"")+" vs "+(x.awayName||"");return "<option value='"+JSON.stringify(x).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";}).join("");
         fbEspnSetStatus(events.length?"Using stored world fixtures while refresh is unavailable.":"World fixture refresh failed: "+(e?.message||String(e)),events.length?"info":"error");
         return events;
       }
@@ -2231,6 +2236,61 @@
       return { my: myL[0], opp: oppL[0] };
     }
     function fbEspnRenderInjury(side, meta, teamName) { return; }
+    // Extract advanced team stats from an ESPN summary/boxscore payload.
+    // Returns nulls when ESPN does not expose the metric for that event.
+    function fbEspnExtractAdvanced(summary, teamId) {
+      try {
+        const out = { xg: null, xga: null, shots: null, sot: null, big: null };
+        if (!summary || teamId == null) return out;
+        const tid = String(teamId);
+        const box = summary.boxscore || summary.boxScore || {};
+        const teams = Array.isArray(box.teams) ? box.teams : [];
+        const mine = teams.find(t => String(t?.team?.id || t?.id || "") === tid) || null;
+        const opp = teams.find(t => String(t?.team?.id || t?.id || "") !== tid) || null;
+        const readStat = (teamObj, names) => {
+          if (!teamObj) return null;
+          const stats = Array.isArray(teamObj.statistics) ? teamObj.statistics : (Array.isArray(teamObj.stats) ? teamObj.stats : []);
+          const want = names.map(n => String(n).toLowerCase());
+          for (let i = 0; i < stats.length; i++) {
+            const s = stats[i] || {};
+            const label = String(s.name || s.displayName || s.abbreviation || s.label || "").toLowerCase();
+            if (!want.some(w => label === w || label.indexOf(w) !== -1)) continue;
+            const v = Number(s.value != null ? s.value : s.displayValue);
+            if (Number.isFinite(v)) return v;
+          }
+          return null;
+        };
+        out.shots = readStat(mine, ["totalshots", "shots", "shots total", "total shots"]);
+        out.sot = readStat(mine, ["shotsonTarget", "shots on target", "sot", "shots on goal"]);
+        out.xg = readStat(mine, ["expectedgoals", "expected goals", "xg", "xgoals"]);
+        out.xga = readStat(opp, ["expectedgoals", "expected goals", "xg", "xgoals"]);
+        out.big = readStat(mine, ["bigchances", "big chances", "big chances created"]);
+        // Some soccer payloads nest under players — aggregate shots if team stats missing
+        if (out.shots == null && Array.isArray(box.players)) {
+          let shots = 0, sot = 0, found = false;
+          box.players.forEach(function(side) {
+            const teamMatch = String(side?.team?.id || "") === tid;
+            if (!teamMatch) return;
+            (side.statistics || []).forEach(function(st) {
+              (st.athletes || []).forEach(function(a) {
+                (a.stats || a.statistics || []).forEach(function(sv) {
+                  const n = String(sv.name || sv.displayName || "").toLowerCase();
+                  const v = Number(sv.value != null ? sv.value : sv.displayValue);
+                  if (!Number.isFinite(v)) return;
+                  if (n.indexOf("totalshots") !== -1 || n === "shots") { shots += v; found = true; }
+                  if (n.indexOf("shotson") !== -1 || n.indexOf("on target") !== -1) { sot += v; found = true; }
+                });
+              });
+            });
+          });
+          if (found) { out.shots = shots; out.sot = sot; }
+        }
+        return out;
+      } catch (e) {
+        return { xg: null, xga: null, shots: null, sot: null, big: null };
+      }
+    }
+
     async function fbEspnBuildTeamData(slug, team, fixtureDate) {
       let events=await fbEspnFetchTeamEvents(slug,team.id);
       const cutoff=fixtureDate?Date.parse(fixtureDate):Date.now();
@@ -4234,6 +4294,8 @@
         empty.style.display=display.length?"none":"block";
         empty.textContent="No live/recent picks. Older picks moved to record.";
       }
+      var tw=document.querySelector(".tracker-table-wrap");
+      if(tw && !document.querySelector(".tracker-panel.analytics-view")) tw.style.display=display.length?"":"none";
       if(summary){
         summary.textContent=display.length+" live/recent • "+pendingCount+" pending • "+(stats.wins||0)+" wins • "+(stats.losses||0)+" losses";
       }
