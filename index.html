@@ -1,4 +1,3 @@
-M
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -519,7 +518,7 @@ M
         <input id="a1HAllowed" placeholder="e.g. 0,1,1,0,2" aria-label="Team A 1st-half goals allowed, last 10 (recent to oldest)" />
       </div>
     </div>
-    <div style="margin-top:6px;">
+    <div style="margin-top:6px;display:none;">
       <label>Matches in Last 7 Days <span style="font-size:10px;color:#888;">(fixture-congestion signal)</span></label>
       <input id="aFixtureLoad7d" type="number" min="0" step="1" placeholder="e.g. 2" style="max-width:120px;" aria-label="Team A matches played in last 7 days" />
     </div>
@@ -546,7 +545,7 @@ M
         <input id="b1HAllowed" placeholder="e.g. 1,0,2,1,1" aria-label="Team B 1st-half goals allowed, last 10 (recent to oldest)" />
       </div>
     </div>
-    <div style="margin-top:6px;">
+    <div style="margin-top:6px;display:none;">
       <label>Matches in Last 7 Days <span style="font-size:10px;color:#888;">(fixture-congestion signal)</span></label>
       <input id="bFixtureLoad7d" type="number" min="0" step="1" placeholder="e.g. 0" style="max-width:120px;" aria-label="Team B matches played in last 7 days" />
     </div>
@@ -878,7 +877,7 @@ M
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "football_engine_v6_fetch_threshold_fix";
+    const APP_BUILD_VERSION = "football_engine_v7_context_wired_to_math";
     const ENGINE_MODEL_VERSION = "football_v2_core";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
@@ -2124,24 +2123,6 @@ M
     // it into the projection would just be a confident-looking guess wearing
     // a statistical costume. Better to show you the real signal and let you
     // apply judgment, same as anyone who actually follows the sport does.
-    async function fbEspnFetchTeamInjuries(slug, teamId) {
-      try {
-        const data = await fbEspnFetchJSON(FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/injuries", 12000);
-        const list = Array.isArray(data?.injuries) ? data.injuries : (Array.isArray(data?.items) ? data.items : []);
-        return list.map(function(inj) {
-          const athlete = inj?.athlete || inj;
-          return {
-            name: athlete?.displayName || athlete?.shortName || "Unknown player",
-            position: athlete?.position?.abbreviation || "",
-            status: inj?.status?.type?.description || inj?.status || inj?.type?.description || "Unknown",
-            detail: inj?.details?.type || inj?.longComment || inj?.shortComment || ""
-          };
-        }).filter(function(x){ return x.name && x.name !== "Unknown player"; }).slice(0, 15);
-      } catch (e) {
-        engineDebug("Team injuries fetch unavailable", { league: slug, teamId, error: e?.message || String(e) });
-        return [];
-      }
-    }
     async function fbEspnFetchTeamTransactions(slug, teamId) {
       try {
         const data = await fbEspnFetchJSON(FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/transactions", 12000);
@@ -2153,6 +2134,31 @@ M
         engineDebug("Team transactions fetch unavailable", { league: slug, teamId, error: e?.message || String(e) });
         return [];
       }
+    }
+    // Squad-churn detector — feeds the math (as a confidence dampener, see
+    // fb2_runEngine's `integrity` line), unlike injuries/news which are display
+    // only. Direction is unknowable from a transaction list or a headline (a
+    // signing could make a team better OR disrupt settled form) so this never
+    // shifts the projection mean — it only flags "recent history is a less
+    // reliable read on the CURRENT squad than usual," the same demotion the
+    // engine already applies for high goal-volatility. Manager-change keywords
+    // are matched narrowly (explicit words like "sacked"/"appoints head coach")
+    // to keep the false-positive rate low — this is keyword detection, not
+    // sentiment analysis, and is only trusted for that one narrow question.
+    function fbEspnComputeSquadChurn(transactions, news, sinceDays) {
+      const cutoff = Date.now() - (sinceDays || 21) * 86400000;
+      const reasons = [];
+      const recentTx = (transactions || []).filter(function(t) {
+        const ts = Date.parse(t.date || "");
+        return Number.isFinite(ts) ? ts >= cutoff : true; // undated entries assumed recent (ESPN lists newest first)
+      });
+      if (recentTx.length >= 2) reasons.push(recentTx.length + " squad moves in the last " + (sinceDays || 21) + " days");
+      const mgrWords = /\b(sack(ed|s)?|fire(d|s)?|appoint(ed|s)?\s+(head\s+)?coach|new\s+(head\s+)?coach|new\s+manager|interim\s+(head\s+)?coach|interim\s+manager|steps?\s+down\s+as\s+(head\s+)?coach|takes?\s+over\s+as\s+(head\s+)?coach)\b/i;
+      const mgrHit = [...(transactions || []), ...(news || [])].some(function(x) {
+        return mgrWords.test(x.text || x.headline || "");
+      });
+      if (mgrHit) reasons.push("possible recent manager change mentioned in ESPN transactions/news");
+      return { churn: reasons.length > 0, reasons };
     }
     async function fbEspnFetchRelevantNews(slug, teamAName, teamBName) {
       try {
@@ -2174,34 +2180,41 @@ M
       }
     }
     async function fbEspnFetchTeamFullContext(slug, teamId, teamName, otherTeamName) {
-      const [injuries, transactions, news] = await Promise.all([
-        fbEspnFetchTeamInjuries(slug, teamId),
+      // Injuries are NOT fetched here — fbEspnBuildTeamData already fetches
+      // them (fbEspnFetchInjuryMeta) because the math needs them; fetching
+      // the same ESPN endpoint a second time here just for display would be
+      // a wasted request. The render call below reads the injury list back
+      // out of dataA.injuryMeta/dataB.injuryMeta instead.
+      const [transactions, news] = await Promise.all([
         fbEspnFetchTeamTransactions(slug, teamId),
         fbEspnFetchRelevantNews(slug, teamName, otherTeamName)
       ]);
-      return { injuries, transactions, news };
+      return { transactions, news };
     }
-    function fbEspnRenderTeamContext(nameA, nameB, contextA, contextB) {
+    function fbEspnRenderTeamContext(nameA, nameB, contextA, contextB, injuryMetaA, injuryMetaB) {
       const el = document.getElementById("teamContextBody");
       if (!el) return;
       function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
-      function col(name, ctx) {
-        const inj = (ctx?.injuries || []);
+      function col(name, ctx, inj) {
+        const notes = (inj?.notes || []);
         const tx = (ctx?.transactions || []);
         const nw = (ctx?.news || []);
+        const churn = fbEspnComputeSquadChurn(tx, nw);
         let h = '<div style="flex:1;min-width:0;">';
         h += '<div style="font-weight:700;margin-bottom:4px;">' + esc(name) + '</div>';
-        h += '<div style="font-size:11px;color:#aaa;margin-bottom:2px;">🩹 Injuries / unavailable (' + inj.length + ')</div>';
-        h += inj.length ? inj.map(function(i){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + esc(i.name) + (i.position?' ('+esc(i.position)+')':'') + ' — ' + esc(i.status) + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">None reported by ESPN right now.</div>';
+        h += '<div style="font-size:11px;color:#aaa;margin-bottom:2px;">🩹 Injuries / unavailable (' + notes.length + ') — factored into the projection</div>';
+        h += notes.length ? notes.map(function(n){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + esc(n) + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">None reported by ESPN right now.</div>';
+        if (inj && inj.impact) h += '<div style="font-size:11px;color:#c96;margin-top:2px;">Applied as a ' + Math.round(Math.abs(inj.impact)) + '% attack-strength reduction (capped, conservative).</div>';
         h += '<div style="font-size:11px;color:#aaa;margin:6px 0 2px;">🔁 Recent squad moves (' + tx.length + ')</div>';
         h += tx.length ? tx.map(function(t){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + esc(t.text) + (t.date?' <span style="color:#777;">('+esc(t.date)+')</span>':'') + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">No recent transactions on ESPN.</div>';
         h += '<div style="font-size:11px;color:#aaa;margin:6px 0 2px;">📰 Related news (' + nw.length + ')</div>';
         h += nw.length ? nw.map(function(a){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + (a.link ? '<a href="'+esc(a.link)+'" target="_blank" rel="noopener" style="color:#8ab4f8;">'+esc(a.headline)+'</a>' : esc(a.headline)) + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">Nothing specific in ESPN\'s latest headlines.</div>';
+        if (churn.churn) h += '<div style="font-size:11px;color:#c96;margin-top:4px;">⚠️ Squad-churn signal: ' + esc(churn.reasons.join('; ')) + ' — confidence grade capped this run, projection itself unchanged.</div>';
         h += '</div>';
         return h;
       }
-      el.innerHTML = '<div style="display:flex;gap:14px;flex-wrap:wrap;">' + col(nameA, contextA) + col(nameB, contextB) + '</div>' +
-        '<div style="font-size:10px;color:#777;margin-top:8px;">This panel is informational only — it is not mixed into the projection math. Read it and weigh it yourself; ESPN doesn\'t reliably expose things like tactical setup, exact starting XI until close to kickoff, or "why" a manager was changed.</div>';
+      el.innerHTML = '<div style="display:flex;gap:14px;flex-wrap:wrap;">' + col(nameA, contextA, injuryMetaA) + col(nameB, contextB, injuryMetaB) + '</div>' +
+        '<div style="font-size:10px;color:#777;margin-top:8px;">Injuries feed the projection directly (capped, conservative). Squad moves / manager-change news only widen or narrow confidence — never the projection itself, since direction can\'t be known from a transaction list. ESPN doesn\'t reliably expose tactical setup or the exact starting XI until close to kickoff.</div>';
       const section = document.getElementById("teamContextSection");
       if (section) section.classList.remove("collapsed");
     }
@@ -2521,7 +2534,13 @@ M
           fbEspnFetchTeamFullContext(slug, teamA.id, teamA.name, teamB.name),
           fbEspnFetchTeamFullContext(slug, teamB.id, teamB.name, teamA.name)
         ]);
-        fbEspnRenderTeamContext(teamA.name, teamB.name, contextA, contextB);
+        // Squad-churn is a confidence signal, not a projection input — computed
+        // here (once, from data already fetched above) and attached to dataA/
+        // dataB so it rides along into window.__fbAutoData and fb2_inputFeatures
+        // picks it up the same way it already picks up injury impact.
+        dataA.churn = fbEspnComputeSquadChurn(contextA.transactions, contextA.news).churn;
+        dataB.churn = fbEspnComputeSquadChurn(contextB.transactions, contextB.news).churn;
+        fbEspnRenderTeamContext(teamA.name, teamB.name, contextA, contextB, dataA.injuryMeta, dataB.injuryMeta);
 
         fbEspnFillFormFromTeamData("A", dataA);
         fbEspnFillFormFromTeamData("B", dataB);
@@ -3551,7 +3570,7 @@ M
       const auto=window.__fbAutoData||{};
       const A={name:fb2_text("ssTeamAName","Home"),id:fb2_text("ssTeamAId"),gf:fb2_series("aFTScored"),ga:fb2_series("aFTAllowed"),h1gf:fb2_series("a1HScored"),h1ga:fb2_series("a1HAllowed")};
       const B={name:fb2_text("ssTeamBName","Away"),id:fb2_text("ssTeamBId"),gf:fb2_series("bFTScored"),ga:fb2_series("bFTAllowed"),h1gf:fb2_series("b1HScored"),h1ga:fb2_series("b1HAllowed")};
-      [A,B].forEach((t,i)=>{ const p=i===0?"a":"b",src=i===0?(auto.A||{}):(auto.B||{}); t.xg=Number.isFinite(src.xg)?src.xg:fb2_num(p+"XG",null);t.xga=Number.isFinite(src.xga)?src.xga:fb2_num(p+"XGA",null);t.shots=Number.isFinite(src.shots)?src.shots:fb2_num(p+"Shots",null);t.sot=Number.isFinite(src.sot)?src.sot:fb2_num(p+"SOT",null);t.big=Number.isFinite(src.big)?src.big:fb2_num(p+"BigChances",null);t.injury=Number.isFinite(src.injury)?src.injury:(fb2_num(p+"InjuryImpact",0)||0);t.susp=Number.isFinite(src.susp)?src.susp:(fb2_num(p+"SuspensionImpact",0)||0);t.lineup=Number.isFinite(src.lineup)?src.lineup:fb2_num(p+"LineupStrength",100);t.rotation=Number.isFinite(src.rotation)?src.rotation:(fb2_num(p+"RotationPenalty",0)||0);t.rest=Number.isFinite(src.restDays)?src.restDays:fb2_num(p+"RestDays",null);t.travel=Number.isFinite(src.travel)?src.travel:(fb2_num(p+"TravelKm",0)||0);t.manager=Number.isFinite(src.manager)?src.manager:(fb2_num(p+"ManagerChange",0)||0);t.motivation=Number.isFinite(src.motivation)?src.motivation:fb2_pct(p+"Motivation",50);t.spa=Number.isFinite(src.spa)?src.spa:fb2_pct(p+"SetPieceAttack",50);t.spd=Number.isFinite(src.spd)?src.spd:fb2_pct(p+"SetPieceDefense",50);t.ta=Number.isFinite(src.ta)?src.ta:fb2_pct(p+"TacticalAttack",50);t.td=Number.isFinite(src.td)?src.td:fb2_pct(p+"TacticalDefense",50);t.load7=Number.isFinite(src.matchesLast7d)?src.matchesLast7d:(fb2_num(p+"FixtureLoad7d",0)||0); });
+      [A,B].forEach((t,i)=>{ const p=i===0?"a":"b",src=i===0?(auto.A||{}):(auto.B||{}); t.xg=Number.isFinite(src.xg)?src.xg:fb2_num(p+"XG",null);t.xga=Number.isFinite(src.xga)?src.xga:fb2_num(p+"XGA",null);t.shots=Number.isFinite(src.shots)?src.shots:fb2_num(p+"Shots",null);t.sot=Number.isFinite(src.sot)?src.sot:fb2_num(p+"SOT",null);t.big=Number.isFinite(src.big)?src.big:fb2_num(p+"BigChances",null);t.injury=Number.isFinite(src.injury)?src.injury:(fb2_num(p+"InjuryImpact",0)||0);t.churn=!!src.churn;t.susp=Number.isFinite(src.susp)?src.susp:(fb2_num(p+"SuspensionImpact",0)||0);t.lineup=Number.isFinite(src.lineup)?src.lineup:fb2_num(p+"LineupStrength",100);t.rotation=Number.isFinite(src.rotation)?src.rotation:(fb2_num(p+"RotationPenalty",0)||0);t.rest=Number.isFinite(src.restDays)?src.restDays:fb2_num(p+"RestDays",null);t.travel=Number.isFinite(src.travel)?src.travel:(fb2_num(p+"TravelKm",0)||0);t.manager=Number.isFinite(src.manager)?src.manager:(fb2_num(p+"ManagerChange",0)||0);t.motivation=Number.isFinite(src.motivation)?src.motivation:fb2_pct(p+"Motivation",50);t.spa=Number.isFinite(src.spa)?src.spa:fb2_pct(p+"SetPieceAttack",50);t.spd=Number.isFinite(src.spd)?src.spd:fb2_pct(p+"SetPieceDefense",50);t.ta=Number.isFinite(src.ta)?src.ta:fb2_pct(p+"TacticalAttack",50);t.td=Number.isFinite(src.td)?src.td:fb2_pct(p+"TacticalDefense",50);t.load7=Number.isFinite(src.matchesLast7d)?src.matchesLast7d:(fb2_num(p+"FixtureLoad7d",0)||0); });
       return {A,B};
     }
     // fb2_competitionLabel intentionally kept as TARGET's own version, defined
@@ -4057,7 +4076,14 @@ M
       if(data.A.gf.length<4||data.B.gf.length<4) engineDebug("Thin football sample",{home:data.A.gf.length,away:data.B.gf.length});
       const lambdas=fb2_lambdas(data,ctx),live=fb2_liveAdjust(lambdas);const activeL={home:live.home,away:live.away};
       const fh=fb2_firstHalf(data,lambdas);const ftM=fb2_scoreMatrix(activeL.home,activeL.away),h1M=fb2_scoreMatrix(fh.home,fh.away);
-      const sample=Math.min(data.A.gf.length,data.B.gf.length);const volatility=Math.max(getVolatilityRatio(data.A.gf.concat(data.B.gf),1.4),getVolatilityRatio(data.A.ga.concat(data.B.ga),1.4));const integrity=volatility>=2.2;
+      const sample=Math.min(data.A.gf.length,data.B.gf.length);const volatility=Math.max(getVolatilityRatio(data.A.gf.concat(data.B.gf),1.4),getVolatilityRatio(data.A.ga.concat(data.B.ga),1.4));
+      // Squad churn (recent transactions / a likely manager change) never
+      // shifts the projection mean — direction is unknowable — but it does
+      // demote confidence the same way high goal-volatility already does,
+      // since it means recent form is a less reliable read on the CURRENT
+      // squad than it would normally be.
+      const churn=!!data.A.churn||!!data.B.churn;
+      const integrity=volatility>=2.2||churn;
       const rows=fb2_marketRows(data,ctx,activeL,fh,ftM,h1M,integrity,sample);
       // Reconnect trap detection into the LIVE path (was only on retired legacy)
       rows.forEach(function(p){
@@ -4084,7 +4110,7 @@ M
         }
         addTrackedPicks(payloads);
       }
-      engineDebug("Football Core V2 complete",{context:ctx,lambdas:activeL,firstHalf:fh,oneXTwo:x12,btts,monteCarlo:mc,actionable:actionable.length,integrity,sample,leagueTrust:leagueTrust.level});
+      engineDebug("Football Core V2 complete",{context:ctx,lambdas:activeL,firstHalf:fh,oneXTwo:x12,btts,monteCarlo:mc,actionable:actionable.length,integrity,churn,volatility:+volatility.toFixed(2),sample,leagueTrust:leagueTrust.level});
       const st=document.getElementById("fixtureContextStatus");if(st)st.textContent=`${ctx.competition||"Unknown competition"} · ${ctx.eventId?"Event "+ctx.eventId:"manual fixture ID"} · λ ${activeL.home.toFixed(2)}–${activeL.away.toFixed(2)} · 1X2 ${(x12.home*100).toFixed(1)} / ${(x12.draw*100).toFixed(1)} / ${(x12.away*100).toFixed(1)} · BTTS ${(btts*100).toFixed(1)}%`;
     }
     function loadFbVerifiedConfig(market){
