@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1578,7 +1579,27 @@
         "fifa.world":"FIFA World Cup","fifa.friendly":"International Friendly"
       };
       if (FULL[s]) return FULL[s];
-      // Fallback: clean but still readable (never leave raw slug)
+      // Fallback: expand common ESPN country/region prefixes so names are never
+      // shown as terse codes such as "Esp 1", "Eng 1", "Swe 1", etc.
+      const PREFIX = {
+        eng:"English", esp:"Spanish", spa:"Spanish", ger:"German", ita:"Italian",
+        fra:"French", ned:"Dutch", por:"Portuguese", bel:"Belgian", tur:"Turkish",
+        gre:"Greek", sco:"Scottish", aut:"Austrian", sui:"Swiss", den:"Danish",
+        nor:"Norwegian", swe:"Swedish", pol:"Polish", cze:"Czech", cro:"Croatian",
+        srb:"Serbian", ukr:"Ukrainian", rus:"Russian", rou:"Romanian", hun:"Hungarian",
+        bul:"Bulgarian", arg:"Argentine", bra:"Brazilian", mex:"Mexican", usa:"American",
+        can:"Canadian", jpn:"Japanese", kor:"South Korean", chn:"Chinese", sau:"Saudi Arabian",
+        uae:"UAE", qat:"Qatari", irn:"Iranian", irq:"Iraqi", isr:"Israeli",
+        egy:"Egyptian", rsa:"South African", mar:"Moroccan", tun:"Tunisian", alg:"Algerian",
+        aus:"Australian", chi:"Chilean", col:"Colombian", uru:"Uruguayan", per:"Peruvian",
+        ecu:"Ecuadorian", par:"Paraguayan", bol:"Bolivian", ven:"Venezuelan", nga:"Nigerian",
+        gha:"Ghanaian", ind:"Indian", idn:"Indonesian", tha:"Thai", vie:"Vietnamese",
+        mys:"Malaysian", uefa:"UEFA", conmebol:"CONMEBOL", fifa:"FIFA", afc:"AFC", caf:"CAF"
+      };
+      const parts = s.replace(/_/g, " ").replace(/-/g, " ").split(".");
+      const prefix = PREFIX[parts[0]];
+      const rest = parts.slice(1).join(" ").replace(/\b\w/g, c => c.toUpperCase());
+      if (prefix && rest) return prefix + " " + rest;
       return s.replace(/\./g, " ").replace(/_/g, " ").replace(/-/g, " ")
         .replace(/\b\w/g, c => c.toUpperCase());
     }
@@ -1766,11 +1787,17 @@
         }
         const seen = new Set();
         FB_ESPN.registry = refs.map(function(r) {
-          return fbEspnSlugFromRef((r && (r.$ref || r.ref || r.slug)) || "");
-        }).filter(Boolean).filter(function(slug){
-          if (slug === "all" || seen.has(slug)) return false; seen.add(slug); return true;
-        }).map(function(slug){
-          return { slug:slug, name:fbEspnPrettySlug(slug), country:countryFromSlug(slug) };
+          const ref = (r && (r.$ref || r.ref || r.slug)) || "";
+          const slug = fbEspnSlugFromRef(ref) || String(r && (r.slug || r.id || "")).trim();
+          if (!slug) return null;
+          // ESPN registry responses may expose the canonical competition name.
+          // Keep it. Do not replace a full name with a slug-derived abbreviation.
+          const name = String(
+            r && (r.name || r.displayName || r.longName || r.label || r.description || "")
+          ).trim();
+          return { slug: slug, name: name || fbEspnPrettySlug(slug), country: countryFromSlug(slug) };
+        }).filter(Boolean).filter(function(x){
+          if (x.slug === "all" || seen.has(x.slug)) return false; seen.add(x.slug); return true;
         });
         FB_ESPN.loaded = true;
         await fbWorldSaveRegistry(FB_ESPN.registry);
@@ -1820,6 +1847,31 @@
         return name;
       }catch(e){return null;}
     }
+    async function fbEspnFetchLeagueDay(slug, offset, force) {
+      const dateKey = fbEspnLocalDateKey(offset);
+      const cacheKey = "league:" + String(slug) + ":" + dateKey;
+      const cached = FB_ESPN.eventCache.get(cacheKey);
+      if (!force && Array.isArray(cached) && Date.now() - Number(cached._updatedAt || 0) < 120000) return cached;
+      if (!slug || slug === "all") return [];
+      const url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + dateKey + "&limit=1000";
+      const data = await fbEspnFetchJSON(url, 15000);
+      const raw = Array.isArray(data && data.events) ? data.events : [];
+      const seen = new Set(), clean = [];
+      raw.map(function(ev){ return fbEspnNormalizeEvent(ev, slug); }).filter(Boolean).forEach(function(e){
+        // For a league-specific scoreboard the requested slug is authoritative.
+        e.leagueSlug = slug;
+        if (!e.competitionName || e.competitionName === "Soccer") {
+          const meta = (FB_ESPN.registry || []).find(function(x){ return String(x.slug) === String(slug); });
+          e.competitionName = meta && meta.name ? meta.name : fbEspnPrettySlug(slug);
+        }
+        if (!seen.has(e.id)) { seen.add(e.id); clean.push(e); }
+      });
+      clean.sort(function(a,b){ return Date.parse(a.date || 0) - Date.parse(b.date || 0); });
+      Object.defineProperty(clean, "_updatedAt", { value: Date.now(), enumerable: false });
+      FB_ESPN.eventCache.set(cacheKey, clean);
+      return clean;
+    }
+
     async function fbEspnSyncWorldDay(offset, force) {
       const dateKey=fbEspnLocalDateKey(offset);
       const cacheKey="world:"+dateKey;
@@ -1861,13 +1913,44 @@
       const dateKey=fbEspnLocalDateKey(offset), dayLabel=offset===0?"today":"tomorrow";
       fixtureSel.innerHTML='<option value="">Loading '+dayLabel+' matches…</option>';
       try {
-        let events=await fbEspnSyncWorldDay(offset,false);
-        if(!events || !events.length) {
-          const stored=await fbWorldLoadFixtures();
-          events=stored.filter(function(e){return (e.dateKey||fbWorldDateKeyFromDate(e.date))===dateKey;});
-          if(!events.length) events=await fbEspnSyncWorldDay(offset,true);
+        let events = [];
+        if (slug && slug !== "all") {
+          // IMPORTANT: ESPN's /soccer/all/scoreboard feed can omit the league
+          // identifier from event objects. Filtering that feed by league therefore
+          // returns zero matches even when matches exist. Query the selected league
+          // directly; the league slug is then authoritative.
+          try {
+            events = await fbEspnFetchLeagueDay(slug, offset, false);
+            if (!events.length) events = await fbEspnFetchLeagueDay(slug, offset, true);
+          } catch (leagueErr) {
+            engineDebug("Selected ESPN league scoreboard failed", { league: slug, dateKey: dateKey, error: leagueErr?.message || String(leagueErr) });
+            const stored = await fbWorldLoadFixtures();
+            events = stored.filter(function(e){
+              return (e.dateKey || fbWorldDateKeyFromDate(e.date)) === dateKey &&
+                String(e.leagueSlug || "").toLowerCase() === slug.toLowerCase();
+            });
+            if (!events.length) throw leagueErr;
+          }
+        } else {
+          events = await fbEspnSyncWorldDay(offset, false);
+          if (!events || !events.length) {
+            const stored = await fbWorldLoadFixtures();
+            events = stored.filter(function(e){ return (e.dateKey || fbWorldDateKeyFromDate(e.date)) === dateKey; });
+            if (!events.length) events = await fbEspnSyncWorldDay(offset, true);
+          }
         }
-        if(slug) events=events.filter(function(e){return String(e.leagueSlug||"").toLowerCase()===slug.toLowerCase();});
+        if (slug && events && events.length) {
+          try {
+            const currentStored = await fbWorldLoadFixtures();
+            const otherDays = currentStored.filter(function(x){
+              return (x.dateKey || fbWorldDateKeyFromDate(x.date)) !== dateKey;
+            });
+            const merged = otherDays.concat(events.map(function(e){ const x = Object.assign({}, e); delete x.raw; x.dateKey = dateKey; return x; }));
+            await fbWorldSaveFixtures(merged);
+          } catch (persistErr) {
+            engineDebug("Selected league fixtures could not be persisted", { league: slug, error: persistErr?.message || String(persistErr) });
+          }
+        }
         if(token!==fbEspnFixtureLoadToken) return events||[];
         fixtureSel.innerHTML='<option value="">— Select match —</option>'+(events||[]).map(function(e){
           const when=e.date?new Date(e.date).toLocaleString():"time unavailable";
@@ -5523,17 +5606,14 @@ async function auditFullLineScan() {
 // actually resolves instead of always evaluating falsy.
 
 document.addEventListener("DOMContentLoaded", function() {
-  // Expand ESPN + League sections so the user can see them immediately
-  ["leagueSection", "espnAutoSection"].forEach(function(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove("collapsed");
-  });
+  // All top-level sections are collapsed on initial load.
+  // makeSectionsCollapsible() is the single authority for the initial state.
   if (typeof fbEspnLoadRegistry === "function") {
     fbEspnLoadRegistry().then(async function() {
       try {
         await fbEspnSyncWorldFixtures(false);
         if (typeof fbEspnLoadFixtures === "function") await fbEspnLoadFixtures(0);
-        if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("World leagues + Today/Tomorrow fixtures loaded.", "ok");
+        if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("World leagues stored · Today/Tomorrow fixture feed ready.", "ok");
       } catch (e) {
         if (typeof engineDebug === "function") engineDebug("ESPN world boot sync failed", { error: e && e.message ? e.message : String(e) });
       }
