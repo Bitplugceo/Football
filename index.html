@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +10,7 @@ S
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: football_engine_v3_world_registry_today_tomorrow_storage_fix — bump this string on every deploy.
+  <!-- BUILD_MARKER: football_engine_v4_bb_exact_ui_flow_autofetch_fix — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon. -->
@@ -439,7 +438,7 @@ S
   <h3>League Tier</h3>
   <label>Select League</label>
   <select id="leagueSelect" class="league-box" onchange="if(typeof fbEspnOnLeagueChange==='function')fbEspnOnLeagueChange()">
-    <option value="">All leagues</option>
+    <option value="">- Select League -</option>
   </select>
   <div id="leagueCoverage" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
 </div>
@@ -459,17 +458,17 @@ S
   <input id="fixtureKickoff" type="hidden" value="" />
 
   <label style="font-size:12px;">Team A Name (Home)</label>
-  <input id="ssTeamAName" placeholder="e.g. Real Betis" style="max-width:100%;" autocomplete="off" />
+  <input id="ssTeamAName" placeholder="e.g. Real Betis" autocomplete="off" />
   <input id="ssTeamAId" type="hidden" value="" />
 
   <label style="font-size:12px;">Team B Name (Away)</label>
-  <input id="ssTeamBName" placeholder="e.g. Real Sociedad" style="max-width:100%;" autocomplete="off" />
+  <input id="ssTeamBName" placeholder="e.g. Real Sociedad" autocomplete="off" />
   <input id="ssTeamBId" type="hidden" value="" />
 
   <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 4px;">
     <button type="button" class="fetch-btn" id="fbEspnAutoFetchBtn">📡 Fetch Stats</button>
   </div>
-  <div id="fbEspnStatus" style="font-size:10px;min-height:16px;color:var(--muted);">Pick a league → Today/Tomorrow loads matches → select match or type names → Fetch Stats.</div>
+  <div id="fbEspnStatus" style="font-size:10px;min-height:16px;color:var(--muted);">Pick a league → Today/Tomorrow loads matches → select match to fetch stats.</div>
   <div id="fbEspnCoverage" style="font-size:10px;color:var(--muted);">World registry: loading… · Fixtures: Today + Tomorrow only</div>
   <div id="ssFetchStatus" style="font-size:10px;min-height:0;color:var(--muted);"></div>
 
@@ -1824,7 +1823,7 @@ S
       const current=sel.value || "";
       const groups={};
       (FB_ESPN.registry||[]).forEach(function(x){ const c=x.country||"Other"; (groups[c]=groups[c]||[]).push(x); });
-      let html='<option value="">All leagues</option>';
+      let html='<option value="">- Select League -</option>';
       Object.keys(groups).sort().forEach(function(country){
         html+='<optgroup label="'+safeText(country)+'">';
         groups[country].sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(x){
@@ -1843,7 +1842,7 @@ S
         const data=await fbEspnFetchJSON("https://sports.core.api.espn.com/v2/sports/soccer/leagues/"+encodeURIComponent(slug)+"?lang=en&region=us",10000);
         const name=data?.name||data?.displayName||data?.shortName||data?.abbreviation||null;
         if(name&&item)item.resolvedName=String(name);
-        if(name){const sel=document.getElementById("leagueSelect");const opt=sel&&Array.from(sel.options).find(o=>o.value===slug);if(opt)opt.textContent=String(name)+" · "+slug;}
+        if(name){const sel=document.getElementById("leagueSelect");const opt=sel&&Array.from(sel.options).find(o=>o.value===slug);if(opt)opt.textContent=String(name);}
         return name;
       }catch(e){return null;}
     }
@@ -2409,7 +2408,24 @@ S
 
 
     async function fbEspnOnLeagueChange() {
-      if (typeof fbEspnLoadFixtures === "function") await fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0);
+      const leagueSel=document.getElementById('leagueSelect');
+      const slug=(leagueSel?.value||'').trim();
+      // Selecting a league immediately opens ESPN Auto-Fetch, exactly like BB.
+      document.querySelectorAll('.section').forEach(function(section){
+        if(section.id!=='leagueSection') section.classList.add('collapsed');
+      });
+      const espn=document.getElementById('espnAutoSection');
+      if(espn) espn.classList.remove('collapsed');
+      if(!slug){
+        const fixtureSel=document.getElementById('fbEspnFixtureSelect');
+        if(fixtureSel) fixtureSel.innerHTML='<option value="">— Select match —</option>';
+        if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('Pick a league → Today/Tomorrow loads matches → select match to fetch stats.', 'info');
+        return;
+      }
+      ['ssTeamAName','ssTeamAId','ssTeamBName','ssTeamBId','fixtureKickoff'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
+      ['fbInjuryBoxA','fbInjuryBoxB'].forEach(function(id){const e=document.getElementById(id);if(e)e.style.display='none';});
+      if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('Loading '+(leagueSel.options[leagueSel.selectedIndex]?.textContent||slug)+' matches…','info');
+      if(typeof fbEspnLoadFixtures==='function') await fbEspnLoadFixtures(typeof fbEspnFixtureOffset!=='undefined'?fbEspnFixtureOffset:0);
     }
     window.fbEspnOnLeagueChange = fbEspnOnLeagueChange;
 
@@ -3180,15 +3196,42 @@ S
       try{const x=JSON.parse(localStorage.getItem('FOOTBALL_THRESHOLD_VERIFIED_'+String(market))||'null');return x||null;}catch(e){return null;}
     }
     function toggleTheme(){document.body.classList.toggle('dark-mode');try{localStorage.setItem('theme',document.body.classList.contains('dark-mode')?'dark':'light');}catch(e){}}
+    function fbResetUiToFreshPage(){
+      // Exact basketball startup/reset state: League Tier open; every other section collapsed.
+      document.querySelectorAll('.section').forEach(function(section){
+        section.classList.remove('locked');
+        section.classList.add('collapsed');
+      });
+      const leagueSection=document.getElementById('leagueSection');
+      if(leagueSection) leagueSection.classList.remove('collapsed');
+      const leagueSelect=document.getElementById('leagueSelect');
+      if(leagueSelect) leagueSelect.value='';
+      const fixtureSelect=document.getElementById('fbEspnFixtureSelect');
+      if(fixtureSelect) fixtureSelect.innerHTML='<option value="">— Select match —</option>';
+      fbEspnFixtureOffset=0;
+      const today=document.getElementById('fbEspnDayToday'), tomorrow=document.getElementById('fbEspnDayTomorrow');
+      if(today) today.classList.add('active');
+      if(tomorrow) tomorrow.classList.remove('active');
+      const espn=document.getElementById('espnAutoSection');
+      if(espn) espn.classList.add('collapsed');
+      if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('Pick a league → Today/Tomorrow loads matches → select match to fetch stats.', 'info');
+      if(typeof fbEspnSetCoverage==='function') fbEspnSetCoverage((FB_ESPN.registry||[]).length+' ESPN soccer competitions stored locally · Fixtures: Today + Tomorrow only');
+    }
     function clearAll(){
+      try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
       ['ssTeamAName','ssTeamAId','ssTeamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','a1HScored','a1HAllowed','b1HScored','b1HAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','a1HH2H','b1HH2H','ftMarket','h1Market','h2Market','fixtureKickoff'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
       ['useFTH2H','use1HH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
+      ['fbInjuryBoxA','fbInjuryBoxB'].forEach(function(id){const e=document.getElementById(id);if(e)e.style.display='none';});
+      ['fbInjuryContentA','fbInjuryContentB','ssFetchStatus'].forEach(function(id){const e=document.getElementById(id);if(e)e.textContent='';});
       const r=document.getElementById('results');if(r){r.style.display='none';r.innerHTML='<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>';}
       window.__fbAutoData={context:{},A:{},B:{},market:{},h2h:[],source:'none',coverage:null};
-      engineDebug('Football engine inputs cleared');
+      try { if (typeof selectedTeamIds !== 'undefined') selectedTeamIds={A:null,B:null}; } catch(_e) {}
+      try { if (typeof g_lastFetchedTeams !== 'undefined') g_lastFetchedTeams={A:'',B:''}; } catch(_e) {}
+      fbResetUiToFreshPage();
+      engineDebug('Football engine inputs cleared — fresh BB-style UI state restored');
     }
     function runEngine(){return runEngineLegacy();}
-    window.fb2_competitionLabel=fb2_competitionLabel;window.fb2_scoreMatrix=fb2_scoreMatrix;window.fb2_1x2=fb2_1x2;window.fb2_btts=fb2_btts;window.fb2_asianHandicap=fb2_asianHandicap;window.fb2_fairOdds=fb2_fairOdds;window.loadFbVerifiedConfig=loadFbVerifiedConfig;window.toggleTheme=toggleTheme;window.clearAll=clearAll;window.runEngine=runEngine;
+    window.fbResetUiToFreshPage=fbResetUiToFreshPage;window.fb2_competitionLabel=fb2_competitionLabel;window.fb2_scoreMatrix=fb2_scoreMatrix;window.fb2_1x2=fb2_1x2;window.fb2_btts=fb2_btts;window.fb2_asianHandicap=fb2_asianHandicap;window.fb2_fairOdds=fb2_fairOdds;window.loadFbVerifiedConfig=loadFbVerifiedConfig;window.toggleTheme=toggleTheme;window.clearAll=clearAll;window.runEngine=runEngine;
 
     // ---------- Tracker / settlement core (self-contained) ----------
     // The football build previously referenced the basketball tracker API
@@ -3358,11 +3401,13 @@ S
     // ---------- DOM ready ----------
     document.addEventListener("DOMContentLoaded", function() {
       makeSectionsCollapsible();
-      // ALL sections start collapsed — user opens what they need
+      // Exact BB startup state: League Tier open; every other section collapsed.
       document.querySelectorAll(".section").forEach(s => {
-        if (s.id === "leagueSection" || s.id === "espnAutoSection") return;
         s.classList.add("collapsed");
+        s.classList.remove("locked");
       });
+      const _bootLeague = document.getElementById("leagueSection");
+      if (_bootLeague) _bootLeague.classList.remove("collapsed");
 
       // Hide all auto-fill indicators initially (CSS also defaults them to none)
       document.querySelectorAll(".autofill-indicator").forEach(el => el.style.display = "none");
@@ -3428,7 +3473,15 @@ S
           if (aId && fx.homeId) aId.value = String(fx.homeId);
           if (bId && fx.awayId) bId.value = String(fx.awayId);
           if (kick && fx.date) kick.value = fx.date;
-        } catch (e) {}
+          // BB-style: tapping a match starts the data fetch. The button remains only as fallback/retry.
+          if (typeof fbEspnAutoFetch === "function") {
+            Promise.resolve(fbEspnAutoFetch()).catch(function(err){
+              if (typeof engineDebug === "function") engineDebug("Auto-fetch on match selection failed", {error: err?.message || String(err)});
+            });
+          }
+        } catch (e) {
+          if (typeof engineDebug === "function") engineDebug("Fixture selection parse failed", {error: e?.message || String(e)});
+        }
       });
 
 
@@ -5606,14 +5659,14 @@ async function auditFullLineScan() {
 // actually resolves instead of always evaluating falsy.
 
 document.addEventListener("DOMContentLoaded", function() {
-  // All top-level sections are collapsed on initial load.
-  // makeSectionsCollapsible() is the single authority for the initial state.
+  // Exact BB startup state: League Tier is open; all other sections are collapsed.
+  if (typeof fbResetUiToFreshPage === "function") fbResetUiToFreshPage();
   if (typeof fbEspnLoadRegistry === "function") {
     fbEspnLoadRegistry().then(async function() {
       try {
         await fbEspnSyncWorldFixtures(false);
-        if (typeof fbEspnLoadFixtures === "function") await fbEspnLoadFixtures(0);
-        if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("World leagues stored · Today/Tomorrow fixture feed ready.", "ok");
+        if (typeof fbEspnSetCoverage === "function") fbEspnSetCoverage((FB_ESPN.registry||[]).length+" ESPN soccer competitions stored locally · Fixtures: Today + Tomorrow only");
+        if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("Pick a league → Today/Tomorrow loads matches → select match to fetch stats.", "info");
       } catch (e) {
         if (typeof engineDebug === "function") engineDebug("ESPN world boot sync failed", { error: e && e.message ? e.message : String(e) });
       }
@@ -5635,11 +5688,11 @@ document.addEventListener("DOMContentLoaded", function() {
   }
   document.addEventListener("visibilitychange", function(){
     if (document.visibilityState === "visible") {
-      Promise.resolve(fbEspnSyncWorldFixtures(true)).then(function(){ return fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0); }).catch(function(){});
+      Promise.resolve(fbEspnSyncWorldFixtures(true)).then(function(){ const ls=document.getElementById('leagueSelect'); if(ls && ls.value && typeof fbEspnLoadFixtures === "function") return fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0); }).catch(function(){});
     }
   });
   window.addEventListener("pageshow", function(){
-    Promise.resolve(fbEspnSyncWorldFixtures(true)).then(function(){ return fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0); }).catch(function(){});
+    Promise.resolve(fbEspnSyncWorldFixtures(true)).then(function(){ const ls=document.getElementById('leagueSelect'); if(ls && ls.value && typeof fbEspnLoadFixtures === "function") return fbEspnLoadFixtures(typeof fbEspnFixtureOffset !== "undefined" ? fbEspnFixtureOffset : 0); }).catch(function(){});
   });
 });
 
