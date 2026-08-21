@@ -1,4 +1,3 @@
-M
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -480,6 +479,11 @@ M
   </div>
 </div>
 
+<div class="section" id="teamContextSection">
+    <h3>Team News, Injuries &amp; Squad Moves <span style="font-size:10px;color:#888;">(from ESPN — context only, not part of the math)</span></h3>
+    <div id="teamContextBody" style="font-size:12px;color:#888;">Run a fetch to populate this — filled in automatically alongside recent form.</div>
+  </div>
+
 <div class="section" id="marketSection">
     <h3>Market Lines</h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -492,25 +496,6 @@ M
     </div>
   </div>
 
-<div class="section" id="oddsSection">
-    <h3>Odds <span style="font-size:10px;color:#888;">(optional — enables Edge/EV grading instead of raw probability)</span></h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-      <div><label>1X2 — Home</label><input id="oddsHome" placeholder="e.g. 1.85" aria-label="1X2 home odds" /></div>
-      <div><label>1X2 — Draw</label><input id="oddsDraw" placeholder="e.g. 3.40" aria-label="1X2 draw odds" /></div>
-      <div><label>1X2 — Away</label><input id="oddsAway" placeholder="e.g. 4.20" aria-label="1X2 away odds" /></div>
-      <div><label>FT Over odds</label><input id="oddsOverFT" placeholder="e.g. 1.90" aria-label="Full-time over odds" /></div>
-      <div><label>FT Under odds</label><input id="oddsUnderFT" placeholder="e.g. 1.90" aria-label="Full-time under odds" /></div>
-      <div><label>BTTS — Yes odds</label><input id="oddsBttsYes" placeholder="e.g. 1.80" aria-label="BTTS yes odds" /></div>
-      <div><label>BTTS — No odds</label><input id="oddsBttsNo" placeholder="e.g. 1.95" aria-label="BTTS no odds" /></div>
-      <div><label>AH Home odds</label><input id="oddsHomeAH" placeholder="e.g. 1.90" aria-label="Asian handicap home odds" /></div>
-      <div><label>AH Away odds</label><input id="oddsAwayAH" placeholder="e.g. 1.90" aria-label="Asian handicap away odds" /></div>
-      <div><label>Team A Over odds</label><input id="oddsTeamAOver" placeholder="e.g. 1.90" aria-label="Team A total over odds" /></div>
-      <div><label>Team A Under odds</label><input id="oddsTeamAUnder" placeholder="e.g. 1.90" aria-label="Team A total under odds" /></div>
-      <div><label>Team B Over odds</label><input id="oddsTeamBOver" placeholder="e.g. 1.90" aria-label="Team B total over odds" /></div>
-      <div><label>Team B Under odds</label><input id="oddsTeamBUnder" placeholder="e.g. 1.90" aria-label="Team B total under odds" /></div>
-    </div>
-  </div>
-
 <div class="section" id="ancillarySection">
     <h3>Corners / Cards / Shots <span style="font-size:10px;color:#888;">(optional extra markets)</span></h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -518,20 +503,14 @@ M
       <div></div>
       <div><label>Team A avg corners</label><input id="aCorners" placeholder="e.g. 5.2" aria-label="Team A average corners" /></div>
       <div><label>Team B avg corners</label><input id="bCorners" placeholder="e.g. 4.6" aria-label="Team B average corners" /></div>
-      <div><label>Corners Over odds</label><input id="oddsCornersOver" placeholder="e.g. 1.90" aria-label="Corners over odds" /></div>
-      <div><label>Corners Under odds</label><input id="oddsCornersUnder" placeholder="e.g. 1.90" aria-label="Corners under odds" /></div>
       <div><label>Cards Line</label><input id="cardsLine" placeholder="e.g. 4.5" aria-label="Cards total line" /></div>
       <div></div>
       <div><label>Team A avg cards</label><input id="aCards" placeholder="e.g. 2.1" aria-label="Team A average cards" /></div>
       <div><label>Team B avg cards</label><input id="bCards" placeholder="e.g. 2.4" aria-label="Team B average cards" /></div>
-      <div><label>Cards Over odds</label><input id="oddsCardsOver" placeholder="e.g. 1.90" aria-label="Cards over odds" /></div>
-      <div><label>Cards Under odds</label><input id="oddsCardsUnder" placeholder="e.g. 1.90" aria-label="Cards under odds" /></div>
       <div><label>Shots Line</label><input id="shotsLine" placeholder="e.g. 23.5" aria-label="Shots total line" /></div>
       <div></div>
       <div><label>Team A avg shots</label><input id="aShotsMarket" placeholder="e.g. 12.5" aria-label="Team A average shots" /></div>
       <div><label>Team B avg shots</label><input id="bShotsMarket" placeholder="e.g. 10.5" aria-label="Team B average shots" /></div>
-      <div><label>Shots Over odds</label><input id="oddsShotsOver" placeholder="e.g. 1.90" aria-label="Shots over odds" /></div>
-      <div><label>Shots Under odds</label><input id="oddsShotsUnder" placeholder="e.g. 1.90" aria-label="Shots under odds" /></div>
     </div>
   </div>
   <div class="section" id="teamASection">
@@ -2142,6 +2121,95 @@ M
       const data=await fbEspnFetchJSON(FB_ESPN.SITE(slug)+"/summary?event="+encodeURIComponent(eventId));
       FB_ESPN.summaryCache.set(key,data); return data;
     }
+    // ---------- Team context: injuries, transfers, news ----------
+    // These are surfaced as read-only context for you to weigh yourself —
+    // NOT mixed into the Poisson/Dixon-Coles projection math. There's no
+    // trustworthy, calibrated number for "how many expected goals does
+    // losing this specific player cost," so guessing one and quietly baking
+    // it into the projection would just be a confident-looking guess wearing
+    // a statistical costume. Better to show you the real signal and let you
+    // apply judgment, same as anyone who actually follows the sport does.
+    async function fbEspnFetchTeamInjuries(slug, teamId) {
+      try {
+        const data = await fbEspnFetchJSON(FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/injuries", 12000);
+        const list = Array.isArray(data?.injuries) ? data.injuries : (Array.isArray(data?.items) ? data.items : []);
+        return list.map(function(inj) {
+          const athlete = inj?.athlete || inj;
+          return {
+            name: athlete?.displayName || athlete?.shortName || "Unknown player",
+            position: athlete?.position?.abbreviation || "",
+            status: inj?.status?.type?.description || inj?.status || inj?.type?.description || "Unknown",
+            detail: inj?.details?.type || inj?.longComment || inj?.shortComment || ""
+          };
+        }).filter(function(x){ return x.name && x.name !== "Unknown player"; }).slice(0, 15);
+      } catch (e) {
+        engineDebug("Team injuries fetch unavailable", { league: slug, teamId, error: e?.message || String(e) });
+        return [];
+      }
+    }
+    async function fbEspnFetchTeamTransactions(slug, teamId) {
+      try {
+        const data = await fbEspnFetchJSON(FB_ESPN.SITE(slug) + "/teams/" + encodeURIComponent(teamId) + "/transactions", 12000);
+        const list = Array.isArray(data?.transactions) ? data.transactions : (Array.isArray(data?.items) ? data.items : []);
+        return list.map(function(t) {
+          return { date: t?.date || "", text: t?.description || t?.text || "" };
+        }).filter(function(x){ return x.text; }).slice(0, 10);
+      } catch (e) {
+        engineDebug("Team transactions fetch unavailable", { league: slug, teamId, error: e?.message || String(e) });
+        return [];
+      }
+    }
+    async function fbEspnFetchRelevantNews(slug, teamAName, teamBName) {
+      try {
+        const data = await fbEspnFetchJSON(FB_ESPN.SITE(slug) + "/news?limit=50", 12000);
+        const list = Array.isArray(data?.articles) ? data.articles : [];
+        const a = (teamAName || "").toLowerCase(), b = (teamBName || "").toLowerCase();
+        const hit = function(h) {
+          const t = (h || "").toLowerCase();
+          return (a && t.indexOf(a) !== -1) || (b && t.indexOf(b) !== -1);
+        };
+        return list.filter(function(art) {
+          return hit(art?.headline) || hit(art?.description);
+        }).map(function(art) {
+          return { headline: art?.headline || "", published: art?.published || "", link: art?.links?.web?.href || "" };
+        }).slice(0, 8);
+      } catch (e) {
+        engineDebug("League news fetch unavailable", { league: slug, error: e?.message || String(e) });
+        return [];
+      }
+    }
+    async function fbEspnFetchTeamFullContext(slug, teamId, teamName, otherTeamName) {
+      const [injuries, transactions, news] = await Promise.all([
+        fbEspnFetchTeamInjuries(slug, teamId),
+        fbEspnFetchTeamTransactions(slug, teamId),
+        fbEspnFetchRelevantNews(slug, teamName, otherTeamName)
+      ]);
+      return { injuries, transactions, news };
+    }
+    function fbEspnRenderTeamContext(nameA, nameB, contextA, contextB) {
+      const el = document.getElementById("teamContextBody");
+      if (!el) return;
+      function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
+      function col(name, ctx) {
+        const inj = (ctx?.injuries || []);
+        const tx = (ctx?.transactions || []);
+        const nw = (ctx?.news || []);
+        let h = '<div style="flex:1;min-width:0;">';
+        h += '<div style="font-weight:700;margin-bottom:4px;">' + esc(name) + '</div>';
+        h += '<div style="font-size:11px;color:#aaa;margin-bottom:2px;">🩹 Injuries / unavailable (' + inj.length + ')</div>';
+        h += inj.length ? inj.map(function(i){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + esc(i.name) + (i.position?' ('+esc(i.position)+')':'') + ' — ' + esc(i.status) + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">None reported by ESPN right now.</div>';
+        h += '<div style="font-size:11px;color:#aaa;margin:6px 0 2px;">🔁 Recent squad moves (' + tx.length + ')</div>';
+        h += tx.length ? tx.map(function(t){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + esc(t.text) + (t.date?' <span style="color:#777;">('+esc(t.date)+')</span>':'') + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">No recent transactions on ESPN.</div>';
+        h += '<div style="font-size:11px;color:#aaa;margin:6px 0 2px;">📰 Related news (' + nw.length + ')</div>';
+        h += nw.length ? nw.map(function(a){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + (a.link ? '<a href="'+esc(a.link)+'" target="_blank" rel="noopener" style="color:#8ab4f8;">'+esc(a.headline)+'</a>' : esc(a.headline)) + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">Nothing specific in ESPN\'s latest headlines.</div>';
+        h += '</div>';
+        return h;
+      }
+      el.innerHTML = '<div style="display:flex;gap:14px;flex-wrap:wrap;">' + col(nameA, contextA) + col(nameB, contextB) + '</div>' +
+        '<div style="font-size:10px;color:#777;margin-top:8px;">This panel is informational only — it is not mixed into the projection math. Read it and weigh it yourself; ESPN doesn\'t reliably expose things like tactical setup, exact starting XI until close to kickoff, or "why" a manager was changed.</div>';
+      const section = document.getElementById("teamContextSection");
+      if (section) section.classList.remove("collapsed");
+    }
     function fbEspnExtractAdvanced(summary, teamId) {
       const out={xg:null,xga:null,shots:null,sot:null,big:null};
       const box=summary?.boxscore; const teams=Array.isArray(box?.teams)?box.teams:[];
@@ -2452,10 +2520,13 @@ M
         }
 
         setSt("⏳ Fetching recent form + H2H for " + teamA.name + " vs " + teamB.name + "…", "info");
-        const [dataA, dataB] = await Promise.all([
+        const [dataA, dataB, contextA, contextB] = await Promise.all([
           fbEspnBuildTeamData(slug, teamA, fixtureDate),
-          fbEspnBuildTeamData(slug, teamB, fixtureDate)
+          fbEspnBuildTeamData(slug, teamB, fixtureDate),
+          fbEspnFetchTeamFullContext(slug, teamA.id, teamA.name, teamB.name),
+          fbEspnFetchTeamFullContext(slug, teamB.id, teamB.name, teamA.name)
         ]);
+        fbEspnRenderTeamContext(teamA.name, teamB.name, contextA, contextB);
 
         fbEspnFillFormFromTeamData("A", dataA);
         fbEspnFillFormFromTeamData("B", dataB);
@@ -4050,11 +4121,12 @@ M
     function clearAll(){
       try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
       ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','a1HScored','a1HAllowed','b1HScored','b1HAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','a1HH2H','b1HH2H','ftMarket','h1Market','h2Market','fixtureKickoff',
-       'ahLine','teamATotalLine','teamBTotalLine','oddsHome','oddsDraw','oddsAway','oddsOverFT','oddsUnderFT','oddsBttsYes','oddsBttsNo','oddsHomeAH','oddsAwayAH','oddsTeamAOver','oddsTeamAUnder','oddsTeamBOver','oddsTeamBUnder',
-       'cornersLine','aCorners','bCorners','oddsCornersOver','oddsCornersUnder','cardsLine','aCards','bCards','oddsCardsOver','oddsCardsUnder','shotsLine','aShotsMarket','bShotsMarket','oddsShotsOver','oddsShotsUnder'
+       'ahLine','teamATotalLine','teamBTotalLine',
+       'cornersLine','aCorners','bCorners','cardsLine','aCards','bCards','shotsLine','aShotsMarket','bShotsMarket'
       ].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
       ['useFTH2H','use1HH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
       const r=document.getElementById('results');if(r){r.style.display='none';r.innerHTML='<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>';}
+      const tc=document.getElementById('teamContextBody');if(tc)tc.innerHTML='Run a fetch to populate this — filled in automatically alongside recent form.';
       window.__fbAutoData={context:{},A:{},B:{},market:{},h2h:[],source:'none',coverage:null};
       try { if (typeof selectedTeamIds !== 'undefined') selectedTeamIds={A:null,B:null}; } catch(_e) {}
       try { if (typeof g_lastFetchedTeams !== 'undefined') g_lastFetchedTeams={A:'',B:''}; } catch(_e) {}
