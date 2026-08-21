@@ -1,3 +1,4 @@
+D
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -545,7 +546,7 @@
       <input id="aFTH2H" placeholder="Team A full-time goals vs B" aria-label="Team A full-time goals scored in head-to-head meetings vs Team B" />
       <input id="bFTH2H" placeholder="Team B full-time goals vs A" aria-label="Team B full-time goals scored in head-to-head meetings vs Team A" />
     </div>
-    <div id="h2h1HSection" style="display:none;margin-top:6px;">
+    <div id="h2h1HSection" style="margin-top:6px;">
       <label><input type="checkbox" id="use1HH2H" aria-label="Use 1H H2H (min 2 games)" /> Use 1H H2H (min 2 games)</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
         <input id="a1HH2H" placeholder="Team A 1st-half goals vs B" aria-label="Team A 1st-half goals scored in head-to-head meetings vs Team B" />
@@ -560,6 +561,7 @@
   <button id="auditCopyBtn" type="button" title="Copy Audit" style="background: #d4af37 !important; color: #111 !important; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.35) !important; font-weight: 700 !important; border: none !important; padding: 5px 14px !important; font-size: 12px !important; cursor: pointer !important; width: auto !important; min-width: 0 !important;">📋</button>
   <button id="inputsCopyBtn" type="button" title="Copy Inputs &amp; Market Lines" style="background: #d4af37 !important; color: #111 !important; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.35) !important; font-weight: 700 !important; border: none !important; padding: 5px 14px !important; font-size: 12px !important; cursor: pointer !important; width: auto !important; min-width: 0 !important;">🗒️</button>
 </div>
+<div id="buildTag" style="text-align:center;font-size:10px;color:#999;margin:10px 0 4px;">&nbsp;</div>
 <div class="table-wrap">
   <table id="results" style="display:none;">
     <tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>
@@ -864,11 +866,20 @@
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "football_engine_v2_tier12_patch1";
+    const APP_BUILD_VERSION = "football_engine_v4_bb_exact_ui_flow_autofetch_fix";
     const ENGINE_MODEL_VERSION = "football_v2_core";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
     window.__APP_BUILD_VERSION = APP_BUILD_VERSION;
+    // Visible on-page build tag (mirrors the BUILD_MARKER html comment at the
+    // top of this file) — lets you confirm on a phone, with no dev tools,
+    // whether the site you're looking at is actually running this build or
+    // a stale cached copy. If this text doesn't match the file you deployed,
+    // hard-refresh / clear the site data / re-add the home-screen icon.
+    document.addEventListener("DOMContentLoaded", function() {
+      const tag = document.getElementById("buildTag");
+      if (tag) tag.textContent = "Build: " + APP_BUILD_VERSION;
+    });
 
     // ---------- Utility functions ----------
     // Drift error storage
@@ -1614,6 +1625,26 @@
       for(const [requestUrl,label] of attempts){try{const data=await one(requestUrl,label);FB_ESPN.requestCache.set(cacheKey,{data,ts:Date.now()});return data;}catch(e){last=e;engineDebug(label+" failed",{url,error:e?.message||String(e)});}}
       throw last||new Error("ESPN fetch failed");
     }
+    // Runs `fn` over `items` with at most `limit` requests in flight at once,
+    // instead of one giant Promise.all(). Used for the per-game summary
+    // fetches (1H goals, xG, H2H 1H splits): firing 10-20+ of these at full
+    // parallel is what used to trip the free CORS-proxy fallbacks and break
+    // the whole auto-fetch. Small batches get the same total data without
+    // the burst.
+    async function fbEspnMapLimit(items, limit, fn) {
+      const out = new Array(items.length);
+      let next = 0;
+      async function worker() {
+        while (next < items.length) {
+          const i = next++;
+          try { out[i] = await fn(items[i], i); }
+          catch (e) { out[i] = null; }
+        }
+      }
+      const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker);
+      await Promise.all(workers);
+      return out;
+    }
     function fbEspnSetStatus(text, kind = "info") {
       const el = document.getElementById("fetchStatus");
       if (!el) return;
@@ -2125,13 +2156,13 @@
       // Advanced stats (xG/shots) AND 1st-half goals both live in ESPN's
       // per-event summary/boxscore payload, so fetch it once per recent game
       // and derive both from that single fetch — no extra requests needed.
-      // Capped at 5 (not the full 10-game window): each of these is a real
-      // network request with a multi-step CORS-proxy fallback chain, and
-      // firing 10 per team (20 total, plus H2H) in parallel is enough to
-      // trip ESPN's rate limiting / exhaust the free proxy fallbacks, which
-      // breaks the whole auto-fetch rather than just thinning the 1H sample.
-      const advRefs=chosen.slice(0,5);
-      const summaries=await Promise.all(advRefs.map(e=>fbEspnFetchSummary(slug,e.id).catch(()=>null)));
+      // Full 10-game window (matches "Last 10 Overall" FT), fetched in small
+      // concurrency-limited batches (fbEspnMapLimit) rather than one big
+      // Promise.all — that burst-of-10-at-once pattern is what used to trip
+      // the free CORS-proxy fallbacks and break the whole auto-fetch. Batching
+      // gets the full 10-game 1H sample without the rate-limit risk.
+      const advRefs=chosen.slice(0,10);
+      const summaries=await fbEspnMapLimit(advRefs, 4, e=>fbEspnFetchSummary(slug,e.id).catch(()=>null));
       const advs=summaries.map(s=>s?fbEspnExtractAdvanced(s,team.id):null);
       const finiteAvg=k=>{const vals=advs.map(x=>x&&x[k]).filter(Number.isFinite);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;};
       const advanced={xg:finiteAvg("xg"),xga:finiteAvg("xga"),shots:finiteAvg("shots"),sot:finiteAvg("sot"),big:finiteAvg("big")};
@@ -2247,7 +2278,27 @@
       }
     }
 
-    function fbEspnFillH2H(h2h, idA) {
+    // H2H meetings come from schedule/season listings (fbEspnFindH2HDeep),
+    // which — same as team recent-form — generally don't carry linescores,
+    // so 1st-half H2H needs its own per-game summary fetch, same as the
+    // team-level 1H sample above. Batched for the same rate-limit reason.
+    async function fbEspnFetchH2H1H(slug, h2h, idA) {
+      const summaries = await fbEspnMapLimit(h2h, 4, e => fbEspnFetchSummary(slug, e.id).catch(() => null));
+      const aH1 = [], bH1 = [];
+      h2h.forEach(function(e, i) {
+        const s = summaries[i];
+        if (!s) return;
+        // idA is team A's actual ESPN team id, which is stable across every
+        // historical meeting regardless of which side was home in that game —
+        // fbEspnHalfGoalsFromSummary matches on that id, not on home/away.
+        const half = fbEspnHalfGoalsFromSummary(s, idA);
+        if (!half) return;
+        aH1.push(half.my);
+        bH1.push(half.opp);
+      });
+      return { aH1, bH1 };
+    }
+    function fbEspnFillH2H(h2h, idA, h2h1) {
       if (!h2h || !h2h.length) return false;
       const aFT = [], bFT = [];
       h2h.forEach(function(e) {
@@ -2267,6 +2318,16 @@
       if (tag) tag.style.display = "inline";
       const sec = document.getElementById("h2hSection");
       if (sec) sec.classList.remove("collapsed");
+      // 1st-half H2H — separate sample, filled only when the per-game summary
+      // fetch actually resolved enough games (min 2, same floor as FT H2H).
+      const aH1 = (h2h1 && h2h1.aH1) || [];
+      const bH1 = (h2h1 && h2h1.bH1) || [];
+      if (aH1.length >= 2 && bH1.length >= 2) {
+        set("a1HH2H", aH1.join(","));
+        set("b1HH2H", bH1.join(","));
+        const cb1 = document.getElementById("use1HH2H");
+        if (cb1) cb1.checked = true;
+      }
       return true;
     }
 
@@ -2358,7 +2419,12 @@
         // Deep search is authoritative; if a transient historical request failed,
         // retain the already-fetched recent meetings instead of dropping H2H entirely.
         if (!h2h.length && h2hRecent.length) h2h = h2hRecent;
-        const h2hOk = fbEspnFillH2H(h2h, String(teamA.id));
+        let h2h1 = { aH1: [], bH1: [] };
+        if (h2h.length >= 2) {
+          setSt("⏳ Loading 1st-half splits for " + h2h.length + " H2H meeting(s)…", "info");
+          h2h1 = await fbEspnFetchH2H1H(slug, h2h, String(teamA.id));
+        }
+        const h2hOk = fbEspnFillH2H(h2h, String(teamA.id), h2h1);
 
         // Market odds from selected fixture if present
         if (fixture && fixture.odds) {
@@ -2371,11 +2437,13 @@
           A: dataA,
           B: dataB,
           h2h: h2h,
+          h2h1: h2h1,
           market: {},
           coverage: {
             aFT: (dataA.scored || []).length,
             bFT: (dataB.scored || []).length,
             h2h: h2h.length,
+            h2h1H: (h2h1.aH1 || []).length,
             a1H: (dataA.h1Scored || []).length,
             b1H: (dataB.h1Scored || []).length
           }
@@ -2385,6 +2453,7 @@
           "✅ ESPN auto-fetch OK — A: " + (dataA.scored || []).length + " FT, " +
           (dataA.h1Scored || []).length + " 1H · B: " + (dataB.scored || []).length + " FT, " +
           (dataB.h1Scored || []).length + " 1H · H2H: " + h2h.length +
+          " (" + (h2h1.aH1 || []).length + " w/ 1H split) " +
           (h2hOk ? " (filled)" : " (none found)");
         setSt(msg, "ok");
         if (typeof engineDebug === "function") {
