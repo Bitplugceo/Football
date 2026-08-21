@@ -1,3 +1,4 @@
+M
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -496,23 +497,6 @@
     </div>
   </div>
 
-<div class="section" id="ancillarySection">
-    <h3>Corners / Cards / Shots <span style="font-size:10px;color:#888;">(optional extra markets)</span></h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-      <div><label>Corners Line</label><input id="cornersLine" placeholder="e.g. 9.5" aria-label="Corners total line" /></div>
-      <div></div>
-      <div><label>Team A avg corners</label><input id="aCorners" placeholder="e.g. 5.2" aria-label="Team A average corners" /></div>
-      <div><label>Team B avg corners</label><input id="bCorners" placeholder="e.g. 4.6" aria-label="Team B average corners" /></div>
-      <div><label>Cards Line</label><input id="cardsLine" placeholder="e.g. 4.5" aria-label="Cards total line" /></div>
-      <div></div>
-      <div><label>Team A avg cards</label><input id="aCards" placeholder="e.g. 2.1" aria-label="Team A average cards" /></div>
-      <div><label>Team B avg cards</label><input id="bCards" placeholder="e.g. 2.4" aria-label="Team B average cards" /></div>
-      <div><label>Shots Line</label><input id="shotsLine" placeholder="e.g. 23.5" aria-label="Shots total line" /></div>
-      <div></div>
-      <div><label>Team A avg shots</label><input id="aShotsMarket" placeholder="e.g. 12.5" aria-label="Team A average shots" /></div>
-      <div><label>Team B avg shots</label><input id="bShotsMarket" placeholder="e.g. 10.5" aria-label="Team B average shots" /></div>
-    </div>
-  </div>
   <div class="section" id="teamASection">
     <h3>Team A - Last 10 Overall <span class="autofill-indicator" id="aAutoTag">✅ Auto-filled</span></h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
@@ -894,7 +878,7 @@
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "football_engine_v5_core_v2_restored";
+    const APP_BUILD_VERSION = "football_engine_v6_fetch_threshold_fix";
     const ENGINE_MODEL_VERSION = "football_v2_core";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
@@ -2074,7 +2058,18 @@
       } catch (e) {
         scheduleError = e;
       }
-      if (!events.length) {
+      // Count only what's actually *usable* (finished, real score, right
+      // competition) before deciding whether the primary call was good enough —
+      // NOT the raw event count. Previously this only ran the scoreboard-window
+      // fallback when the primary call returned zero events, which meant a team
+      // whose /schedule call returned a couple of events (mostly future
+      // fixtures, e.g. right at a season start) got stuck with almost no real
+      // history, while a team whose primary call failed outright (0 events)
+      // paradoxically got the *richer* fallback data. Now the fallback always
+      // runs when the primary call didn't clear a real threshold, and results
+      // from both sources are merged (deduped below by event id either way).
+      const usableFromPrimary = events.filter(e => fbEspnIsUsableLeagueMatch(e, slug) && e.finished && Number.isFinite(e.homeScore) && Number.isFinite(e.awayScore)).length;
+      if (usableFromPrimary < 8) {
         // Some competitions do not expose /teams/{id}/schedule, and even when
         // they do, it only covers the *current* season — empty right at a
         // season's start (e.g. matchday 1, before this team has a played
@@ -2106,7 +2101,7 @@
         // boundary, 0 events from /schedule, recovered fine via scoreboard
         // windows). A genuine fetch failure still logs as ERROR below, since
         // scheduleError.message keeps whatever wording the real error has.
-        engineDebug("ESPN team-schedule scoreboard fallback used", {league:slug,teamId,events:events.length,windows:windows.length,note:scheduleError?("primary schedule request threw: "+(scheduleError.message||String(scheduleError))):("schedule endpoint returned 0 events (normal at a season boundary) — recovered "+events.length+" via scoreboard windows")});
+        engineDebug("ESPN team-schedule scoreboard fallback used", {league:slug,teamId,events:events.length,windows:windows.length,note:scheduleError?("primary schedule request threw: "+(scheduleError.message||String(scheduleError))):("primary schedule call returned only "+usableFromPrimary+" usable game(s) (normal at a season boundary) — merged in "+events.length+" total via scoreboard windows")});
       }
       const unique=[]; const seen=new Set();
       events.forEach(e=>{
@@ -3998,11 +3993,10 @@
       const topScores=[];for(let hh=0;hh<=5;hh++)for(let aa=0;aa<=5;aa++)topScores.push({h:hh,a:aa,p:ftM[hh][aa]});topScores.sort((u,v)=>v.p-u.p);topScores.slice(0,5).forEach(sc=>{ const p=fb2_calibrateBinary("correct_score",sc.p).p; rows.push({marketKey:"correct_"+sc.h+"_"+sc.a,name:"Correct Score "+sc.h+"-"+sc.a,prob:p,rawProb:sc.p,odds:null,ev:null,line:null,projection:p,grade:fb2_grade(p,null,sample,integrity),pick:"NO PLAY",side:sc.h+"-"+sc.a,integrity}); });
       const ah=parseMarketLine(fb2_text("ahLine"));if(Number.isFinite(ah)){const ha=fb2_asianHandicap(ftM,ah,true),aa=fb2_asianHandicap(ftM,-ah,false);add("ah_home","Asian Handicap Home "+displayLine(ah),ha.win,"AH HOME "+displayLine(ah),odds.homeAH,ah,null);add("ah_away","Asian Handicap Away "+displayLine(-ah),aa.win,"AH AWAY "+displayLine(-ah),odds.awayAH,-ah,null);}
       const ta=parseMarketLine(fb2_text("teamATotalLine")),tb=parseMarketLine(fb2_text("teamBTotalLine"));if(Number.isFinite(ta)){const p=fb2_fromMatrix(ftM,(h)=>h>ta),u=fb2_fromMatrix(ftM,(h)=>h<ta);add("teamA_over","Team A Over "+displayLine(ta),p,"TEAM A OVER "+displayLine(ta),odds.aOver,ta,lambdas.home);add("teamA_under","Team A Under "+displayLine(ta),u,"TEAM A UNDER "+displayLine(ta),odds.aUnder,ta,lambdas.home);}if(Number.isFinite(tb)){const p=fb2_fromMatrix(ftM,(h,a)=>a>tb),u=fb2_fromMatrix(ftM,(h,a)=>a<tb);add("teamB_over","Team B Over "+displayLine(tb),p,"TEAM B OVER "+displayLine(tb),odds.bOver,tb,lambdas.away);add("teamB_under","Team B Under "+displayLine(tb),u,"TEAM B UNDER "+displayLine(tb),odds.bUnder,tb,lambdas.away);}
-      const ancillary=[{prefix:"corners",a:fb2_num("aCorners",null),b:fb2_num("bCorners",null),line:parseMarketLine(fb2_text("cornersLine")),odds:fb2_parseOdds("oddsCornersOver"),underOdds:fb2_parseOdds("oddsCornersUnder"),label:"Corners",dispersion:1.10},{prefix:"cards",a:fb2_num("aCards",null),b:fb2_num("bCards",null),line:parseMarketLine(fb2_text("cardsLine")),odds:fb2_parseOdds("oddsCardsOver"),underOdds:fb2_parseOdds("oddsCardsUnder"),label:"Cards",dispersion:1.20},{prefix:"shots",a:fb2_num("aShotsMarket",null),b:fb2_num("bShotsMarket",null),line:parseMarketLine(fb2_text("shotsLine")),odds:fb2_parseOdds("oddsShotsOver"),underOdds:fb2_parseOdds("oddsShotsUnder"),label:"Shots",dispersion:1.35}];
-      // Same fix as the main add() helper: route both legs through
-      // fb2_marketPick so a missing odds field falls back to the pure
-      // model-probability gate instead of hard-defaulting to "NO PLAY".
-      ancillary.forEach(z=>{if(Number.isFinite(z.a)&&Number.isFinite(z.b)&&Number.isFinite(z.line)){const mean=z.a+z.b,p=fb2_countOver(mean,z.line,z.dispersion);if(p==null)return;const pu=fb2_countUnder(mean,z.line,z.dispersion);if(pu==null)return;const ev=fb2_ev(p,z.odds),g=fb2_grade(p,ev,sample,integrity);rows.push({marketKey:z.prefix+"_over",name:z.label+" Over "+displayLine(z.line),prob:p,rawProb:p,odds:z.odds,ev,line:z.line,projection:mean,grade:g,pick:fb2_marketPick(p,"OVER "+displayLine(z.line),z.odds,sample,integrity,0.025).pick,side:"OVER "+displayLine(z.line),integrity});const evU=fb2_ev(pu,z.underOdds),gU=fb2_grade(pu,evU,sample,integrity);rows.push({marketKey:z.prefix+"_under",name:z.label+" Under "+displayLine(z.line),prob:pu,rawProb:pu,odds:z.underOdds,ev:evU,line:z.line,projection:mean,grade:gU,pick:fb2_marketPick(pu,"UNDER "+displayLine(z.line),z.underOdds,sample,integrity,0.025).pick,side:"UNDER "+displayLine(z.line),integrity});}});
+      // Corners/Cards/Shots ancillary markets removed — they never had a real
+      // settlement path (ESPN's match summary isn't fetched for final corner/
+      // card/shot counts, only pre-match averages the user typed in), so they
+      // could generate a pick but could never actually resolve win/loss.
       return rows;
     }
     function fb2_renderRows(rows,ctx,lambdas,integrity){
@@ -4121,8 +4115,7 @@
     function clearAll(){
       try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
       ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','a1HScored','a1HAllowed','b1HScored','b1HAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','a1HH2H','b1HH2H','ftMarket','h1Market','h2Market','fixtureKickoff',
-       'ahLine','teamATotalLine','teamBTotalLine',
-       'cornersLine','aCorners','bCorners','cardsLine','aCards','bCards','shotsLine','aShotsMarket','bShotsMarket'
+       'ahLine','teamATotalLine','teamBTotalLine'
       ].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
       ['useFTH2H','use1HH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
       const r=document.getElementById('results');if(r){r.style.display='none';r.innerHTML='<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>';}
