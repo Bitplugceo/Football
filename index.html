@@ -475,14 +475,8 @@
     <button type="button" class="fetch-btn" id="fbEspnAutoFetchBtn">📡 Fetch Stats</button>
   </div>
   <div id="fetchStatus" style="font-size:10px;min-height:16px;color:var(--muted);"></div>
-    <div class="inj-body" id="fbInjuryContentB"></div>
-  </div>
+    </div>
 </div>
-
-<div class="section" id="teamContextSection">
-    <h3>Team News, Injuries &amp; Squad Moves <span style="font-size:10px;color:#888;">(from ESPN — context only, not part of the math)</span></h3>
-    <div id="teamContextBody" style="font-size:12px;color:#888;">Run a fetch to populate this — filled in automatically alongside recent form.</div>
-  </div>
 
 <div class="section" id="marketSection">
     <h3>Market Lines</h3>
@@ -581,14 +575,10 @@
 <div id="trackerModal" class="tracker-modal" aria-hidden="true">
   <div class="tracker-panel">
     <div class="tracker-head">
-      <span id="trackerHeadTitle">Tracked Picks</span>
+      <span id="trackerHeadTitle" style="cursor:pointer;" title="Tap to switch Tracked Picks / Engine Report">Tracked Picks</span>
       <span id="trackerStatusLabel" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;pointer-events:none;white-space:nowrap;"></span>
       <div class="tracker-head-actions">
-        <button type="button" id="trackerCopyDataBtn" class="tracker-insights-btn" title="Copy tracker data to clipboard" onclick="window.copyTrackerData()">📑</button>
-        <span class="engine-battery" id="engineHealthBatteryWrap" title="Rolling engine performance">
-          <span class="engine-battery-shell"><span class="engine-battery-fill" id="enginePerfFill" style="width:0%;"></span></span>
-          <span class="engine-battery-pct" id="enginePerfPct">—</span>
-        </span>
+        <button type="button" id="trackerReportBtn" class="tracker-insights-btn" title="Engine Report" style="font-size:16px;">📊</button>
         <button type="button" id="trackerCloseBtn" class="tracker-close">✕</button>
       </div>
     </div>
@@ -2192,42 +2182,12 @@
       return { transactions, news };
     }
     function fbEspnRenderTeamContext(nameA, nameB, contextA, contextB, injuryMetaA, injuryMetaB) {
+      // UI removed: injuries still flow into projection via dataA/B.injury → fb2_modifier.
+      // Squad moves / headlines are not used for totals (direction unknown from lists alone).
       const el = document.getElementById("teamContextBody");
-      if (!el) return;
-      function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
-      function col(name, ctx, inj) {
-        const notes = (inj?.notes || []);
-        const tx = (ctx?.transactions || []);
-        const nw = (ctx?.news || []);
-        const churn = fbEspnComputeSquadChurn(tx, nw);
-        let h = '<div style="flex:1;min-width:0;">';
-        h += '<div style="font-weight:700;margin-bottom:4px;">' + esc(name) + '</div>';
-        h += '<div style="font-size:11px;color:#aaa;margin-bottom:2px;">🩹 Injuries / unavailable (' + notes.length + ') — factored into the projection</div>';
-        h += notes.length ? notes.map(function(n){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + esc(n) + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">None reported by ESPN right now.</div>';
-        if (inj && inj.impact) h += '<div style="font-size:11px;color:#c96;margin-top:2px;">Applied as a ' + Math.round(Math.abs(inj.impact)) + '% attack-strength reduction (capped, conservative).</div>';
-        h += '<div style="font-size:11px;color:#aaa;margin:6px 0 2px;">🔁 Recent squad moves (' + tx.length + ')</div>';
-        h += tx.length ? tx.map(function(t){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + esc(t.text) + (t.date?' <span style="color:#777;">('+esc(t.date)+')</span>':'') + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">No recent transactions on ESPN.</div>';
-        h += '<div style="font-size:11px;color:#aaa;margin:6px 0 2px;">📰 Related news (' + nw.length + ')</div>';
-        h += nw.length ? nw.map(function(a){ return '<div style="font-size:12px;margin-bottom:2px;">• ' + (a.link ? '<a href="'+esc(a.link)+'" target="_blank" rel="noopener" style="color:#8ab4f8;">'+esc(a.headline)+'</a>' : esc(a.headline)) + '</div>'; }).join('') : '<div style="font-size:12px;color:#777;">Nothing specific in ESPN\'s latest headlines.</div>';
-        if (churn.churn) h += '<div style="font-size:11px;color:#c96;margin-top:4px;">⚠️ Squad-churn signal: ' + esc(churn.reasons.join('; ')) + ' — confidence grade capped this run, projection itself unchanged.</div>';
-        h += '</div>';
-        return h;
-      }
-      el.innerHTML = '<div style="display:flex;gap:14px;flex-wrap:wrap;">' + col(nameA, contextA, injuryMetaA) + col(nameB, contextB, injuryMetaB) + '</div>' +
-        '<div style="font-size:10px;color:#777;margin-top:8px;">Injuries feed the projection directly (capped, conservative). Squad moves / manager-change news only widen or narrow confidence — never the projection itself, since direction can\'t be known from a transaction list. ESPN doesn\'t reliably expose tactical setup or the exact starting XI until close to kickoff.</div>';
+      if (el) el.innerHTML = "";
       const section = document.getElementById("teamContextSection");
-      if (section) section.classList.remove("collapsed");
-    }
-    function fbEspnExtractAdvanced(summary, teamId) {
-      const out={xg:null,xga:null,shots:null,sot:null,big:null};
-      const box=summary?.boxscore; const teams=Array.isArray(box?.teams)?box.teams:[];
-      const mine=teams.find(t=>String(t?.team?.id||t?.id||"")===String(teamId));
-      const opp=teams.find(t=>String(t?.team?.id||t?.id||"")!==String(teamId));
-      const mapStats=(entry)=>{const m={};(entry?.statistics||[]).forEach(st=>{const name=fbEspnNormalizeName(st?.name||st?.label||st?.abbreviation||"");const val=Number(st?.value??st?.displayValue);if(Number.isFinite(val))m[name]=val;});return m;};
-      const m=mapStats(mine),o=mapStats(opp);
-      const pick=(m,keys)=>{for(const k of keys){if(Number.isFinite(m[k]))return m[k];}return null;};
-      out.xg=pick(m,["expectedgoals","xg"]);out.xga=pick(o,["expectedgoals","xg"]);out.shots=pick(m,["shots","totalshots"]);out.sot=pick(m,["shotsontarget","shotsontargets","sot"]);out.big=pick(m,["bigchances","bigchancescreated"]);
-      return out;
+      if (section) section.style.display = "none";
     }
     async function fbEspnFetchInjuryMeta(slug, teamId) {
       const result={outCount:0,dtdCount:0,impact:0,notes:[],available:false};
@@ -4296,59 +4256,121 @@
     var __fbTrackerView='picks';
     function isTrackerReportView(){return __fbTrackerView==='report';}
     function setTrackerModalView(view){
-      __fbTrackerView=view==='report'?'report':'picks';
-      const panel=document.getElementById('trackerAnalyticsPanel'), wrap=document.getElementById('trackedPicksTable');
-      if(panel) panel.style.display=__fbTrackerView==='report'?'block':'none';
-      if(wrap) wrap.style.display=__fbTrackerView==='report'?'none':'table';
-      const title=document.getElementById('trackerHeadTitle'); if(title) title.textContent=__fbTrackerView==='report'?'Football Engine Report':'Tracked Picks';
-      if(__fbTrackerView==='report' && panel){
-        const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])];
-        const settledList=all.filter(p=>["win","loss","push"].includes(String(p.resultStatus||"").toLowerCase()));
-        const wins=settledList.filter(p=>p.resultStatus==="win").length;
-        const losses=settledList.filter(p=>p.resultStatus==="loss").length;
-        const pushes=settledList.filter(p=>p.resultStatus==="push").length;
-        const settledN=settledList.length;
-        const wr=settledN?(wins/settledN*100):null;
-        const activeCount=(g_trackerState.activePicks||[]).length;
-        const trackerMin=50;
-        const checkpointStatus=settledN>=trackerMin?"Review ready":"Building";
-        const byMarket={};
-        settledList.forEach(p=>{
-          const k=p.marketName||p.marketKey||"other";
-          byMarket[k]=byMarket[k]||{w:0,l:0};
-          if(p.resultStatus==="win")byMarket[k].w++; else if(p.resultStatus==="loss")byMarket[k].l++;
-        });
-        let bestMarket=null,bestRate=-1;
-        Object.keys(byMarket).forEach(k=>{
-          const d=byMarket[k]; const n=d.w+d.l; if(n>=3){const r=d.w/n; if(r>bestRate){bestRate=r;bestMarket={name:k,w:d.w,l:d.l,r:r};}}
-        });
-        const reviewRows=[];
-        if(bestMarket){
-          reviewRows.push({area:"Best market",status:"CONFIRMED STRENGTH",decision:"KEEP",review:bestMarket.name+" is leading at "+(bestMarket.r*100).toFixed(1)+"% with "+bestMarket.w+" wins and "+bestMarket.l+" losses.",action:"Keep this market logic as it is. Do not weaken it from one bad day."});
-        }
-        if(settledN<trackerMin){
-          reviewRows.push({area:"Checkpoint",status:"WATCHING",decision:"COLLECT MORE",review:settledN+"/"+trackerMin+" settled picks collected so far.",action:(trackerMin-settledN)+" more settled picks are needed before the tracker can give a full review."});
-        } else {
-          reviewRows.push({area:"Overall",status:"WATCHING",decision:"KEEP",review:"Win rate "+(wr!=null?wr.toFixed(1)+"%":"—")+" across "+settledN+" settled.",action:"Continue collecting evidence. Do not force global edits from short samples."});
-        }
-        const reviewHtml=reviewRows.map(row=>'<div class="tracker-review-row"><div class="tracker-review-top"><div class="tracker-review-area">'+fbTrackerEsc(row.area)+'</div><div class="tracker-review-status">'+fbTrackerEsc(row.status)+'</div></div><div class="tracker-review-text"><strong>'+fbTrackerEsc(row.decision)+'</strong> — '+fbTrackerEsc(row.review)+'</div><div class="tracker-review-action">'+fbTrackerEsc(row.action)+'</div></div>').join("");
-        panel.innerHTML=
-          '<div class="tracker-analytics-shell">'+
-          '<div class="tracker-analytics-topbar"><div class="tracker-analytics-heading"><div class="tracker-analytics-kicker">ENGINE REPORT</div><div class="tracker-analytics-title">Tracked results and learning</div><div class="tracker-analytics-subtitle">Pick record, feedback, and post-checkpoint suggestions live here.</div></div></div>'+
-          '<div class="tracker-kpi-grid">'+
-            '<div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall</div><div class="tracker-kpi-value">'+wins+'W</div><div class="tracker-kpi-sub">Losses '+losses+' • Pushes '+pushes+' • Win rate '+(wr==null?"—":wr.toFixed(1)+"%")+'</div></div>'+
-            '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">'+activeCount+'</div><div class="tracker-kpi-sub">Current model football_v2_core</div></div>'+
-            '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks</div><div class="tracker-kpi-value">'+settledN+'</div><div class="tracker-kpi-sub">Checkpoint target '+trackerMin+'</div></div>'+
-            '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Review status</div><div class="tracker-kpi-value">'+fbTrackerEsc(checkpointStatus)+'</div><div class="tracker-kpi-sub">Current version only</div></div>'+
-          '</div>'+
-          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Out-of-sample validation</div><div class="tracker-analytics-card-meta">Not yet available</div></div><div class="tracker-analytics-card-body"><div class="tracker-empty-note">No out-of-sample check yet for this league. This runs automatically once enough settled picks exist (needs 30+ settled picks with a valid createdAt) and refreshes periodically during the retraining pipeline.</div></div></div>'+
-          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Checkpoint review</div><div class="tracker-analytics-card-meta">'+fbTrackerEsc(checkpointStatus)+'</div></div><div class="tracker-analytics-card-body"><div class="tracker-review-list">'+reviewHtml+'</div></div></div>'+
-          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Measurement lab</div><div class="tracker-analytics-card-meta">Tracked-pick evidence only</div></div><div class="tracker-analytics-card-body"><div class="tracker-report-subtitle">This layer measures what the engine actually saved to tracker.</div><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Experiment</th><th class="num">Games</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th><th class="num">Net wins</th></tr></thead><tbody>'+
-          '<tr><td>All tracked picks</td><td class="num">'+all.length+'</td><td class="num">'+settledN+'</td><td class="num">'+wins+'</td><td class="num">'+losses+'</td><td class="num">'+pushes+'</td><td class="rate">'+(wr==null?"—":wr.toFixed(1)+"%")+'</td><td class="num">'+(wins-losses)+'</td></tr>'+
-          '</tbody></table></div></div></div>'+
-          '</div>';
+      __fbTrackerView = (view === "report") ? "report" : "picks";
+      const isReport = __fbTrackerView === "report";
+      const panelEl = document.querySelector(".tracker-panel");
+      if (panelEl) panelEl.classList.toggle("analytics-view", isReport);
+
+      const analytics = document.getElementById("trackerAnalyticsPanel");
+      const empty = document.getElementById("trackerEmpty");
+      const tableWrap = document.querySelector(".tracker-table-wrap");
+      const summary = document.getElementById("trackerSummary");
+      const marketSum = document.getElementById("trackerMarketSummary");
+      const title = document.getElementById("trackerHeadTitle");
+
+      if (title) title.textContent = isReport ? "Engine Report" : "Tracked Picks";
+      if (summary) summary.style.display = isReport ? "none" : "";
+      if (marketSum) marketSum.style.display = isReport ? "none" : "";
+      if (empty) empty.style.display = isReport ? "none" : (empty.style.display || "");
+      if (tableWrap) tableWrap.style.display = isReport ? "none" : "";
+      if (analytics) {
+        analytics.style.display = isReport ? "block" : "none";
+        if (!isReport) { analytics.innerHTML = ""; }
       }
 
+      if (isReport && analytics) {
+        const all = [...(g_trackerState.activePicks || []), ...(g_trackerState.archivedPicks || [])];
+        const settledList = all.filter(p => ["win", "loss", "push"].includes(String(p.resultStatus || "").toLowerCase()));
+        const wins = settledList.filter(p => p.resultStatus === "win").length;
+        const losses = settledList.filter(p => p.resultStatus === "loss").length;
+        const pushes = settledList.filter(p => p.resultStatus === "push").length;
+        const settledN = settledList.length;
+        const wr = settledN ? (wins / settledN * 100) : null;
+        const activeCount = (g_trackerState.activePicks || []).length;
+        const trackerMin = 50;
+        const checkpointStatus = settledN >= trackerMin ? "Review ready" : "Building";
+        const byMarket = {};
+        settledList.forEach(p => {
+          const k = p.marketName || p.marketKey || "other";
+          byMarket[k] = byMarket[k] || { w: 0, l: 0 };
+          if (p.resultStatus === "win") byMarket[k].w++;
+          else if (p.resultStatus === "loss") byMarket[k].l++;
+        });
+        let bestMarket = null, bestRate = -1;
+        Object.keys(byMarket).forEach(k => {
+          const d = byMarket[k];
+          const n = d.w + d.l;
+          if (n >= 3) {
+            const r = d.w / n;
+            if (r > bestRate) { bestRate = r; bestMarket = { name: k, w: d.w, l: d.l, r: r }; }
+          }
+        });
+        const reviewRows = [];
+        if (bestMarket) {
+          reviewRows.push({
+            area: "Best market",
+            status: "CONFIRMED STRENGTH",
+            decision: "KEEP",
+            review: bestMarket.name + " is leading at " + (bestMarket.r * 100).toFixed(1) + "% with " + bestMarket.w + " wins and " + bestMarket.l + " losses.",
+            action: "Keep this market logic as it is. Do not weaken it from one bad day."
+          });
+        }
+        if (settledN < trackerMin) {
+          reviewRows.push({
+            area: "Checkpoint",
+            status: "WATCHING",
+            decision: "COLLECT MORE",
+            review: settledN + "/" + trackerMin + " settled picks collected so far.",
+            action: (trackerMin - settledN) + " more settled picks are needed before the tracker can give a full review."
+          });
+        } else {
+          reviewRows.push({
+            area: "Overall",
+            status: "WATCHING",
+            decision: "KEEP",
+            review: "Win rate " + (wr != null ? wr.toFixed(1) + "%" : "—") + " across " + settledN + " settled.",
+            action: "Continue collecting evidence. Do not force global edits from short samples."
+          });
+        }
+        const reviewHtml = reviewRows.map(row =>
+          '<div class="tracker-review-row"><div class="tracker-review-top"><div class="tracker-review-area">' + fbTrackerEsc(row.area) +
+          '</div><div class="tracker-review-status">' + fbTrackerEsc(row.status) +
+          '</div></div><div class="tracker-review-text"><strong>' + fbTrackerEsc(row.decision) +
+          '</strong> — ' + fbTrackerEsc(row.review) +
+          '</div><div class="tracker-review-action">' + fbTrackerEsc(row.action) + '</div></div>'
+        ).join("");
+        analytics.innerHTML =
+          '<div class="tracker-analytics-shell">' +
+          '<div class="tracker-analytics-topbar"><div class="tracker-analytics-heading">' +
+          '<div class="tracker-analytics-kicker">ENGINE REPORT</div>' +
+          '<div class="tracker-analytics-title">Tracked results and learning</div>' +
+          '<div class="tracker-analytics-subtitle">Pick record, feedback, and post-checkpoint suggestions live here.</div>' +
+          '</div></div>' +
+          '<div class="tracker-kpi-grid">' +
+          '<div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall</div><div class="tracker-kpi-value">' + wins + 'W</div>' +
+          '<div class="tracker-kpi-sub">Losses ' + losses + ' • Pushes ' + pushes + ' • Win rate ' + (wr == null ? "—" : wr.toFixed(1) + "%") + '</div></div>' +
+          '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">' + activeCount + '</div>' +
+          '<div class="tracker-kpi-sub">Current model football_v2_core</div></div>' +
+          '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks</div><div class="tracker-kpi-value">' + settledN + '</div>' +
+          '<div class="tracker-kpi-sub">Checkpoint target ' + trackerMin + '</div></div>' +
+          '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Review status</div><div class="tracker-kpi-value">' + fbTrackerEsc(checkpointStatus) + '</div>' +
+          '<div class="tracker-kpi-sub">Current version only</div></div>' +
+          '</div>' +
+          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Out-of-sample validation</div>' +
+          '<div class="tracker-analytics-card-meta">Not yet available</div></div><div class="tracker-analytics-card-body">' +
+          '<div class="tracker-empty-note">No out-of-sample check yet for this league. This runs automatically once enough settled picks exist (needs 30+ settled picks with a valid createdAt).</div></div></div>' +
+          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Checkpoint review</div>' +
+          '<div class="tracker-analytics-card-meta">' + fbTrackerEsc(checkpointStatus) + '</div></div><div class="tracker-analytics-card-body"><div class="tracker-review-list">' + reviewHtml + '</div></div></div>' +
+          '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Measurement lab</div>' +
+          '<div class="tracker-analytics-card-meta">Tracked-pick evidence only</div></div><div class="tracker-analytics-card-body">' +
+          '<div class="tracker-report-subtitle">This layer measures what the engine actually saved to tracker.</div>' +
+          '<div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr>' +
+          '<th>Experiment</th><th class="num">Games</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th><th class="num">Net wins</th>' +
+          '</tr></thead><tbody><tr><td>All tracked picks</td><td class="num">' + all.length + '</td><td class="num">' + settledN +
+          '</td><td class="num">' + wins + '</td><td class="num">' + losses + '</td><td class="num">' + pushes +
+          '</td><td class="rate">' + (wr == null ? "—" : wr.toFixed(1) + "%") + '</td><td class="num">' + (wins - losses) +
+          '</td></tr></tbody></table></div></div></div></div>';
+      }
     }
     function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView(__fbTrackerView);}
     function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}}
@@ -4577,6 +4599,10 @@
 
       document.getElementById("trackerToggleBtn").addEventListener("click", openTrackerModal);
       document.getElementById("trackerCloseBtn").addEventListener("click", closeTrackerModal);
+      const _reportBtn = document.getElementById("trackerReportBtn");
+      if (_reportBtn) _reportBtn.addEventListener("click", function() {
+        setTrackerModalView(isTrackerReportView() ? "picks" : "report");
+      });
       document.getElementById("trackerModal").addEventListener("click", e=>{ if(e.target===e.currentTarget) closeTrackerModal(); });
       // Tracker view toggle on title click (exact BB behavior: picks <-> report)
       const headTitle = document.getElementById('trackerHeadTitle');
@@ -6748,6 +6774,7 @@ async function auditFullLineScan() {
 document.addEventListener("DOMContentLoaded", function() {
   // Exact BB startup state: League Tier is open; all other sections are collapsed.
   if (typeof fbResetUiToFreshPage === "function") fbResetUiToFreshPage();
+  var _tcx=document.getElementById("teamContextSection"); if(_tcx) _tcx.style.display="none";
   if (typeof fbEspnLoadRegistry === "function") {
     fbEspnLoadRegistry().then(async function() {
       try {
