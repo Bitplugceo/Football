@@ -1796,7 +1796,7 @@
         if (cached.length) {
           FB_ESPN.registry = cached.map(function(x){ return { slug:String(x.slug), name:String(x.name || fbEspnPrettySlug(x.slug)), country:String(x.country || "") }; });
           FB_ESPN.loaded = true;
-          // Do not rewrite league dropdown here — active today/tomorrow list owns the select.
+          fbEspnRenderLeagueRegistry();
         }
       } catch (e) {}
       try {
@@ -1835,13 +1835,15 @@
         });
         FB_ESPN.loaded = true;
         await fbWorldSaveRegistry(FB_ESPN.registry);
-        // Dropdown stays active-leagues-only; registry is for name resolution.
+        fbEspnRenderLeagueRegistry();
+        fbEspnSetCoverage(FB_ESPN.registry.length + " ESPN soccer competitions stored");
         engineDebug("ESPN soccer world registry refreshed", { count:FB_ESPN.registry.length });
         return FB_ESPN.registry;
       } catch(e) {
         if (!FB_ESPN.registry.length) {
           FB_ESPN.registry = (typeof FB_ESPN_DAY_SCAN_LEAGUES !== "undefined" ? FB_ESPN_DAY_SCAN_LEAGUES : []).map(function(slug){return {slug:slug,name:fbEspnPrettySlug(slug),country:""};});
           FB_ESPN.loaded = FB_ESPN.registry.length > 0;
+          fbEspnRenderLeagueRegistry();
         }
         fbEspnSetCoverage((FB_ESPN.registry.length || 0) + " stored competitions · refresh unavailable");
         fbEspnSetStatus("League registry refresh failed; using stored registry.", "error");
@@ -1849,126 +1851,21 @@
         return FB_ESPN.registry;
       }
     }
-    // League dropdown shows ONLY competitions that have fixtures today or tomorrow
-    // (from ESPN world scoreboard day feeds). Full registry is kept in memory for
-    // name/slug resolution, but is not dumped into the select.
-    function fbEspnCollectActiveLeaguesFromEvents(events) {
-      const map = new Map();
-      (events || []).forEach(function(e) {
-        if (!e) return;
-        let slug = String(e.leagueSlug || e.competitionSlug || "").trim();
-        if (!slug || slug === "all") {
-          slug = fbEspnResolveLeagueSlugByName(e.competitionName || "") || "";
-        }
-        if (!slug || slug === "all") return;
-        const reg = (FB_ESPN.registry || []).find(function(x) {
-          return String(x.slug).toLowerCase() === slug.toLowerCase();
+    function fbEspnRenderLeagueRegistry() {
+      const sel=document.getElementById("leagueSelect"); if(!sel) return;
+      const current=sel.value || "";
+      const groups={};
+      (FB_ESPN.registry||[]).forEach(function(x){ const c=x.country||"Other"; (groups[c]=groups[c]||[]).push(x); });
+      let html='<option value="">- Select League -</option>';
+      Object.keys(groups).sort().forEach(function(country){
+        html+='<optgroup label="'+safeText(country)+'">';
+        groups[country].sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(x){
+          html+='<option value="'+String(x.slug).replace(/"/g,"&quot;")+'">'+safeText(x.name)+'</option>';
         });
-        const name = (reg && reg.name) || e.competitionName || fbEspnPrettySlug(slug);
-        const country = (reg && reg.country) || "";
-        if (!map.has(slug)) map.set(slug, { slug: slug, name: String(name), country: String(country || ""), count: 0 });
-        map.get(slug).count += 1;
+        html+='</optgroup>';
       });
-      return Array.from(map.values()).sort(function(a, b) {
-        return String(a.name).localeCompare(String(b.name));
-      });
-    }
-    function fbEspnRenderLeagueRegistry(activeOnly) {
-      const sel = document.getElementById("leagueSelect");
-      if (!sel) return;
-      const current = sel.value || "";
-      // Default: active-only. Pass activeOnly === false only for emergency fallback.
-      if (activeOnly === false) {
-        const groups = {};
-        (FB_ESPN.registry || []).forEach(function(x) {
-          const c = x.country || "Other";
-          (groups[c] = groups[c] || []).push(x);
-        });
-        let html = '<option value="">— Select League —</option>';
-        Object.keys(groups).sort().forEach(function(country) {
-          html += '<optgroup label="' + safeText(country) + '">';
-          groups[country].sort(function(a, b) { return a.name.localeCompare(b.name); }).forEach(function(x) {
-            html += '<option value="' + String(x.slug).replace(/"/g, "&quot;") + '">' + safeText(x.name) + "</option>";
-          });
-          html += "</optgroup>";
-        });
-        sel.innerHTML = html;
-        if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
-        return;
-      }
-      const active = Array.isArray(FB_ESPN.activeLeagues) ? FB_ESPN.activeLeagues : [];
-      let html = '<option value="">— Select League —</option>';
-      if (!active.length) {
-        html = '<option value="">Loading leagues with matches…</option>';
-        sel.innerHTML = html;
-        return;
-      }
-      active.forEach(function(x) {
-        const label = x.count ? (x.name + " (" + x.count + ")") : x.name;
-        html += '<option value="' + String(x.slug).replace(/"/g, "&quot;") + '">' + safeText(label) + "</option>";
-      });
-      sel.innerHTML = html;
-      if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
-    }
-    async function fbEspnPaintActiveLeaguesFromCache() {
-      try {
-        const stored = await fbWorldLoadFixtures();
-        const today = fbEspnLocalDateKey(0);
-        const tomorrow = fbEspnLocalDateKey(1);
-        const filtered = (stored || []).filter(function(e) {
-          const k = e.dateKey || fbWorldDateKeyFromDate(e.date);
-          return k === today || k === tomorrow;
-        });
-        if (filtered.length) {
-          FB_ESPN.activeLeagues = fbEspnCollectActiveLeaguesFromEvents(filtered);
-          fbEspnRenderLeagueRegistry(true);
-          return FB_ESPN.activeLeagues;
-        }
-      } catch (_e) {}
-      return [];
-    }
-    async function fbEspnRefreshActiveLeagues(force) {
-      // 1) Instant paint from IndexedDB/local cache when available
-      if (!force) {
-        await fbEspnPaintActiveLeaguesFromCache();
-      }
-      // 2) Network refresh for today + tomorrow (short timeout race)
-      try {
-        const withTimeout = function(p, ms) {
-          return Promise.race([
-            p,
-            new Promise(function(_, rej) { setTimeout(function() { rej(new Error("timeout")); }, ms); })
-          ]);
-        };
-        const days = await Promise.all([
-          withTimeout(fbEspnSyncWorldDay(0, true), 2800).catch(function() { return null; }),
-          withTimeout(fbEspnSyncWorldDay(1, true), 2800).catch(function() { return null; })
-        ]);
-        const net = [].concat(days[0] || [], days[1] || []);
-        if (net.length) {
-          FB_ESPN.activeLeagues = fbEspnCollectActiveLeaguesFromEvents(net);
-          fbEspnRenderLeagueRegistry(true);
-          try {
-            const persistRows = net.map(function(e) { const x = Object.assign({}, e); delete x.raw; return x; });
-            await fbWorldSaveFixtures(persistRows);
-          } catch (_p) {}
-        } else if (!(FB_ESPN.activeLeagues || []).length) {
-          await fbEspnPaintActiveLeaguesFromCache();
-        }
-        const n = (FB_ESPN.activeLeagues || []).length;
-        const t0 = (days[0] || []).length;
-        const t1 = (days[1] || []).length;
-        if (typeof fbEspnSetCoverage === "function") {
-          fbEspnSetCoverage(n + " leagues with matches · Today " + t0 + " · Tomorrow " + t1);
-        }
-        return FB_ESPN.activeLeagues || [];
-      } catch (e) {
-        if (typeof engineDebug === "function") {
-          engineDebug("Active league refresh failed", { error: e && e.message ? e.message : String(e) });
-        }
-        if (!(FB_ESPN.activeLeagues || []).length) await fbEspnPaintActiveLeaguesFromCache();
-        return FB_ESPN.activeLeagues || [];
-      }
+      sel.innerHTML=html;
+      if(current && Array.from(sel.options).some(function(o){return o.value===current;})) sel.value=current;
     }
     async function fbEspnLoadLeagueMeta(slug) {
       if(!slug)return null;
@@ -2035,9 +1932,6 @@
         await fbWorldSaveFixtures(persistRows);
         FB_ESPN.lastWorldSyncAt=Date.now();
         await fbWorldSaveMeta("lastWorldSync",{at:FB_ESPN.lastWorldSyncAt,today:(days[0]||[]).length,tomorrow:(days[1]||[]).length});
-        // Keep league dropdown limited to competitions that actually play today/tomorrow.
-        FB_ESPN.activeLeagues = fbEspnCollectActiveLeaguesFromEvents([].concat(days[0]||[], days[1]||[]));
-        fbEspnRenderLeagueRegistry(true);
         return true;
       } finally { FB_ESPN.fixtureSyncBusy=false; }
     }
@@ -2775,8 +2669,6 @@
     window.fbEspnAutoFetch = fbEspnAutoFetch;
     window.fbEspnLoadFixtures = fbEspnLoadFixtures;
     window.fbEspnLoadRegistry = fbEspnLoadRegistry;
-    window.fbEspnRefreshActiveLeagues = fbEspnRefreshActiveLeagues;
-    window.fbEspnPaintActiveLeaguesFromCache = fbEspnPaintActiveLeaguesFromCache;
     window.fbEspnSetFixtureDay = fbEspnSetFixtureDay;
     window.fbEspnFillFormFromTeamData = fbEspnFillFormFromTeamData;
 
@@ -6977,23 +6869,18 @@ document.addEventListener("DOMContentLoaded", function() {
   if (typeof fbResetUiToFreshPage === "function") fbResetUiToFreshPage();
   var _tcx=document.getElementById("teamContextSection"); if(_tcx) _tcx.style.display="none";
   var _espn=document.getElementById("espnAutoSection"); if(_espn){ _espn.classList.add("fb-espn-hidden"); _espn.classList.add("collapsed"); }
-  // Instant league list from cache, then network refresh (target < 3s)
-  if (typeof fbEspnPaintActiveLeaguesFromCache === "function") {
-    Promise.resolve(fbEspnPaintActiveLeaguesFromCache()).catch(function(){});
-  }
-  if (typeof fbEspnRefreshActiveLeagues === "function") {
-    Promise.resolve(fbEspnRefreshActiveLeagues(false)).then(function() {
-      var _al = (FB_ESPN.activeLeagues || []).length;
-      if (typeof fbEspnSetCoverage === "function") fbEspnSetCoverage(_al + " leagues with matches today/tomorrow");
-      if (typeof fbEspnSetStatus === "function") fbEspnSetStatus(_al ? "" : "No leagues with matches for today/tomorrow yet.", "info");
-    }).catch(function(e) {
-      if (typeof engineDebug === "function") engineDebug("ESPN active league boot failed", { error: e && e.message ? e.message : String(e) });
-    });
-  }
-  // Registry loads in background for name resolution only — does not block dropdown
   if (typeof fbEspnLoadRegistry === "function") {
-    Promise.resolve(fbEspnLoadRegistry()).catch(function(e) {
-      if (typeof engineDebug === "function") engineDebug("ESPN boot registry failed", { error: e && e.message ? e.message : String(e) });
+    fbEspnLoadRegistry().then(async function() {
+      try {
+        await fbEspnSyncWorldFixtures(false);
+        if (typeof fbEspnSetCoverage === "function") fbEspnSetCoverage((FB_ESPN.registry||[]).length+" ESPN soccer competitions stored locally · Fixtures: Today + Tomorrow only");
+        if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("", "info");
+      } catch (e) {
+        if (typeof engineDebug === "function") engineDebug("ESPN world boot sync failed", { error: e && e.message ? e.message : String(e) });
+      }
+    }).catch(function(e) {
+      if (typeof engineDebug === "function") engineDebug("ESPN boot load failed", { error: e && e.message ? e.message : String(e) });
+      if (typeof fbEspnSetStatus === "function") fbEspnSetStatus("Using stored league/fixture data; refresh unavailable.", "error");
     });
   }
   // Best-effort background refresh while the page/PWA is alive. Browsers may
