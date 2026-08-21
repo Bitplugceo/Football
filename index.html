@@ -578,7 +578,7 @@
       <span id="trackerHeadTitle" style="cursor:pointer;" title="Tap to switch Tracked Picks / Engine Report">Tracked Picks</span>
       <span id="trackerStatusLabel" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;pointer-events:none;white-space:nowrap;"></span>
       <div class="tracker-head-actions">
-        <button type="button" id="trackerReportBtn" class="tracker-insights-btn" title="Engine Report" style="font-size:16px;">📊</button>
+        <button type="button" id="trackerMilitaryRaidBtn" class="tracker-insights-btn" title="Military Raid" style="font-size:16px;">🚨</button>
         <button type="button" id="trackerCloseBtn" class="tracker-close">✕</button>
       </div>
     </div>
@@ -4599,9 +4599,13 @@
 
       document.getElementById("trackerToggleBtn").addEventListener("click", openTrackerModal);
       document.getElementById("trackerCloseBtn").addEventListener("click", closeTrackerModal);
-      const _reportBtn = document.getElementById("trackerReportBtn");
-      if (_reportBtn) _reportBtn.addEventListener("click", function() {
-        setTrackerModalView(isTrackerReportView() ? "picks" : "report");
+      const _raidBtn = document.getElementById("trackerMilitaryRaidBtn");
+      if (_raidBtn) _raidBtn.addEventListener("click", function() {
+        try {
+          if (typeof militaryRaid === "function") militaryRaid();
+          else if (typeof window.militaryRaid === "function") window.militaryRaid();
+          else if (typeof AFDB !== "undefined" && AFDB && typeof AFDB.runTestFetch === "function") AFDB.runTestFetch();
+        } catch (e) { console.warn("Military raid failed", e); }
       });
       document.getElementById("trackerModal").addEventListener("click", e=>{ if(e.target===e.currentTarget) closeTrackerModal(); });
       // Tracker view toggle on title click (exact BB behavior: picks <-> report)
