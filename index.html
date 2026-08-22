@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: football_engine_v5_2_single_prediction_markets — bump this string on every deploy.
+  <!-- BUILD_MARKER: football_engine_v5_3b_pending_blank_fix — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -232,7 +233,7 @@
     .track-push { background: #3a404c !important; color: #fff !important; font-weight: 800 !important; }
     .tracker-status-stack { display: grid; gap: 4px; justify-items: center; }
     .tracker-manual-settle { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
-    .tracker-manual-btn { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; box-shadow: none !important; padding: 3px 6px !important; margin: 0 !important; min-width: 26px !important; font-size: 10px !important; font-weight: 800 !important; line-height: 1 !important; }
+    .tracker-manual-btn { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; box-shadow: none !important; padding: 4px 8px !important; margin: 0 !important; min-width: 28px !important; min-height: 22px !important; font-size: 11px !important; font-weight: 800 !important; line-height: 1.2 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; visibility: visible !important; opacity: 1 !important; }
     body.dark-mode .tracker-manual-btn { background: #1c1c1c !important; color: #f2f2f2 !important; border-color: #333 !important; }
     .tracker-manual-hint { font-size: 9px; line-height: 1.2; color: var(--tracker-subtext); font-weight: 800; text-transform: uppercase; }
     .tracker-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: stretch; justify-content: flex-end; padding-top: env(safe-area-inset-top); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); z-index: 9999; overscroll-behavior: none; }
@@ -3824,8 +3825,6 @@
       else if(mk==="double_12") status=h!==a?"win":"loss";
       else if(mk==="btts_yes") status=h>0&&a>0?"win":"loss";
       else if(mk==="btts_no") status=h===0||a===0?"win":"loss";
-      else if(mk==="home_1up") status=h===a+1?"win":"loss";
-      else if(mk==="away_1up") status=a===h+1?"win":"loss";
       else if(haveH1&&mk==="h1_1x2_home") status=h1h>h1a?"win":"loss";
       else if(haveH1&&mk==="h1_1x2_draw") status=h1h===h1a?"win":"loss";
       else if(haveH1&&mk==="h1_1x2_away") status=h1a>h1h?"win":"loss";
@@ -3914,9 +3913,9 @@
         rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});
       };
       const ftLine=parseMarketLine(fb2_text("ftMarket"));const h1Line=parseMarketLine(fb2_text("h1Market"));
-      add("1x2_home","1X2 — Home",x12.home,"HOME",odds.home,null,x12.home);
-      add("1x2_draw","1X2 — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);
-      add("1x2_away","1X2 — Away",x12.away,"AWAY",odds.away,null,x12.away);
+      add("1x2_home","1 — Home",x12.home,"HOME",odds.home,null,x12.home);
+      add("1x2_draw","X — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);
+      add("1x2_away","2 — Away",x12.away,"AWAY",odds.away,null,x12.away);
       // Double Chance — plain-language labels
       add("double_1x","Home win or Draw",x12.home+x12.draw,"HOME OR DRAW",null,null,x12.home+x12.draw);
       add("double_x2","Draw or Away win",x12.draw+x12.away,"DRAW OR AWAY",null,null,x12.draw+x12.away);
@@ -3935,11 +3934,7 @@
       add("h1_1x2_home","1H — Home",x12h1.home,"1H HOME",null,null,x12h1.home);
       add("h1_1x2_draw","1H — Draw",x12h1.draw,"1H DRAW",null,null,x12h1.draw);
       add("h1_1x2_away","1H — Away",x12h1.away,"1H AWAY",null,null,x12h1.away);
-      // Home / Away 1 Up = win by exactly 1 goal
-      const home1Up=fb2_fromMatrix(ftM,(h,a)=>h===a+1);
-      const away1Up=fb2_fromMatrix(ftM,(h,a)=>a===h+1);
-      add("home_1up","Home 1 Up (win by 1)",home1Up,"HOME 1 UP",null,null,home1Up);
-      add("away_1up","Away 1 Up (win by 1)",away1Up,"AWAY 1 UP",null,null,away1Up);
+      // Home / Away 1 Up removed
       // Highest scoring half — single market predicting 1H or 2H
       const h2Mtmp=fb2_scoreMatrix(Math.max(0.05,lambdas.home-fhLambdas.home),Math.max(0.05,lambdas.away-fhLambdas.away));
       const halfDist1=fb2_goalDistribution(h1M), halfDist2=fb2_goalDistribution(h2Mtmp);
@@ -3972,7 +3967,7 @@
       topH1.sort(function(u,v){return v.p-u.p;});
       if(topH1.length){
         const sc=topH1[0];
-        add("h1_cs_"+sc.h+"_"+sc.a,"1H Correct Score "+sc.h+"-"+sc.a,sc.p,sc.h+"-"+sc.a,null,null,sc.p);
+        add("h1_cs_"+sc.h+"_"+sc.a,"1H Correct Score",sc.p,sc.h+"-"+sc.a,null,null,sc.p);
       }
       // FT Total Goals — single market (Over or Under the line)
       if(Number.isFinite(ftLine)){
@@ -4004,7 +3999,7 @@
           const sc=topScores[0];
           const p=fb2_calibrateBinary("correct_score",sc.p).p;
           const q=fb2_marketPick(p,sc.h+"-"+sc.a,null,sample,integrity,0.025);
-          rows.push({marketKey:"correct_"+sc.h+"_"+sc.a,name:"Correct Score "+sc.h+"-"+sc.a,prob:p,rawProb:sc.p,odds:null,ev:null,line:null,projection:p,grade:fb2_grade(p,null,sample,integrity),pick:q.pick,side:sc.h+"-"+sc.a,integrity});
+          rows.push({marketKey:"correct_"+sc.h+"_"+sc.a,name:"Correct Score",prob:p,rawProb:sc.p,odds:null,ev:null,line:null,projection:p,grade:fb2_grade(p,null,sample,integrity),pick:q.pick==="NO PLAY"?"NO PLAY":(sc.h+"-"+sc.a),side:sc.h+"-"+sc.a,integrity});
         }
       }
       // Asian Handicap — single market: which side covers
@@ -4255,7 +4250,9 @@
         const when=formatTrackedDate(p.eventDate||p.createdAt);
         const match=(p.homeTeam&&p.homeTeam!=="—"?p.homeTeam:"A")+" vs "+(p.awayTeam&&p.awayTeam!=="—"?p.awayTeam:"B");
         const st=String(p.resultStatus||"pending").toLowerCase();
-        const sig=encodeURIComponent(p.signature||"");
+        const _rawSig=p.signature||(String(p.eventId||"")+"|"+String(p.marketKey||"")+"|"+String(p.side||p.predictionText||"")+"|"+String(p.createdAt||""));
+         if(!p.signature) p.signature=_rawSig;
+         const sig=encodeURIComponent(p.signature);
         const pId=(p.signature||Math.random().toString(36).slice(2)).replace(/[^a-zA-Z0-9]/g,"").slice(0,16);
         let statusClass="track-pending";
         if(st==="win")statusClass="track-win";
@@ -4263,16 +4260,22 @@
         else if(st==="push")statusClass="track-push";
         let statusHtml="";
         if(st==="pending"){
-          statusHtml='<div class="tracker-disp-toggle" data-pid="'+pId+'" style="font-weight:900;font-size:10px;cursor:pointer;text-decoration:underline dotted #ccc;" title="Click to settle">PENDING</div>'+
-            '<div id="act-'+pId+'" style="display:none;flex-direction:column;align-items:center;gap:2px;margin-top:-2px;">'+
-            '<div style="font-size:8px;font-weight:900;opacity:0.6;margin-bottom:1px;">SETTLE</div>'+
-            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">W</button>'+
-            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">L</button>'+
-            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">P</button>'+
-            '</div>';
+          statusHtml='<div class="tracker-status-stack" style="gap:3px;">'+
+            '<div style="font-weight:900;font-size:9px;opacity:0.75;">PENDING</div>'+
+            '<div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" title="Mark Win">W</button>'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" title="Mark Loss">L</button>'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" title="Mark Push">P</button>'+
+            '</div></div>';
         } else {
-          statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to edit">'+st.toUpperCase()+'</div>';
+          statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to change result">'+st.toUpperCase().replace('_',' ')+'</div>';
           if(p.actualScore||p.actual!=null) statusHtml+='<div style="font-size:6px;font-weight:800;line-height:1.1;margin-top:1px;color:#fff;">'+fbTrackerEsc(String(p.actualScore||p.actual))+'</div>';
+          statusHtml+='<div style="display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap;">'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" title="Set Win">W</button>'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" title="Set Loss">L</button>'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" title="Set Push">P</button>'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="pending" data-sig="'+sig+'" title="Revert to pending">↺</button>'+
+            '</div>';
         }
         // Pick text is the delete button (BB style)
         const pickCell='<span class="tracker-delete-pick-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to permanently delete this pick">'+fbTrackerEsc(p.predictionText||"—")+'</span>'+(p.isLock?' <span class="lock">🔒</span>':'');
@@ -4437,10 +4440,17 @@
     function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView('picks');}
     function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}}
     function applyManualSettlementToTrackedPick(signature,status){
-      const all=[g_trackerState.activePicks,g_trackerState.archivedPicks]; let found=null;
-      all.forEach(arr=>arr.forEach(p=>{if(p.signature===signature)found=p;})); if(!found)return false;
-      found.resultStatus=status; found.settledAt=status==='pending'?null:new Date().toISOString();
-      if(status!=='pending' && g_trackerState.activePicks.includes(found)){g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p!==found);g_trackerState.archivedPicks.push(found);}
+      if(!signature){ console.warn('Manual settle: empty signature'); return false; }
+      const all=[g_trackerState.activePicks||[],g_trackerState.archivedPicks||[]];
+      let found=null;
+      all.forEach(arr=>arr.forEach(p=>{ if(p && p.signature===signature) found=p; }));
+      if(!found){ console.warn('Manual settle: pick not found', signature); return false; }
+      const st=String(status||'pending').toLowerCase();
+      if(['win','loss','push','pending','half_win','half_loss'].indexOf(st)<0) return false;
+      found.resultStatus=st;
+      found.settledAt=st==='pending'?null:new Date().toISOString();
+      // Keep the pick in the live/active list so W/L/P does not make the row vanish.
+      // User can still delete it; auto-archive happens only via explicit archive flows.
       fbTrackerRecount();fbTrackerSave();renderTrackedPicks();return true;
     }
     function deleteTrackedPickBySignature(signature){
@@ -4688,13 +4698,8 @@
         });
       }
       document.getElementById("trackedPicksBody").addEventListener("click", function(e) {
-        const target = e.target.closest(".tracker-disp-toggle");
-        if(target) {
-          const pid = target.dataset.pid;
-          target.style.display = "none";
-          const act = document.getElementById("act-"+pid);
-          if(act) act.style.display = "flex";
-        }
+        // W/L/P are always visible — no hide/show toggle (that caused blank cells
+        // when act-{pid} ids collided or signatures were empty).
         const btn = e.target.closest(".tracker-settle-btn");
         if(btn) {
           const sig = decodeURIComponent(btn.dataset.sig);
