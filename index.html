@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: football_engine_v5_4_single_dc_1hwinner — bump this string on every deploy.
+  <!-- BUILD_MARKER: football_engine_v5_4b_original_settle_ui — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -232,7 +232,7 @@
     .track-push { background: #3a404c !important; color: #fff !important; font-weight: 800 !important; }
     .tracker-status-stack { display: grid; gap: 4px; justify-items: center; }
     .tracker-manual-settle { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
-    .tracker-manual-btn { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; box-shadow: none !important; padding: 4px 8px !important; margin: 0 !important; min-width: 28px !important; min-height: 22px !important; font-size: 11px !important; font-weight: 800 !important; line-height: 1.2 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; visibility: visible !important; opacity: 1 !important; }
+    .tracker-manual-btn { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; box-shadow: none !important; padding: 3px 6px !important; margin: 0 !important; min-width: 26px !important; font-size: 10px !important; font-weight: 800 !important; line-height: 1 !important; }
     body.dark-mode .tracker-manual-btn { background: #1c1c1c !important; color: #f2f2f2 !important; border-color: #333 !important; }
     .tracker-manual-hint { font-size: 9px; line-height: 1.2; color: var(--tracker-subtext); font-weight: 800; text-transform: uppercase; }
     .tracker-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: stretch; justify-content: flex-end; padding-top: env(safe-area-inset-top); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); z-index: 9999; overscroll-behavior: none; }
@@ -4267,18 +4267,17 @@
         else if(st==="push")statusClass="track-push";
         let statusHtml="";
         if(st==="pending"){
-          // Unique id per row (index + signature hash) so toggle never collides / blanks
-          const rowId = "t"+idx+"_"+String(p.signature||"").replace(/[^a-zA-Z0-9]/g,"").slice(0,20)+(pId||"");
-          statusHtml='<div class="tracker-disp-toggle" data-act="act-'+rowId+'" style="font-weight:900;font-size:10px;cursor:pointer;text-decoration:underline dotted #ccc;" title="Click to settle">PENDING</div>'+
-            '<div id="act-'+rowId+'" class="tracker-manual-settle" style="display:none;flex-direction:column;align-items:center;gap:2px;">'+
-            '<div class="tracker-manual-hint">SETTLE</div>'+
-            '<div style="display:flex;gap:3px;justify-content:center;">'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'">W</button>'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'">L</button>'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'">P</button>'+
-            '</div></div>';
+          // Unique per-row id (index) — prevents blank cells when signatures collide
+          const uniquePid = "r"+idx+"_"+String(pId||"").slice(0,12);
+          statusHtml='<div class="tracker-disp-toggle" data-pid="'+uniquePid+'" style="font-weight:900;font-size:10px;cursor:pointer;text-decoration:underline dotted #ccc;" title="Click to settle">PENDING</div>'+
+            '<div id="act-'+uniquePid+'" style="display:none;flex-direction:column;align-items:center;gap:2px;margin-top:-2px;">'+
+            '<div style="font-size:8px;font-weight:900;opacity:0.6;margin-bottom:1px;">SETTLE</div>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">W</button>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">L</button>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">P</button>'+
+            '</div>';
         } else {
-          statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to edit">'+st.toUpperCase().replace('_',' ')+'</div>';
+          statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to edit">'+st.toUpperCase()+'</div>';
           if(p.actualScore||p.actual!=null) statusHtml+='<div style="font-size:6px;font-weight:800;line-height:1.1;margin-top:1px;color:#fff;">'+fbTrackerEsc(String(p.actualScore||p.actual))+'</div>';
         }
         // Pick text is the delete button (BB style)
@@ -4444,17 +4443,18 @@
     function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView('picks');}
     function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}}
     function applyManualSettlementToTrackedPick(signature,status){
-      if(!signature){ console.warn('Manual settle: empty signature'); return false; }
-      const all=[g_trackerState.activePicks||[],g_trackerState.archivedPicks||[]];
-      let found=null;
-      all.forEach(arr=>arr.forEach(p=>{ if(p && p.signature===signature) found=p; }));
-      if(!found){ console.warn('Manual settle: pick not found', signature); return false; }
-      const st=String(status||'pending').toLowerCase();
-      if(['win','loss','push','pending','half_win','half_loss'].indexOf(st)<0) return false;
-      found.resultStatus=st;
-      found.settledAt=st==='pending'?null:new Date().toISOString();
-      // Keep the pick in the live/active list so W/L/P does not make the row vanish.
-      // User can still delete it; auto-archive happens only via explicit archive flows.
+      if(!signature) return false;
+      const all=[g_trackerState.activePicks||[],g_trackerState.archivedPicks||[]]; let found=null;
+      all.forEach(arr=>arr.forEach(p=>{if(p&&p.signature===signature)found=p;})); if(!found)return false;
+      found.resultStatus=status; found.settledAt=status==='pending'?null:new Date().toISOString();
+      if(status!=='pending' && (g_trackerState.activePicks||[]).includes(found)){
+        g_trackerState.activePicks=g_trackerState.activePicks.filter(p=>p!==found);
+        g_trackerState.archivedPicks.push(found);
+      }
+      if(status==='pending' && (g_trackerState.archivedPicks||[]).includes(found)){
+        g_trackerState.archivedPicks=g_trackerState.archivedPicks.filter(p=>p!==found);
+        g_trackerState.activePicks.push(found);
+      }
       fbTrackerRecount();fbTrackerSave();renderTrackedPicks();return true;
     }
     function deleteTrackedPickBySignature(signature){
@@ -4704,15 +4704,10 @@
       document.getElementById("trackedPicksBody").addEventListener("click", function(e) {
         const target = e.target.closest(".tracker-disp-toggle");
         if(target) {
-          e.preventDefault();
-          e.stopPropagation();
-          const actId = target.getAttribute("data-act");
-          const act = actId ? document.getElementById(actId) : null;
-          if(act) {
-            target.style.display = "none";
-            act.style.display = "flex";
-          }
-          return;
+          const pid = target.dataset.pid;
+          target.style.display = "none";
+          const act = document.getElementById("act-"+pid);
+          if(act) act.style.display = "flex";
         }
         const btn = e.target.closest(".tracker-settle-btn");
         if(btn) {
