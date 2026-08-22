@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +10,7 @@ S
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: football_engine_v5_3b_pending_blank_fix — bump this string on every deploy.
+  <!-- BUILD_MARKER: football_engine_v5_4_single_dc_1hwinner — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -3916,10 +3915,13 @@ S
       add("1x2_home","1 — Home",x12.home,"HOME",odds.home,null,x12.home);
       add("1x2_draw","X — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);
       add("1x2_away","2 — Away",x12.away,"AWAY",odds.away,null,x12.away);
-      // Double Chance — plain-language labels
-      add("double_1x","Home win or Draw",x12.home+x12.draw,"HOME OR DRAW",null,null,x12.home+x12.draw);
-      add("double_x2","Draw or Away win",x12.draw+x12.away,"DRAW OR AWAY",null,null,x12.draw+x12.away);
-      add("double_12","Home or Away win",x12.home+x12.away,"HOME OR AWAY",null,null,x12.home+x12.away);
+      // Double Chance — single market: highest of 1X / X2 / 12
+      {
+        const d1x = x12.home+x12.draw, dx2 = x12.draw+x12.away, d12 = x12.home+x12.away;
+        if (d1x >= dx2 && d1x >= d12) add("double_1x","Double Chance",d1x,"HOME OR DRAW",null,null,d1x);
+        else if (dx2 >= d12) add("double_x2","Double Chance",dx2,"DRAW OR AWAY",null,null,dx2);
+        else add("double_12","Double Chance",d12,"HOME OR AWAY",null,null,d12);
+      }
       // BTTS — single market: Yes or No (highest probability wins the prediction)
       {
         const bttsYes = btts, bttsNo = 1 - btts;
@@ -3929,11 +3931,16 @@ S
           add("btts_no","Both Teams to Score",bttsNo,"NO",odds.bttsNo,null,bttsNo);
         }
       }
-      // 1H 1X2
+      // 1H Winner — single market (Home / Draw / Away)
       const x12h1=fb2_1x2(h1M);
-      add("h1_1x2_home","1H — Home",x12h1.home,"1H HOME",null,null,x12h1.home);
-      add("h1_1x2_draw","1H — Draw",x12h1.draw,"1H DRAW",null,null,x12h1.draw);
-      add("h1_1x2_away","1H — Away",x12h1.away,"1H AWAY",null,null,x12h1.away);
+      {
+        if (x12h1.home >= x12h1.draw && x12h1.home >= x12h1.away)
+          add("h1_1x2_home","1H Winner",x12h1.home,"HOME",null,null,x12h1.home);
+        else if (x12h1.draw >= x12h1.away)
+          add("h1_1x2_draw","1H Winner",x12h1.draw,"DRAW",null,null,x12h1.draw);
+        else
+          add("h1_1x2_away","1H Winner",x12h1.away,"AWAY",null,null,x12h1.away);
+      }
       // Home / Away 1 Up removed
       // Highest scoring half — single market predicting 1H or 2H
       const h2Mtmp=fb2_scoreMatrix(Math.max(0.05,lambdas.home-fhLambdas.home),Math.max(0.05,lambdas.away-fhLambdas.away));
@@ -4246,7 +4253,7 @@ S
       });
       window.__trackerRenderLimit=window.__trackerRenderLimit||50;
       const display=visible.slice(0,window.__trackerRenderLimit);
-      body.innerHTML=display.map(function(p){
+      body.innerHTML=display.map(function(p,idx){
         const when=formatTrackedDate(p.eventDate||p.createdAt);
         const match=(p.homeTeam&&p.homeTeam!=="—"?p.homeTeam:"A")+" vs "+(p.awayTeam&&p.awayTeam!=="—"?p.awayTeam:"B");
         const st=String(p.resultStatus||"pending").toLowerCase();
@@ -4260,22 +4267,19 @@ S
         else if(st==="push")statusClass="track-push";
         let statusHtml="";
         if(st==="pending"){
-          statusHtml='<div class="tracker-status-stack" style="gap:3px;">'+
-            '<div style="font-weight:900;font-size:9px;opacity:0.75;">PENDING</div>'+
-            '<div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" title="Mark Win">W</button>'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" title="Mark Loss">L</button>'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" title="Mark Push">P</button>'+
+          // Unique id per row (index + signature hash) so toggle never collides / blanks
+          const rowId = "t"+idx+"_"+String(p.signature||"").replace(/[^a-zA-Z0-9]/g,"").slice(0,20)+(pId||"");
+          statusHtml='<div class="tracker-disp-toggle" data-act="act-'+rowId+'" style="font-weight:900;font-size:10px;cursor:pointer;text-decoration:underline dotted #ccc;" title="Click to settle">PENDING</div>'+
+            '<div id="act-'+rowId+'" class="tracker-manual-settle" style="display:none;flex-direction:column;align-items:center;gap:2px;">'+
+            '<div class="tracker-manual-hint">SETTLE</div>'+
+            '<div style="display:flex;gap:3px;justify-content:center;">'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'">W</button>'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'">L</button>'+
+            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'">P</button>'+
             '</div></div>';
         } else {
-          statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to change result">'+st.toUpperCase().replace('_',' ')+'</div>';
+          statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to edit">'+st.toUpperCase().replace('_',' ')+'</div>';
           if(p.actualScore||p.actual!=null) statusHtml+='<div style="font-size:6px;font-weight:800;line-height:1.1;margin-top:1px;color:#fff;">'+fbTrackerEsc(String(p.actualScore||p.actual))+'</div>';
-          statusHtml+='<div style="display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap;">'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" title="Set Win">W</button>'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" title="Set Loss">L</button>'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" title="Set Push">P</button>'+
-            '<button type="button" class="tracker-manual-btn tracker-settle-btn" data-manual-settle="pending" data-sig="'+sig+'" title="Revert to pending">↺</button>'+
-            '</div>';
         }
         // Pick text is the delete button (BB style)
         const pickCell='<span class="tracker-delete-pick-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to permanently delete this pick">'+fbTrackerEsc(p.predictionText||"—")+'</span>'+(p.isLock?' <span class="lock">🔒</span>':'');
@@ -4698,8 +4702,18 @@ S
         });
       }
       document.getElementById("trackedPicksBody").addEventListener("click", function(e) {
-        // W/L/P are always visible — no hide/show toggle (that caused blank cells
-        // when act-{pid} ids collided or signatures were empty).
+        const target = e.target.closest(".tracker-disp-toggle");
+        if(target) {
+          e.preventDefault();
+          e.stopPropagation();
+          const actId = target.getAttribute("data-act");
+          const act = actId ? document.getElementById(actId) : null;
+          if(act) {
+            target.style.display = "none";
+            act.style.display = "flex";
+          }
+          return;
+        }
         const btn = e.target.closest(".tracker-settle-btn");
         if(btn) {
           const sig = decodeURIComponent(btn.dataset.sig);
