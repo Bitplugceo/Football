@@ -15,9 +15,8 @@
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
        v5.2 change: every multi-side market is now a single prediction.
-       Removed dual Over/Under rows, multi Correct Scores, dual AH sides.
-       FT/1H/2H totals, Team A/B totals, AH, Correct Score, BTTS, Highest
-       Scoring Half, HT/FT each emit one row with the model's chosen side. -->
+       Removed single-side AF markets (total/spread/ML).
+       Game/1H/2H totals, Spread, Team Totals, Moneyline — each emits one AF-side row. -->
   <title>American Football Prediction Engine</title>
   <style>
     :root {
@@ -894,7 +893,6 @@
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "af_engine_v3_fb2_points_markets";
     const ENGINE_MODEL_VERSION = "af_v1_nfl_points";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
@@ -1148,11 +1146,11 @@
     /**
      * ---------- Points total model ----------
      * A point-share figure is derived from the blended scoring projections
-     * below and combined with the projected total goals for the segment
+     * below and combined with the projected total points for the segment
      * (full match or first half). Total-goal picks are graded off that
-     * combined total via a Poisson-family variance model, not off a
+     * combined total via a scoring-family variance model, not off a
      * point-by-point race the way the original table-tennis engine used —
-     * football goals aren't won "point by point."
+     * football points aren't won "point by point."
      *
      * Constants below are first-principles starting points, not fitted to
      * settled-pick history yet. Once 10+ settled picks exist, they can be
@@ -1163,10 +1161,10 @@
       // American football point-share + total model (full AF rewrite)
       SHARE_DAMPING: 0.55,          // compress attack share toward 0.5
       MATCH_PROXY_DAMPING: 0.40,
-      FATIGUE_STEP: 0.008,          // short week / congestion (less than soccer)
+      FATIGUE_STEP: 0.008,          // short week / congestion (less than multi-week sports)
       FATIGUE_CAP: 0.04,
       INTEGRITY_VOL_CEILING: 2.5,
-      OVERDISPERSION: 1.45,         // point totals overdisperse vs pure Poisson
+      OVERDISPERSION: 1.45,         // point totals overdisperse vs pure scoring
       HOME_FIELD_POINTS: 2.4,       // typical NFL HFA in points
       MIN_VARIANCE_FT: 28,          // floor variance for game totals (~sd 5+)
       MIN_VARIANCE_H1: 12,          // floor for 1H totals
@@ -1210,11 +1208,11 @@
      * Football points don't come from a race-to-N point sequence the way
      * table-tennis points do, so there's no game/match combinatorics chain
      * here — total points for a segment are modeled directly as the sum of
-     * two scoring processes (points), Poisson-like in expectation
+     * two scoring processes (points), scoring-like in expectation
      * but with a mild overdispersion factor applied to the variance since
      * real match-to-match point totals spread a little wider than a pure
-     * Poisson would predict (blowouts and 0-0s are both more common than
-     * a clean Poisson implies). `pFor` is carried through only as a
+     * scoring would predict (blowouts and 0-0s are both more common than
+     * a clean scoring implies). `pFor` is carried through only as a
      * point-share figure for display/grading context (e.g. "who does the
      * model lean toward") — it does not reshape the total the way a TT
      * point-process would.
@@ -1354,10 +1352,10 @@
       return 0;
     }
     /**
-     * Elo -> goal-share pipeline, ready to blend with the scoring-projection
+     * Elo -> point-share pipeline, ready to blend with the scoring-projection
      * estimate. Football has no game/point structure to invert Elo's match
      * win probability through (unlike table tennis' race-to-11 games), so
-     * the match win probability is used directly as a goal-share proxy: the
+     * the match win probability is used directly as a point-share proxy: the
      * favorite is nudged toward a larger slice of the projected total, not
      * toward a re-derived point-win rate.
      */
@@ -1476,11 +1474,62 @@
       ufl: "ufl",
       cfl: "cfl"
     };
+    // ESPN seasontype: 1=preseason, 2=regular, 3=postseason
+    const AF_LEAGUE_SEASON_TYPE = {
+      nfl: 2,
+      nfl_pre: 1,
+      nfl_post: 3,
+      "college-football": 2,
+      "college-football-fcs": 2,
+      ufl: 2,
+      cfl: 2
+    };
     function afResolveLeagueSlug(val) {
       const k = String(val || "").trim();
       if (AF_LEAGUE_SLUGS[k]) return AF_LEAGUE_SLUGS[k];
-      // registry may still provide full ESPN slugs
       return k || "";
+    }
+    function afResolveSeasonType(val) {
+      const k = String(val || "").trim();
+      if (AF_LEAGUE_SEASON_TYPE[k] != null) return AF_LEAGUE_SEASON_TYPE[k];
+      return null; // no filter
+    }
+    function afEventSeasonType(ev) {
+      // ESPN: event.season.type or event.competitions[0].type / notes
+      const t = Number(
+        (ev && ev.season && (ev.season.type || ev.season.slug)) ||
+        (ev && ev.competitions && ev.competitions[0] && ev.competitions[0].type && ev.competitions[0].type.id) ||
+        0
+      );
+      if (t === 1 || t === 2 || t === 3) return t;
+      // slug strings: "preseason" | "regular-season" | "postseason"
+      const slug = String((ev && ev.season && (ev.season.slug || ev.season.name)) || "").toLowerCase();
+      if (slug.indexOf("pre") >= 0) return 1;
+      if (slug.indexOf("post") >= 0 || slug.indexOf("playoff") >= 0) return 3;
+      if (slug.indexOf("regular") >= 0) return 2;
+      return null;
+    }
+    /** Browser-local calendar YYYYMMDD (for Today/Tomorrow UI — matches displayed kickoff clock) */
+    function fbBrowserLocalDateKey(offset) {
+      const off = Number(offset || 0) || 0;
+      const d = new Date();
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() + off);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + m + day;
+    }
+    function fbEspnEventLocalDateKey(iso) {
+      if (!iso) return "";
+      try {
+        const d = new Date(iso);
+        if (!isFinite(d.getTime())) return "";
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return y + m + day;
+      } catch (_e) { return ""; }
     }
 const FB_ESPN = {
       REGISTRY: "https://sports.core.api.espn.com/v2/sports/football/leagues?limit=500&lang=en&region=us",
@@ -1713,7 +1762,7 @@ const FB_ESPN = {
     }
     // Runs `fn` over `items` with at most `limit` requests in flight at once,
     // instead of one giant Promise.all(). Used for the per-game summary
-    // fetches (1H goals, xG, H2H 1H splits): firing 10-20+ of these at full
+    // fetches (1H points, xG, H2H 1H splits): firing 10-20+ of these at full
     // parallel is what used to trip the free CORS-proxy fallbacks and break
     // the whole auto-fetch. Small batches get the same total data without
     // the burst.
@@ -1990,32 +2039,76 @@ const FB_ESPN = {
         return name;
       }catch(e){return null;}
     }
-    async function fbEspnFetchLeagueDay(slug, offset, force) {
-      const dateKey = fbEspnLocalDateKey(offset);
-      const cacheKey = "league:" + String(slug) + ":" + dateKey;
+    async function fbEspnFetchLeagueDay(slug, offset, force, leagueKey) {
+      // leagueKey = #leagueSelect value (nfl vs nfl_pre) for season-type split
+      const localDay = (typeof fbBrowserLocalDateKey === "function")
+        ? fbBrowserLocalDateKey(offset)
+        : fbEspnLocalDateKey(offset);
+      const seasonWant = (typeof afResolveSeasonType === "function")
+        ? afResolveSeasonType(leagueKey || slug)
+        : null;
+      const cacheKey = "league:" + String(slug) + ":" + localDay + ":st" + String(seasonWant || "any");
       const cached = FB_ESPN.eventCache.get(cacheKey);
       if (!force && Array.isArray(cached) && Date.now() - Number(cached._updatedAt || 0) < 120000) return cached;
       if (!slug || slug === "all") return [];
-      const url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + dateKey + "&limit=1000";
-      const data = await fbEspnFetchJSON(url, 15000);
-      const raw = Array.isArray(data && data.events) ? data.events : [];
-      const seen = new Set(), clean = [];
-      raw.map(function(ev){ return fbEspnNormalizeEvent(ev, slug); }).filter(Boolean).forEach(function(e){
-        // Drop events whose ET calendar day does not match the requested dates= key
-        const ek = typeof fbEspnEventDateKey === "function" ? fbEspnEventDateKey(e.date) : "";
-        if (ek && dateKey && ek !== dateKey) return;
-        // For a league-specific scoreboard the requested slug is authoritative.
-        e.leagueSlug = slug;
-        if (!e.competitionName || e.competitionName === "Football") {
-          const meta = (FB_ESPN.registry || []).find(function(x){ return String(x.slug) === String(slug); });
-          e.competitionName = meta && meta.name ? meta.name : fbEspnPrettySlug(slug);
-        }
-        if (!seen.has(e.id)) { seen.add(e.id); clean.push(e); }
+
+      // Pull adjacent ET dates so overnight local kickoffs are not dropped
+      const etKeys = [];
+      const baseEt = fbEspnLocalDateKey(offset);
+      [ -1, 0, 1 ].forEach(function (d) {
+        try {
+          const k = fbEspnLocalDateKey(Number(offset || 0) + d);
+          if (k && etKeys.indexOf(k) < 0) etKeys.push(k);
+        } catch (_e) {}
       });
-      clean.sort(function(a,b){ return Date.parse(a.date || 0) - Date.parse(b.date || 0); });
-      Object.defineProperty(clean, "_updatedAt", { value: Date.now(), enumerable: false });
+      if (etKeys.indexOf(baseEt) < 0) etKeys.push(baseEt);
+
+      let raw = [];
+      for (let i = 0; i < etKeys.length; i++) {
+        let url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + etKeys[i] + "&limit=300";
+        if (seasonWant === 1 || seasonWant === 2 || seasonWant === 3) {
+          url += "&seasontype=" + seasonWant;
+        }
+        try {
+          const data = await fbEspnFetchJSON(url, 15000);
+          const evs = Array.isArray(data && data.events) ? data.events : [];
+          raw = raw.concat(evs);
+        } catch (_err) {
+          if (typeof engineDebug === "function") {
+            engineDebug("scoreboard day fetch failed", { slug: slug, date: etKeys[i], error: String(_err && _err.message || _err) });
+          }
+        }
+      }
+
+      const seen = new Set(), clean = [];
+      raw.forEach(function (ev) {
+        // Season-type gate (preseason vs regular vs post)
+        if (seasonWant === 1 || seasonWant === 2 || seasonWant === 3) {
+          const st = typeof afEventSeasonType === "function" ? afEventSeasonType(ev) : null;
+          // If ESPN omits type, keep only when seasontype was requested on URL; still prefer matching
+          if (st != null && st !== seasonWant) return;
+        }
+        const e = fbEspnNormalizeEvent(ev, slug);
+        if (!e) return;
+        // Today/Tomorrow = browser-local calendar of kickoff (matches times shown in the picker)
+        const localKey = typeof fbEspnEventLocalDateKey === "function" ? fbEspnEventLocalDateKey(e.date) : "";
+        if (localKey && localDay && localKey !== localDay) return;
+        e.leagueSlug = slug;
+        e.seasonType = typeof afEventSeasonType === "function" ? afEventSeasonType(ev) : null;
+        if (!e.competitionName || e.competitionName === "Football") {
+          const meta = (FB_ESPN.registry || []).find(function (x) { return String(x.slug) === String(slug); });
+          e.competitionName = meta && meta.name ? meta.name : (typeof fbEspnPrettySlug === "function" ? fbEspnPrettySlug(slug) : slug);
+        }
+        if (!seen.has(e.id)) {
+          seen.add(e.id);
+          clean.push(e);
+        }
+      });
+      clean.sort(function (a, b) {
+        return Date.parse(a.date || 0) - Date.parse(b.date || 0);
+      });
+      clean._updatedAt = Date.now();
       FB_ESPN.eventCache.set(cacheKey, clean);
-      FB_ESPN.eventCacheTime.set(cacheKey, Date.now());
       return clean;
     }
 
@@ -2057,7 +2150,7 @@ const FB_ESPN = {
       if(tomBtn) tomBtn.classList.toggle("active",fbEspnFixtureOffset===1);
       const leagueSel=document.getElementById("leagueSelect"), fixtureSel=document.getElementById("fbEspnFixtureSelect");
       if(!fixtureSel) return [];
-      const slug=typeof afResolveLeagueSlug==="function"?afResolveLeagueSlug(leagueSel?.value||""):(leagueSel?.value||"").trim();
+      const leagueKey=(leagueSel?.value||"").trim(); const slug=typeof afResolveLeagueSlug==="function"?afResolveLeagueSlug(leagueKey):leagueKey;
       const dateKey=fbEspnLocalDateKey(offset), dayLabel=offset===0?"today":"tomorrow";
       fixtureSel.innerHTML='<option value="">Loading '+dayLabel+' matches…</option>';
       try {
@@ -2068,8 +2161,8 @@ const FB_ESPN = {
           // returns zero matches even when matches exist. Query the selected league
           // directly; the league slug is then authoritative.
           try {
-            events = await fbEspnFetchLeagueDay(slug, offset, false);
-            if (!events.length) events = await fbEspnFetchLeagueDay(slug, offset, true);
+            events = await fbEspnFetchLeagueDay(slug, offset, false, leagueKey);
+            if (!events.length) events = await fbEspnFetchLeagueDay(slug, offset, true, leagueKey);
           } catch (leagueErr) {
             engineDebug("Selected ESPN league scoreboard failed", { league: slug, dateKey: dateKey, error: leagueErr?.message || String(leagueErr) });
             const stored = await fbWorldLoadFixtures();
@@ -2119,7 +2212,7 @@ const FB_ESPN = {
         if (typeof afSeedLiveStatusFromEvents === "function") {
           try { afSeedLiveStatusFromEvents(events, slug); } catch (_seedErr) {}
         }
-        fixtureSel.innerHTML='<option value="">'+(events.length?"— Select match —":"Fixture refresh failed")+'</option>'+(events||[]).map(function(x){var when="";if(x.date){var d=new Date(x.date);if(!isNaN(d.getTime()))when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}var label=(when?when+" — ":"")+(x.homeName||"")+" vs "+(x.awayName||"");return "<option value='"+JSON.stringify(x).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";}).join("");
+        fixtureSel.innerHTML='<option value="">'+(events.length?"— Select match —":"No matches this day (local)")+'</option>'+(events||[]).map(function(x){var when="";if(x.date){var d=new Date(x.date);if(!isNaN(d.getTime()))when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}var label=(when?when+" — ":"")+(x.homeName||"")+" vs "+(x.awayName||"");return "<option value='"+JSON.stringify(x).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";}).join("");
         fbEspnSetStatus(events.length?"Using stored world fixtures while refresh is unavailable.":"World fixture refresh failed: "+(e?.message||String(e)),events.length?"info":"error");
         return events;
       }
@@ -2238,7 +2331,7 @@ const FB_ESPN = {
     }
     // ---------- Team context: injuries, transfers, news ----------
     // These are surfaced as read-only context for you to weigh yourself —
-    // NOT mixed into the Poisson/Dixon-Coles projection math. There's no
+    // NOT mixed into the AF points projection math. There's no
     // trustworthy, calibrated number for "how many expected points does
     // losing this specific player cost," so guessing one and quietly baking
     // it into the projection would just be a confident-looking guess wearing
@@ -2432,7 +2525,7 @@ const FB_ESPN = {
       chosen.forEach(e=>{const mineHome=e.homeId===team.id;const hs=mineHome?e.homeScore:e.awayScore;const as=mineHome?e.awayScore:e.homeScore;scored.push(hs);allowed.push(as);if(!lastGameDate)lastGameDate=e.date;});
       const allLast7=events.filter(e=>{const t=Date.parse(e.date||"");return Number.isFinite(t)&&cutoff-t<=7*86400000&&cutoff>=t;}).length;
       const restDays=lastGameDate?Math.max(0,Math.floor((cutoff-Date.parse(lastGameDate))/86400000)-1):null;
-      // Advanced stats (xG/shots) AND 1st-half goals both live in ESPN's
+      // Advanced stats (xG/shots) AND 1st-half points both live in ESPN's
       // per-event summary/boxscore payload, so fetch it once per recent game
       // and derive both from that single fetch — no extra requests needed.
       // Full 10-game window (matches "Last 10 (Points)" FT), fetched in small
@@ -2509,9 +2602,9 @@ const FB_ESPN = {
       return [...map.values()].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0)).slice(0, maxGames);
     }
     async function fbEspnFetchCompetitionContext(slug, sampleEvents) {
-      const goals=[]; (sampleEvents||[]).forEach(e=>{if(e.finished&&Number.isFinite(e.homeScore)&&Number.isFinite(e.awayScore)){goals.push([e.homeScore,e.awayScore]);}});
-      const home=goals.length?goals.reduce((s,x)=>s+x[0],0)/goals.length:1.35, away=goals.length?goals.reduce((s,x)=>s+x[1],0)/goals.length:1.10;
-      return {homeAvg:clamp(home,0.4,2.5),awayAvg:clamp(away,0.3,2.3),seasonGoalFactor:1,strength:1,sample:goals.length};
+      const points=[]; (sampleEvents||[]).forEach(e=>{if(e.finished&&Number.isFinite(e.homeScore)&&Number.isFinite(e.awayScore)){points.push([e.homeScore,e.awayScore]);}});
+      const home=points.length?points.reduce((s,x)=>s+x[0],0)/points.length:22.5, away=points.length?points.reduce((s,x)=>s+x[1],0)/points.length:20.5;
+      return {homeAvg:clamp(home,7,45),awayAvg:clamp(away,7,45),seasonPointsFactor:1,strength:1,sample:points.length};
     }
     async function fbEspnResolveFixtureEvent(slug, teamAId, teamBId, aroundDate) {
       const base = Number.isFinite(Date.parse(aroundDate||"")) ? new Date(aroundDate) : new Date();
@@ -2759,7 +2852,7 @@ const FB_ESPN = {
 
     async function fbEspnOnLeagueChange() {
       const leagueSel=document.getElementById('leagueSelect');
-      const slug=typeof afResolveLeagueSlug==='function'?afResolveLeagueSlug(leagueSel?.value||''):(leagueSel?.value||'').trim();
+      const leagueKey=(leagueSel?.value||'').trim(); const slug=typeof afResolveLeagueSlug==='function'?afResolveLeagueSlug(leagueKey):leagueKey;
       // Selecting a league immediately opens ESPN Auto-Fetch, exactly like BB.
       document.querySelectorAll('.section').forEach(function(section){
         if(section.id!=='leagueSection') section.classList.add('collapsed');
@@ -2912,8 +3005,8 @@ const FB_ESPN = {
       // ---------- Points total model ----------
       // Derive point-share values from the blended projections above, then
       // combine each with its own projected total (1st-half or full-match)
-      // to get the segment's total-goals model — no game/match combinatorics
-      // chain, since football goals aren't a point-by-point race.
+      // to get the segment's total-points model — no game/match combinatorics
+      // chain, since football points aren't a point-by-point race.
       const ftSampleTier = ftSampleTierEarly;
       const h1SampleTier = h1SampleTierEarly;
       const pGame1Raw = derivePointWinProb(projA1H, projB1H);
@@ -2921,7 +3014,7 @@ const FB_ESPN = {
 
       // ELO layer: blend in who-actually-won history when enough of it
       // exists. Football's Elo match-win probability is used directly as a
-      // goal-share proxy — there's no game/point structure to invert it
+      // point-share proxy — there's no game/point structure to invert it
       // through the way the original table-tennis engine needed.
       const eloKeyA = getEloKey(document.getElementById("teamAName").value, document.getElementById("ssTeamAId").value);
       const eloKeyB = getEloKey(document.getElementById("teamBName").value, document.getElementById("ssTeamBId").value);
@@ -2936,7 +3029,7 @@ const FB_ESPN = {
       const matchMarkov = computeGoalsModel(pCombined, projAFT + projBFT);
 
       // Thin-sample anchor toward a league base. These are generic
-      // first-principles priors for total goals (not fitted to any real
+      // first-principles priors for total points (not fitted to any real
       // league's history yet) — full match and first half respectively.
       const ftN = Math.min(
         (aFT || []).filter(isFinite).length,
@@ -3308,7 +3401,7 @@ const FB_ESPN = {
         expect("empty advisory", getLeagueTrustMeta("").level, "advisory");
       });
 
-      suite("football goals total model", function() {
+      suite("football points total model", function() {
         expectTrue("computeGoalsModel export", typeof computeGoalsModel === "function");
         const neutral = computeGoalsModel(0.5, 2.6);
         expectApprox("share is carried through unchanged", neutral.pWin, 0.5, 0.001);
@@ -3317,7 +3410,7 @@ const FB_ESPN = {
         const zero = computeGoalsModel(0.5, 0);
         expectTrue("a 0-0 projection still returns a small positive variance floor", zero.varianceTotal > 0);
         const favorite = computeGoalsModel(0.8, 2.6);
-        expectApprox("goal-share above 0.5 doesn't change the total by itself", favorite.expectedTotal, neutral.expectedTotal, 0.001);
+        expectApprox("point-share above 0.5 doesn't change the total by itself", favorite.expectedTotal, neutral.expectedTotal, 0.001);
       });
 
       suite("derivePointWinProb / fatigue / probOverLine / integrity flag", function() {
@@ -3349,14 +3442,14 @@ const FB_ESPN = {
         expectTrue("getEloWeight is 0 with no rating history", getEloWeight(0, 0) === 0);
         expectTrue("getEloWeight rises with more matches", getEloWeight(20, 20) > getEloWeight(3, 3));
 
-        // Football's Elo layer feeds the goals model directly as a
-        // goal-share proxy — no game/point inversion chain to round-trip,
+        // Football's Elo layer feeds the points model directly as a
+        // point-share proxy — no game/point inversion chain to round-trip,
         // so just check the pipeline returns a sane, monotonic share.
         expectTrue("getEloImpliedGoalShare export", typeof getEloImpliedGoalShare === "function");
         const pMatch = eloMatchWinProb(1650, 1500);
         const shareResult = getEloImpliedGoalShare("test:_qa_share_a_", "test:_qa_share_b_");
-        expectTrue("goal-share pipeline returns a probability in range", shareResult.pShare > 0 && shareResult.pShare < 1);
-        expectTrue("a bigger Elo favorite gets a bigger implied goal-share", pMatch > 0.5);
+        expectTrue("point-share pipeline returns a probability in range", shareResult.pShare > 0 && shareResult.pShare < 1);
+        expectTrue("a bigger Elo favorite gets a bigger implied point-share", pMatch > 0.5);
 
         // Isolated update using throwaway keys so real rating data is untouched.
         const testKeyA = "test:_qa_elo_a_" + Date.now();
@@ -3389,15 +3482,18 @@ const FB_ESPN = {
 
       suite("Football Core V2 score model / markets", function() {
         expectTrue("FB2 core present", !!window.runEngine && typeof window.settleTrackedPickFromScore === "function");
-        const m = fb2_scoreMatrix(1.5, 1.0);
-        const x = fb2_1x2(m);
-        expectApprox("1X2 sums to 1", x.home + x.draw + x.away, 1, 0.001);
-        expectTrue("draw probability positive", x.draw > 0);
-        expectTrue("BTTS probability bounded", fb2_btts(m) >= 0 && fb2_btts(m) <= 1);
+        // AF unit checks (AF continuous points checks)
         expectTrue("quarter line parser preserves .25", parseMarketLine("2.25") === 2.25);
-        const ah = fb2_asianHandicap(m, -0.25, true);
-        expectTrue("Asian handicap result bounded", ah.win >= 0 && ah.loss >= 0 && ah.push >= 0 && ah.win + ah.loss + ah.push <= 1.001);
         expectTrue("fair odds positive", fb2_fairOdds(0.5) === 2);
+        if (typeof probOverLine === "function" && typeof normalCdf === "function") {
+          const p = probOverLine(47, 30, 47.5);
+          expectTrue("AF total over-prob bounded", p >= 0 && p <= 1);
+        }
+        if (typeof fb2_monteCarlo === "function") {
+          const mc = fb2_monteCarlo({ home: 24, away: 21 }, 1);
+          expectTrue("AF MC home+away ~1", Math.abs((mc.home + mc.away) - 1) < 0.02);
+          expectTrue("AF MC no draw mass", mc.draw === 0);
+        }
       });
 
       function run() {
@@ -3564,19 +3660,19 @@ const FB_ESPN = {
       HOME_ADVANTAGE: 2.4,
       MIN_LAMBDA: 3,
       MAX_LAMBDA: 45,
-      DIXON_COLES_RHO: -0.06,
+      /* rho removed */
       CALIBRATION_MIN: 30,
       MONTE_CARLO_SIMS: 20000,
       // Explicit blend weights — single source of truth (sum of each group ≈ 1)
       WEIGHTS: {
-        attackForm: 0.65,        // Dixon-Coles attack × opp defense base
-        attackObserved: 0.35,    // soft pull toward observed GF/GA
+        attackForm: 0.65,        // attack × opp defense base (points)
+        attackObserved: 0.35,    // soft pull toward observed PF/PA
         xgBlend: 0.40,           // when xG present, mix into lambda
         xgaBlend: 0.25,          // opponent xGA soft pull
         shotProxy: 0.16,         // SOT-derived proxy weight
         bigChance: 0.08,         // big chances soft pull
         h2h: 0.08,               // H2H when ≥3 games
-        eloShareCap: 0.08,       // max |goal-share| nudge from ELO
+        eloShareCap: 0.08,       // max |point-share| nudge from ELO
         eloShareScale: 0.12      // ELO win-edge → share multiplier
       }
     };
@@ -3596,7 +3692,7 @@ const FB_ESPN = {
         aTacticalAttack:auto.A?.ta,bTacticalAttack:auto.B?.ta,aTacticalDefense:auto.A?.td,bTacticalDefense:auto.B?.td,
         aFixtureLoad7d:auto.A?.matchesLast7d,bFixtureLoad7d:auto.B?.matchesLast7d,
         leagueHomeAvg:auto.context?.homeAvg,leagueAwayAvg:auto.context?.awayAvg,
-        seasonGoalFactor:auto.context?.seasonGoalFactor,competitionStrength:auto.context?.strength,
+        seasonPointsFactor:auto.context?.seasonPointsFactor,competitionStrength:auto.context?.strength,
         fixtureKickoff:auto.context?.kickoff
       };
       const v=map[id]; return Number.isFinite(Number(v))?Number(v):fallback;
@@ -3629,82 +3725,9 @@ const FB_ESPN = {
     function fb2_factorFromPct(id, neutral=50, maxShift=0.08) {
       const p=fb2_pct(id,neutral); return 1+((p-neutral)/50)*maxShift;
     }
-    function fb2_scorePmf(lambda,k) {
-      if(!Number.isFinite(lambda)||lambda<0||k<0) return 0;
-      let p=Math.exp(-lambda); for(let i=1;i<=k;i++) p*=lambda/i; return p;
-    }
-    function fb2_dcTau(h,a,lambdaHome,lambdaAway,rho=FB2.DIXON_COLES_RHO) {
-      if(h===0&&a===0) return 1-(lambdaHome*lambdaAway*rho);
-      if(h===0&&a===1) return 1+lambdaHome*rho;
-      if(h===1&&a===0) return 1+lambdaAway*rho;
-      if(h===1&&a===1) return 1-rho;
-      return 1;
-    }
-    function fb2_scoreMatrix(lambdaHome,lambdaAway) {
-      const H=FB2.MAX_GOALS,A=FB2.MAX_GOALS;
-      const m=Array.from({length:H+1},()=>Array(A+1).fill(0));
-      const rho=Number.isFinite(Number(window.__fbCoreOverrides?.dixonColesRho))?Number(window.__fbCoreOverrides.dixonColesRho):FB2.DIXON_COLES_RHO;
-      let total=0;
-      for(let h=0;h<=H;h++) for(let a=0;a<=A;a++){ const p=fb2_scorePmf(lambdaHome,h)*fb2_scorePmf(lambdaAway,a)*fb2_dcTau(h,a,lambdaHome,lambdaAway,rho); m[h][a]=p; total+=p; }
-      if(total<=0) return m;
-      for(let h=0;h<=H;h++) for(let a=0;a<=A;a++) m[h][a]/=total;
-      return m;
-    }
-    function fb2_fromMatrix(m,fn){ let s=0; for(let h=0;h<m.length;h++) for(let a=0;a<m[h].length;a++) if(fn(h,a)) s+=m[h][a]; return clamp(s,0,1); }
-    function fb2_goalDistribution(m){ const out=Array(FB2.MAX_GOALS*2+1).fill(0); for(let h=0;h<m.length;h++) for(let a=0;a<m[h].length;a++) out[h+a]=(out[h+a]||0)+m[h][a]; return out; }
-    function fb2_probTotalOver(m,line){
-      if(!Number.isFinite(line)) return null;
-      const q=Math.round(line*4)/4;
-      if(Math.abs(q-Math.round(q)-0.25)<1e-9 || Math.abs(q-Math.round(q)-0.75)<1e-9){
-        const lo=Math.floor(q), hi=lo+1, half=q<lo+0.5?0.25:0.75;
-        if(half===0.25) return fb2_probTotalOver(m,lo)*0.5 + fb2_probTotalOver(m,lo+0.5)*0.5;
-        return fb2_probTotalOver(m,lo+0.5)*0.5 + fb2_probTotalOver(m,hi)*0.5;
-      }
-      return fb2_fromMatrix(m,(h,a)=>h+a>q);
-    }
-    // Strict under mass (excludes push on whole-number lines). Never use 1-over.
-    function fb2_probTotalUnder(m,line){
-      if(!Number.isFinite(line)) return null;
-      const q=Math.round(line*4)/4;
-      if(Math.abs(q-Math.round(q)-0.25)<1e-9 || Math.abs(q-Math.round(q)-0.75)<1e-9){
-        const lo=Math.floor(q), hi=lo+1, half=q<lo+0.5?0.25:0.75;
-        if(half===0.25) return fb2_probTotalUnder(m,lo)*0.5 + fb2_probTotalUnder(m,lo+0.5)*0.5;
-        return fb2_probTotalUnder(m,lo+0.5)*0.5 + fb2_probTotalUnder(m,hi)*0.5;
-      }
-      return fb2_fromMatrix(m,(h,a)=>h+a<q);
-    }
-    function fb2_asianTotal(m,line,over=true){
-      const q=Math.round(Number(line)*4)/4;
-      const frac=q-Math.floor(q);
-      const settleHalf=(ln)=>{
-        const win=fb2_fromMatrix(m,(h,a)=>over?(h+a>ln):(h+a<ln));
-        const push=fb2_fromMatrix(m,(h,a)=>h+a===ln);
-        return {win,push,loss:Math.max(0,1-win-push)};
-      };
-      if(Math.abs(frac-0.25)<1e-9){ const l=Math.floor(q); const x=settleHalf(l),y=settleHalf(l+0.5); return {win:(x.win+y.win)/2,push:(x.push+y.push)/2,loss:(x.loss+y.loss)/2,line:q}; }
-      if(Math.abs(frac-0.75)<1e-9){ const l=Math.floor(q)+0.5; const x=settleHalf(l),y=settleHalf(l+0.5); return {win:(x.win+y.win)/2,push:(x.push+y.push)/2,loss:(x.loss+y.loss)/2,line:q}; }
-      return Object.assign(settleHalf(q),{line:q});
-    }
-    function fb2_poissonTeamOver(lambda,line){
-      const m=fb2_scoreMatrix(lambda,FB2.MIN_LAMBDA); return fb2_fromMatrix(m,(h)=>h>line);
-    }
-    function fb2_btts(m){ return fb2_fromMatrix(m,(h,a)=>h>0&&a>0); }
-    function fb2_1x2(m){ return {home:fb2_fromMatrix(m,(h,a)=>h>a),draw:fb2_fromMatrix(m,(h,a)=>h===a),away:fb2_fromMatrix(m,(h,a)=>h<a)}; }
-    function fb2_asianHandicap(m,line,home=true){
-      const q=Math.round(Number(line)*4)/4;
-      function single(ln){
-        let win=0,push=0,loss=0;
-        for(let h=0;h<m.length;h++) for(let a=0;a<m[h].length;a++){
-          const margin=home?(h-a)+ln:(a-h)+ln;
-          if(margin>0) win+=m[h][a]; else if(Math.abs(margin)<1e-9) push+=m[h][a]; else loss+=m[h][a];
-        }
-        return {win,push,loss};
-      }
-      const frac=q-Math.floor(q);
-      if(Math.abs(frac-0.25)<1e-9){const l=Math.floor(q),a=single(l),b=single(l+0.5);return {win:(a.win+b.win)/2,push:(a.push+b.push)/2,loss:(a.loss+b.loss)/2,line:q};}
-      if(Math.abs(frac-0.75)<1e-9){const l=Math.floor(q)+0.5,a=single(l),b=single(l+0.5);return {win:(a.win+b.win)/2,push:(a.push+b.push)/2,loss:(a.loss+b.loss)/2,line:q};}
-      return Object.assign(single(q),{line:q});
-    }
+    // Discrete scoreline stack removed — continuous points model only.
+    // Totals & spreads use normalCdf / probOverLine / AF_POINTS_MODEL.
+
     function fb2_impliedOdds(odds){ const o=Number(odds); return Number.isFinite(o)&&o>1 ? 1/o : null; }
     function fb2_devig(odds){
       const p=(odds||[]).map(fb2_impliedOdds); const s=p.filter(Number.isFinite).reduce((a,b)=>a+b,0); return s>0?p.map(x=>Number.isFinite(x)?x/s:null):[];
@@ -3778,13 +3801,13 @@ const FB_ESPN = {
       let stored=null;try{stored=JSON.parse(localStorage.getItem("AF_COMPETITION_PROFILE_"+key)||"null");}catch(e){}
       const auto=window.__fbAutoData||{};
       const home=fb2_num("leagueHomeAvg",auto.context?.homeAvg??stored?.homeAvg??22.5), away=fb2_num("leagueAwayAvg",auto.context?.awayAvg??stored?.awayAvg??20.5);
-      const season=clamp(fb2_num("seasonGoalFactor",auto.context?.seasonGoalFactor??stored?.seasonGoalFactor??1)||1,0.75,1.25);
+      const season=clamp(fb2_num("seasonPointsFactor",auto.context?.seasonPointsFactor??stored?.seasonPointsFactor??1)||1,0.75,1.25);
       const strength=clamp(fb2_num("competitionStrength",auto.context?.strength??stored?.strength??1)||1,0.75,1.25);
-      return {home:clamp(home*season*strength,0.4,2.5),away:clamp(away*season*strength,0.3,2.3),key,seasonGoalFactor:season,strength};
+      return {home:clamp(home*season*strength,0.4,2.5),away:clamp(away*season*strength,0.3,2.3),key,seasonPointsFactor:season,strength};
     }
-    window.saveFootballCompetitionProfile=function(name,homeAvg,awayAvg,seasonGoalFactor=1,strength=1){
+    window.saveFootballCompetitionProfile=function(name,homeAvg,awayAvg,seasonPointsFactor=1,strength=1){
       const key=String(name||"football_global").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
-      const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||1.35,0.4,2.5),awayAvg:clamp(Number(awayAvg)||1.10,0.3,2.3),seasonGoalFactor:clamp(Number(seasonGoalFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
+      const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||1.35,0.4,2.5),awayAvg:clamp(Number(awayAvg)||1.10,0.3,2.3),seasonPointsFactor:clamp(Number(seasonPointsFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
       localStorage.setItem("AF_COMPETITION_PROFILE_"+key,JSON.stringify(profile));return profile;
     };
     function fb2_modifier(team,opponent,home,context){
@@ -3820,7 +3843,7 @@ const FB_ESPN = {
       const aAttack=fb2_shrink(aGF,aN,prior.home), bAttack=fb2_shrink(bGF,bN,prior.away);
       const aDefense=fb2_shrink(aGA,aN,prior.away), bDefense=fb2_shrink(bGA,bN,prior.home);
       const W=FB2.WEIGHTS;
-      // Classic Dixon-Coles style: attack × opponent defence / league average
+      // Attack × opponent defence / league average (points)
       let home=aAttack*(bDefense/Math.max(0.25,prior.home));
       let away=bAttack*(aDefense/Math.max(0.25,prior.away));
       // Soft blend toward raw observed so auto-filled series are respected
@@ -3835,7 +3858,7 @@ const FB_ESPN = {
       const aAtk=clamp(AMod.attack,0.55,1.15), aDef=clamp(AMod.defense,0.70,1.15);
       const bAtk=clamp(BMod.attack,0.55,1.15), bDef=clamp(BMod.defense,0.70,1.15);
       home*=aAtk*bDef; away*=bAtk*aDef;
-      // Shot / SOT proxy — more stable than pure goals in small samples (already fetched)
+      // Shot / SOT proxy — more stable than pure points in small samples (already fetched)
       if(Number.isFinite(data.A.sot)&&data.A.sot>0){
         const shotProxyH=data.A.sot*0.30;
         if(shotProxyH>0.15) home=(1-W.shotProxy)*home+W.shotProxy*shotProxyH;
@@ -3851,7 +3874,7 @@ const FB_ESPN = {
         const hA=fb2_mean(h2hA),hB=fb2_mean(h2hB); home=(1-W.h2h)*home+W.h2h*hA; away=(1-W.h2h)*away+W.h2h*hB;
       }
       const elo=fb2_elo3Way(getEloKey(data.A.name,data.A.id),getEloKey(data.B.name,data.B.id));
-      // Convert ELO win-prob share into a gentle goal-share nudge (not a unit mix)
+      // Convert ELO win-prob share into a gentle point-share nudge (not a unit mix)
       const goalShare=home/Math.max(0.01,home+away);
       const eloWinEdge=(elo.home-elo.away);
       const eloNudge=clamp(eloWinEdge*W.eloShareScale*elo.weight,-W.eloShareCap,W.eloShareCap);
@@ -3899,11 +3922,37 @@ const FB_ESPN = {
       return {home:clamp(h,0,FB2.MAX_LAMBDA),away:clamp(a,0,FB2.MAX_LAMBDA),active:true,minute,hg,ag};
     }
     function fb2_seededRng(seed){let s=(Number(seed)>>>0)||123456789;return()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return(s>>>0)/4294967296;};}
-    function fb2_samplePoisson(lambda,rng){let L=Math.exp(-lambda),k=0,p=1;do{k++;p*=rng();}while(p>L&&k<40);return k-1;}
-    function fb2_monteCarlo(lambdas,seed=1){
-      const rng=fb2_seededRng(seed),n=FB2.MONTE_CARLO_SIMS;let hw=0,dr=0,aw=0,btts=0,tot=0;
-      for(let i=0;i<n;i++){const h=fb2_samplePoisson(lambdas.home,rng),a=fb2_samplePoisson(lambdas.away,rng);if(h>a)hw++;else if(h===a)dr++;else aw++;if(h>0&&a>0)btts++;tot+=h+a;}
-      return {home:hw/n,draw:dr/n,away:aw/n,btts:btts/n,expectedTotal:tot/n,sims:n};
+    function fb2_samplescoring(lambda,rng){let L=Math.exp(-lambda),k=0,p=1;do{k++;p*=rng();}while(p>L&&k<40);return k-1;}
+    function fb2_monteCarlo(lambdas, seed=1){
+      // AF: Gaussian margin / total sims (no discrete scoreline / draws)
+      const rng = (typeof fb2_seededRng === "function") ? fb2_seededRng(seed) : Math.random;
+      const n = Math.min(Number(FB2.MONTE_CARLO_SIMS) || 8000, 12000);
+      const home = Math.max(0, Number(lambdas.home) || 0);
+      const away = Math.max(0, Number(lambdas.away) || 0);
+      const total = home + away;
+      const M = (typeof AF_POINTS_MODEL !== "undefined" ? AF_POINTS_MODEL : {}) || {};
+      const sdT = Math.sqrt(Math.max(M.MIN_VARIANCE_FT || 28, total * (M.OVERDISPERSION || 1.45)));
+      const sdM = Math.sqrt(Math.max(20, sdT * sdT * 0.85));
+      let hw = 0, aw = 0, tot = 0;
+      function gauss() {
+        // Box-Muller
+        const u = Math.max(1e-9, typeof rng === "function" ? rng() : Math.random());
+        const v = Math.max(1e-9, typeof rng === "function" ? rng() : Math.random());
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+      for (let i = 0; i < n; i++) {
+        const margin = (home - away) + sdM * gauss();
+        if (margin > 0) hw++; else aw++;
+        tot += total + sdT * gauss();
+      }
+      return {
+        home: hw / n,
+        draw: 0,
+        away: aw / n,
+        
+        expectedTotal: tot / n,
+        sims: n
+      };
     }
     function fb2_calibrateBinary(marketKey,p){
       const rows=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])].filter(x=>x.marketKey===marketKey&&Number.isFinite(Number(x.modelProbability))&&(x.outcomeBinary===0||x.outcomeBinary===1));
@@ -3954,29 +4003,26 @@ const FB_ESPN = {
       const line=Number(p.line); const mk=String(p.marketKey||"");
       // Every market fb2_marketRows can generate is enumerated below; anything
       // this function still can't resolve (e.g. corners/cards/shots, which need
-      // actual match stats, not just goals) is left "pending" rather than
+      // actual match stats, not just points) is left "pending" rather than
       // defaulting to a fake loss.
       let status="pending";
-      if(mk==="1x2_home") status=h>a?"win":"loss";
-      else if(mk==="1x2_draw"||mk==="draw_only") status=h===a?"win":"loss";
-      else if(mk==="1x2_away") status=h<a?"win":"loss";
-      else if(mk==="double_1x") status=h>=a?"win":"loss";
-      else if(mk==="double_x2") status=a>=h?"win":"loss";
-      else if(mk==="double_12") status=h!==a?"win":"loss";
-      else if(mk==="btts_yes") status=h>0&&a>0?"win":"loss";
-      else if(mk==="btts_no") status=h===0||a===0?"win":"loss";
-      else if(haveH1&&mk==="h1_1x2_home") status=h1h>h1a?"win":"loss";
-      else if(haveH1&&mk==="h1_1x2_draw") status=h1h===h1a?"win":"loss";
-      else if(haveH1&&mk==="h1_1x2_away") status=h1a>h1h?"win":"loss";
-      else if(haveH1&&/^htft_[HDA][HDA]$/.test(mk)){ const h1r=h1h>h1a?"H":h1h===h1a?"D":"A", ftr=h>a?"H":h===a?"D":"A"; status=mk==="htft_"+h1r+ftr?"win":"loss"; }
-      else if(haveH1&&/^h1_cs_(\d+)_(\d+)$/.test(mk)){ const mm=mk.match(/^h1_cs_(\d+)_(\d+)$/); status=(h1h===Number(mm[1])&&h1a===Number(mm[2]))?"win":"loss"; }
-      else if(haveH1&&haveH2&&mk==="high_1h") status=h1Total===h2Total?"push":(h1Total>h2Total?"win":"loss");
-      else if(haveH1&&haveH2&&mk==="high_2h") status=h1Total===h2Total?"push":(h2Total>h1Total?"win":"loss");
+      if(mk==="ml_home") status=h>a?"win":(h===a?"push":"loss");
+      else if(mk==="ml_away") status=a>h?"win":(h===a?"push":"loss");
+      else if(mk==="spread_home"||mk==="ah_home"){
+        const adj = h + (Number.isFinite(line)?line:0);
+        status = adj>a ? "win" : (adj===a ? "push" : "loss");
+      }
+      else if(mk==="spread_away"||mk==="ah_away"){
+        const adj = a - (Number.isFinite(line)?line:0);
+        // away covers when away score beats home with opposite of home line
+        const homeAdj = h + (Number.isFinite(line)?line:0);
+        status = homeAdj<a ? "win" : (homeAdj===a ? "push" : "loss");
+      }
       else if(mk==="ft_over"||mk==="ft_under"){ const r=fb2_settleTotal(total,line); if(r) status=mk==="ft_over"?r:fb2_flipResult(r); }
       else if(haveH1&&(mk==="h1_over"||mk==="h1_under")){ const r=fb2_settleTotal(h1Total,line); if(r) status=mk==="h1_over"?r:fb2_flipResult(r); }
       else if(haveH2&&(mk==="h2_over"||mk==="h2_under")){ const r=fb2_settleTotal(h2Total,line); if(r) status=mk==="h2_over"?r:fb2_flipResult(r); }
-      else if(mk==="teamA_over"||mk==="teamA_under"){ const r=fb2_settleTotal(h,line); if(r) status=mk==="teamA_over"?r:fb2_flipResult(r); }
-      else if(mk==="teamB_over"||mk==="teamB_under"){ const r=fb2_settleTotal(a,line); if(r) status=mk==="teamB_over"?r:fb2_flipResult(r); }
+      else if(mk==="teamA_over"||mk==="teamA_under"||mk==="team_a_over"||mk==="team_a_under"){ const r=fb2_settleTotal(h,line); if(r) status=(mk==="teamA_over"||mk==="team_a_over")?r:fb2_flipResult(r); }
+      else if(mk==="teamB_over"||mk==="teamB_under"||mk==="team_b_over"||mk==="team_b_under"){ const r=fb2_settleTotal(a,line); if(r) status=(mk==="teamB_over"||mk==="team_b_over")?r:fb2_flipResult(r); }
       else if(mk==="ah_home"||mk==="ah_away"){
         const homeSide=mk==="ah_home"; const margin=homeSide?(h-a)+line:(a-h)+line; const frac=Math.round(line*4)%2!==0;
         if(frac){
@@ -4035,7 +4081,7 @@ const FB_ESPN = {
     };
 
     function fb2_marketRows(data,ctx,lambdas,fhLambdas,ftM,h1M,integrity,sample){
-      // AF live markets only — Game Total, 1H Total, Spread, Team Totals, Moneyline (no draw/BTTS/CS)
+      // AF live markets only — Game Total, 1H Total, Spread, Team Totals, Moneyline (AF markets only)
       const rows=[];
       const odds={
         home:fb2_parseOdds("oddsHome"),
@@ -4214,7 +4260,7 @@ const FB_ESPN = {
       if(!data.A.gf.length||!data.B.gf.length){alert("Enter or auto-fill recent points scored for both teams before running.");return;}
       if(data.A.gf.length<4||data.B.gf.length<4) engineDebug("Thin AF sample",{home:data.A.gf.length,away:data.B.gf.length});
       const lambdas=fb2_lambdas(data,ctx),live=fb2_liveAdjust(lambdas);const activeL={home:live.home,away:live.away};
-      const fh=fb2_firstHalf(data,lambdas);const ftM=null,h1M=null; // AF path: continuous points model — no soccer score matrix
+      const fh=fb2_firstHalf(data,lambdas);const ftM=null,h1M=null; // AF path: continuous points model — no discrete score matrix
       const sample=Math.min(data.A.gf.length,data.B.gf.length);const volatility=Math.max(getVolatilityRatio(data.A.gf.concat(data.B.gf),8),getVolatilityRatio(data.A.ga.concat(data.B.ga),8));
       // Squad churn (recent transactions / a likely manager change) never
       // shifts the projection mean — direction is unknowable — but it does
@@ -4237,8 +4283,22 @@ const FB_ESPN = {
       const rawEventsA=Array.isArray(window.__ssRawEvents?.A)?window.__ssRawEvents.A:[],rawEventsB=Array.isArray(window.__ssRawEvents?.B)?window.__ssRawEvents.B:[];
       const featureState={competition:ctx.competition,season:ctx.season,home:data.A,away:data.B,lambdaHome:activeL.home,lambdaAway:activeL.away};
       window.__fbCoreConfig={version:FB2.VERSION,constants:FB2,competitionPrior:fb2_competitionPrior(),featureHash:(typeof hash==="function"?hash(featureState):null),dataFingerprint:(typeof hash==="function"?hash({a:rawEventsA.map(e=>e.id||e.startTimestamp||0),b:rawEventsB.map(e=>e.id||e.startTimestamp||0)}):null),updatedAt:new Date().toISOString()};
-      const mc=fb2_monteCarlo(activeL,Date.now()&0xffffffff);let x12=fb2_1x2(ftM);const elo=lambdas.elo||{home:x12.home,draw:x12.draw,away:x12.away,weight:0};const ew=elo.weight||0;x12={home:x12.home*(1-ew)+elo.home*ew,draw:x12.draw*(1-ew)+elo.draw*ew,away:x12.away*(1-ew)+elo.away*ew};const xsum=x12.home+x12.draw+x12.away;x12.home/=xsum;x12.draw/=xsum;x12.away/=xsum;const btts=fb2_btts(ftM);
-      const fixtureMeta={eventId:ctx.eventId||("manual_fb_"+Date.now()),eventDate:ctx.kickoff,homeTeam:data.A.name,awayTeam:data.B.name,homeTeamId:data.A.id,awayTeamId:data.B.id,league:ctx.competition||"Unknown competition",season:ctx.season,venue:ctx.venue,competitionType:ctx.competitionType,tournamentId:ctx.tournamentId,eloKeyA:getEloKey(data.A.name,data.A.id),eloKeyB:getEloKey(data.B.name,data.B.id),modelVersion:FB2.VERSION,lambdaHome:activeL.home,lambdaAway:activeL.away,homeWinProbability:x12.home,drawProbability:x12.draw,awayWinProbability:x12.away,bttsProbability:btts,monteCarlo:mc,elo:lambdas.elo||null};
+      const mc=fb2_monteCarlo(activeL,Date.now()&0xffffffff);
+      // AF moneyline probs from continuous margin (no draw)
+      const _margin = (Number(activeL.home)||0) - (Number(activeL.away)||0);
+      const _M = (typeof AF_POINTS_MODEL !== "undefined" ? AF_POINTS_MODEL : {}) || {};
+      const _ftTot = (Number(activeL.home)||0) + (Number(activeL.away)||0);
+      const _sdM = Math.sqrt(Math.max(20, Math.max(_M.MIN_VARIANCE_FT||28, _ftTot*(_M.OVERDISPERSION||1.45))*0.85));
+      const _z = (0 - _margin) / Math.max(0.01, _sdM);
+      let pHome = (typeof normalCdf === "function") ? (1 - normalCdf(_z)) : (mc.home || 0.5);
+      let pAway = 1 - pHome;
+      const elo = lambdas.elo || null;
+      if (elo && Number(elo.weight) > 0) {
+        const ew = Math.min(0.35, Number(elo.weight) || 0);
+        pHome = pHome * (1 - ew) + (Number(elo.home) || pHome) * ew;
+        pAway = 1 - pHome;
+      }
+      const fixtureMeta={eventId:ctx.eventId||("manual_fb_"+Date.now()),eventDate:ctx.kickoff,homeTeam:data.A.name,awayTeam:data.B.name,homeTeamId:data.A.id,awayTeamId:data.B.id,league:ctx.competition||"Unknown competition",season:ctx.season,venue:ctx.venue,competitionType:ctx.competitionType,tournamentId:ctx.tournamentId,eloKeyA:getEloKey(data.A.name,data.A.id),eloKeyB:getEloKey(data.B.name,data.B.id),modelVersion:FB2.VERSION,lambdaHome:activeL.home,lambdaAway:activeL.away,homeWinProbability:pHome,drawProbability:0,awayWinProbability:pAway,monteCarlo:mc,elo:elo};
       const leagueTrust=getLeagueTrustMeta(fixtureMeta.league);const payloads=[];
       actionable.forEach(p=>{const side=p.side||getPickSideFromText(p.pick);const signature=fixtureMeta.eventId+"|"+p.marketKey+"|"+side;payloads.push({eventId:fixtureMeta.eventId,eventDate:fixtureMeta.eventDate,homeTeam:fixtureMeta.homeTeam,awayTeam:fixtureMeta.awayTeam,homeTeamId:fixtureMeta.homeTeamId,awayTeamId:fixtureMeta.awayTeamId,league:fixtureMeta.league,season:fixtureMeta.season,venue:fixtureMeta.venue,competitionType:fixtureMeta.competitionType,tournamentId:fixtureMeta.tournamentId,eloKeyA:fixtureMeta.eloKeyA,eloKeyB:fixtureMeta.eloKeyB,leagueTrust:leagueTrust.level,marketKey:p.marketKey,marketName:p.name,line:p.line,projection:Number.isFinite(p.projection)?p.projection:null,modelProbability:Number.isFinite(p.prob)?p.prob:null,featureHash:window.__fbCoreConfig?.featureHash||null,configHash:(typeof hash==="function"?hash(window.__fbCoreConfig||{}):null),rawModelProbability:Number.isFinite(p.rawProb)?p.rawProb:null,fairOdds:fb2_fairOdds(p.prob),odds:Number.isFinite(p.odds)?p.odds:null,ev:Number.isFinite(p.ev)?p.ev:null,edge:Number.isFinite(p.projection)&&Number.isFinite(p.line)?p.projection-p.line:null,edgePct:Number.isFinite(p.projection)&&Number.isFinite(p.line)&&p.line?((p.projection-p.line)/p.line)*100:null,predictionText:p.pick,confidenceGrade:p.grade,side:side,resultStatus:"pending",signature,createdAt:new Date().toISOString(),isLock:!!p.isLock,trap:!!p.trap,sampleTier:sample>=8?"full":sample>=4?"thin":"insufficient",integrityFlag:integrity,actualHomeGoals:null,actualAwayGoals:null});});
       if(payloads.length){
@@ -4249,8 +4309,8 @@ const FB_ESPN = {
         }
         addTrackedPicks(payloads);
       }
-      engineDebug("Football Core V2 complete",{context:ctx,lambdas:activeL,firstHalf:fh,oneXTwo:x12,btts,monteCarlo:mc,actionable:actionable.length,integrity,churn,volatility:+volatility.toFixed(2),sample,leagueTrust:leagueTrust.level});
-      const st=document.getElementById("fixtureContextStatus");if(st)st.textContent=`${ctx.competition||"Unknown competition"} · ${ctx.eventId?"Event "+ctx.eventId:"manual fixture ID"} · λ ${activeL.home.toFixed(2)}–${activeL.away.toFixed(2)} · 1X2 ${(x12.home*100).toFixed(1)} / ${(x12.draw*100).toFixed(1)} / ${(x12.away*100).toFixed(1)} · BTTS ${(btts*100).toFixed(1)}%`;
+      engineDebug("AF Core complete",{context:ctx,lambdas:activeL,firstHalf:fh,ml:{home:pHome,away:pAway},monteCarlo:mc,actionable:actionable.length,integrity,churn,volatility:+volatility.toFixed(2),sample,leagueTrust:leagueTrust.level});
+      const st=document.getElementById("fixtureContextStatus");if(st)st.textContent=`${ctx.competition||"Unknown competition"} · ${ctx.eventId?"Event "+ctx.eventId:"manual fixture ID"} · λ ${activeL.home.toFixed(2)}–${activeL.away.toFixed(2)} · ML ${(pHome*100).toFixed(1)}–${(pAway*100).toFixed(1)} · Total ~${((Number(activeL.home)||0)+(Number(activeL.away)||0)).toFixed(1)}`;
     }
     function loadFbVerifiedConfig(market){
       try{const x=JSON.parse(localStorage.getItem('FOOTBALL_THRESHOLD_VERIFIED_'+String(market))||'null');return x||null;}catch(e){return null;}
@@ -4299,8 +4359,7 @@ const FB_ESPN = {
     }
     // runEngineLegacy (further up this file) is kept only for the internal
     // regression test suite / as a reference implementation — production now
-    // runs the restored Football Core V2 (fb2_runEngine): Dixon-Coles-adjusted
-    // score matrix, full market suite, calibration, and EV-based grading.
+    // runs the AF Core (fb2_runEngine): continuous points model, AF market suite, calibration, and EV-based grading.
     function runEngine(){return fb2_runEngine();}
     window.engineDebug=engineDebug;
     window.getPick=getPick;
@@ -4310,7 +4369,7 @@ const FB_ESPN = {
     window.getSampleTier=getSampleTier;
     window.detectTrap=detectTrap;
     window.getVolatilityRatio=getVolatilityRatio;
-    window.fb2_runEngine=runEngine;window.fbResetUiToFreshPage=fbResetUiToFreshPage;window.fb2_competitionLabel=fb2_competitionLabel;window.fb2_scoreMatrix=fb2_scoreMatrix;window.fb2_1x2=fb2_1x2;window.fb2_btts=fb2_btts;window.fb2_asianHandicap=fb2_asianHandicap;window.fb2_fairOdds=fb2_fairOdds;window.loadFbVerifiedConfig=loadFbVerifiedConfig;window.toggleTheme=toggleTheme;window.clearAll=clearAll;window.runEngine=runEngine;
+    window.fb2_runEngine=runEngine;window.fbResetUiToFreshPage=fbResetUiToFreshPage;window.fb2_competitionLabel=fb2_competitionLabel;window.fb2_fairOdds=fb2_fairOdds;window.loadFbVerifiedConfig=loadFbVerifiedConfig;window.toggleTheme=toggleTheme;window.clearAll=clearAll;window.runEngine=runEngine;
 
     // ---------- Tracker / settlement core (self-contained) ----------
     // The football build previously referenced the basketball tracker API
@@ -4924,11 +4983,11 @@ const FB_ESPN = {
     async function settleTrackedPickFromScore(signature,summary){
       const all=[...g_trackerState.activePicks,...g_trackerState.archivedPicks]; const pick=all.find(p=>p.signature===signature); if(!pick)return null;
       let status=null;
-      // Full market-suite settlement (1X2, BTTS, AH, correct score, HT/FT, etc.)
+      // AF market settlement (totals, spread, team totals, moneyline)
       // — covers every marketKey fb2_marketRows can produce. Falls through to
       // the legacy ft/h1/h2 path below for picks made before this market suite
       // was restored, or if fb2_settlePickFromScore leaves it "pending" (e.g.
-      // corners/cards/shots, which need real match stats, not just goals).
+      // corners/cards/shots, which need real match stats, not just points).
       if(typeof fb2_settlePickFromScore==='function'){
         const raw=fbFootballRawScoreFromSummary(summary);
         if(raw){
