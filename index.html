@@ -574,10 +574,10 @@
     </div>
   </div>
   <div class="section" id="h2hSection">
-    <h3>H2H <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled</span></h3>
+    <h3>H2H (Last 5) <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled</span></h3>
     <label><input type="checkbox" id="useFTH2H" aria-label="Use Game H2H (min 2 games)" /> Use Game H2H (min 2 games)</label>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-      <input id="aFTH2H" placeholder="Team A game points vs B" aria-label="Team A full-time points scored in head-to-head meetings vs Team B" />
+      <input id="aFTH2H" placeholder="last 5 H2H points" placeholder="Team A game points vs B" aria-label="Team A full-time points scored in head-to-head meetings vs Team B" />
       <input id="bFTH2H" placeholder="Team B game points vs A" aria-label="Team B full-time points scored in head-to-head meetings vs Team A" />
     </div>
     <div id="h2h1HSection" style="margin-top:6px;">
@@ -731,7 +731,6 @@
         '<button onclick="AFDB.clear()" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;">🗑️ Clear</button>' +
         '<button onclick="AFDB.runTestFetch()" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;box-shadow:0 0 8px rgba(217,31,38,0.4);">🚨 MILITARY RAID</button>' +
         '<button onclick="window.openVisualReportFromDebug()" style="background:#111;border:1px solid #333;color:#d4af37;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;">📊 Tracker Report</button>' +
-        '<button onclick="window.EngineAuditor ? EngineAuditor.open() : alert(\'Full Audit: EngineAuditor not loaded\')" style="background:#0a1f0a;border:1px solid #2f8f4a;color:#49ff7a;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;box-shadow:0 0 8px rgba(47,143,74,0.4);">🩺 Full Audit</button>' +
         '<button onclick="AFDB.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">✕ Close</button>';
 
       const emptyMsg = _showOnlyErrors ? 'No suspects arrested. The code is clean.' : 'No log entries yet. Run a prediction.';
@@ -895,7 +894,7 @@
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "af_engine_v1_nfl_v1";
+    const APP_BUILD_VERSION = "af_engine_v2_points_h2h5";
     const ENGINE_MODEL_VERSION = "af_v1_nfl_points";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
@@ -1160,14 +1159,24 @@
      * pulled into the existing retrospective tuner the same way
      * __fbThresholds already is.
      */
-    const FOOTBALL_MODEL = {
-      SHARE_DAMPING: 0.62,       // compress point-share toward 0.5 — proxy signal, not a literal scoreline
-      MATCH_PROXY_DAMPING: 0.42, // extra damping when share is inferred from noisier full-match aggregates
-      FATIGUE_STEP: 0.012,       // per-share shift per extra match played in the last few days (fixture congestion)
-      FATIGUE_CAP: 0.06,         // hard cap on total fatigue shift
-      INTEGRITY_VOL_CEILING: 2.2,// volRatio above this is flagged as an integrity risk, not just a "trap"
-      OVERDISPERSION: 1.35       // variance inflator (AF point totals spread wider than pure Poisson)
+    const AF_POINTS_MODEL = {
+      // American football point-share + total model (full AF rewrite)
+      SHARE_DAMPING: 0.55,          // compress attack share toward 0.5
+      MATCH_PROXY_DAMPING: 0.40,
+      FATIGUE_STEP: 0.008,          // short week / congestion (less than soccer)
+      FATIGUE_CAP: 0.04,
+      INTEGRITY_VOL_CEILING: 2.5,
+      OVERDISPERSION: 1.45,         // point totals overdisperse vs pure Poisson
+      HOME_FIELD_POINTS: 2.4,       // typical NFL HFA in points
+      MIN_VARIANCE_FT: 28,          // floor variance for game totals (~sd 5+)
+      MIN_VARIANCE_H1: 12,          // floor for 1H totals
+      REGRESSION_TO_MEAN: 0.18,     // pull extreme form means toward league avg
+      LEAGUE_AVG_POINTS: 22.5,      // per-team scoring baseline (NFL-ish)
+      LEAGUE_AVG_TOTAL: 45.0,       // typical game total baseline
+      H2H_WEIGHT_CAP: 0.28,         // max blend weight for last-5 H2H
+      FORM_WEIGHT: 0.72
     };
+    const FOOTBALL_MODEL = AF_POINTS_MODEL; // alias so existing refs keep working
     /** Derive a point-share value from two "expected points" projections. */
     function derivePointWinProb(projFor, projAgainst, damping) {
       if (!isFinite(projFor) || !isFinite(projAgainst) || (projFor + projAgainst) <= 0) return 0.5;
@@ -1210,14 +1219,44 @@
      * model lean toward") — it does not reshape the total the way a TT
      * point-process would.
      */
-    function computeGoalsModel(pFor, expectedTotal) {
+    function computeGoalsModel(pFor, expectedTotal, segment) {
+      // AF full rewrite: points distribution (kept name for call-site compatibility)
+      return computePointsModel(pFor, expectedTotal, segment);
+    }
+    function computePointsModel(pFor, expectedTotal, segment) {
       const et = Math.max(0, Number(expectedTotal) || 0);
-      const varianceTotal = Math.max(0.15, et * FOOTBALL_MODEL.OVERDISPERSION);
+      const M = (typeof AF_POINTS_MODEL !== "undefined" ? AF_POINTS_MODEL : FOOTBALL_MODEL) || {};
+      const minVar = (segment === "h1" || segment === "1h")
+        ? (M.MIN_VARIANCE_H1 || 12)
+        : (M.MIN_VARIANCE_FT || 28);
+      // Variance scales with total but never collapses on low samples
+      const varianceTotal = Math.max(minVar, et * (M.OVERDISPERSION || 1.45));
       return {
-        pWin: Math.max(0, Math.min(1, Number(pFor))),
+        pWin: Math.max(0, Math.min(1, Number(pFor) || 0.5)),
         expectedTotal: et,
-        varianceTotal: varianceTotal
+        varianceTotal: varianceTotal,
+        model: "af_points_v1"
       };
+    }
+    /** Apply home-field advantage to team projections (points). */
+    function afApplyHomeField(projHome, projAway) {
+      const M = AF_POINTS_MODEL || FOOTBALL_MODEL || {};
+      const hfa = Number(M.HOME_FIELD_POINTS) || 2.4;
+      return {
+        home: Math.max(0, Number(projHome) || 0) + hfa * 0.55,
+        away: Math.max(0, Number(projAway) || 0) - hfa * 0.45
+      };
+    }
+    /** Regress a form mean toward league average to avoid overfit on small samples. */
+    function afRegressMean(mean, samples) {
+      const M = AF_POINTS_MODEL || FOOTBALL_MODEL || {};
+      const baseline = Number(M.LEAGUE_AVG_POINTS) || 22.5;
+      const n = Array.isArray(samples) ? samples.length : Number(samples) || 0;
+      const strength = Math.min(1, n / 8);
+      const reg = Number(M.REGRESSION_TO_MEAN) || 0.18;
+      const w = reg * (1 - strength);
+      const m = Number(mean) || 0;
+      return m * (1 - w) + baseline * w;
     }
     /** Abramowitz-Stegun approximation of the standard normal CDF. */
     function normalCdf(x) {
@@ -2019,6 +2058,9 @@ const FB_ESPN = {
         const stored=await fbWorldLoadFixtures();
         let events=stored.filter(function(x){return (x.dateKey||fbWorldDateKeyFromDate(x.date))===dateKey;});
         if(slug) events=events.filter(function(x){return String(x.leagueSlug||"").toLowerCase()===slug.toLowerCase();});
+        if (typeof afSeedLiveStatusFromEvents === "function") {
+          try { afSeedLiveStatusFromEvents(events, slug); } catch (_seedErr) {}
+        }
         fixtureSel.innerHTML='<option value="">'+(events.length?"— Select match —":"Fixture refresh failed")+'</option>'+(events||[]).map(function(x){var when="";if(x.date){var d=new Date(x.date);if(!isNaN(d.getTime()))when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}var label=(when?when+" — ":"")+(x.homeName||"")+" vs "+(x.awayName||"");return "<option value='"+JSON.stringify(x).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";}).join("");
         fbEspnSetStatus(events.length?"Using stored world fixtures while refresh is unavailable.":"World fixture refresh failed: "+(e?.message||String(e)),events.length?"info":"error");
         return events;
@@ -2359,7 +2401,7 @@ const FB_ESPN = {
     }
     function fbEspnFindH2H(eventsA,eventsB,idA,idB,cutoff) {
       const map=new Map(); [...eventsA,...eventsB].forEach(e=>{if(e.homeId!==idA&&e.awayId!==idA&&e.homeId!==idB&&e.awayId!==idB)return;if(!e.finished||!Number.isFinite(e.homeScore)||!Number.isFinite(e.awayScore))return;const hasA=(e.homeId===idA||e.awayId===idA),hasB=(e.homeId===idB||e.awayId===idB);if(hasA&&hasB)map.set(e.id,e);});
-      return [...map.values()].filter(e=>!cutoff||Date.parse(e.date||0)<cutoff).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0)).slice(0,10);
+      return [...map.values()].filter(e=>!cutoff||Date.parse(e.date||0)<cutoff).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0)).slice(0,5);
     }
     // /teams/{id}/schedule with no `season` param returns ESPN's *current*
     // season only, so fbEspnFindH2H (above) can only ever see meetings that
@@ -2382,7 +2424,7 @@ const FB_ESPN = {
       FB_ESPN.leagueCache.set(key, events);
       return events;
     }
-    async function fbEspnFindH2HDeep(slug, idA, idB, cutoff, eventsA, eventsB, maxGames = 10, maxSeasonsBack = 10) {
+    async function fbEspnFindH2HDeep(slug, idA, idB, cutoff, eventsA, eventsB, maxGames = 5, maxSeasonsBack = 8) {
       const map = new Map();
       const add = e => {
         if (!e || !e.finished || !Number.isFinite(e.homeScore) || !Number.isFinite(e.awayScore)) return;
@@ -2593,7 +2635,7 @@ const FB_ESPN = {
 
         const cutoff = fixtureDate ? Date.parse(fixtureDate) : Date.now();
         let h2hRecent = fbEspnFindH2H(dataA.events || [], dataB.events || [], String(teamA.id), String(teamB.id), cutoff);
-        setSt("⏳ Loading up to 10 H2H meetings across historical seasons…", "info");
+        setSt("⏳ Loading up to 5 H2H meetings across historical seasons…", "info");
         let h2h = await fbEspnFindH2HDeep(
           slug,
           String(teamA.id),
@@ -2764,24 +2806,49 @@ const FB_ESPN = {
       const h1W = getDynamicWeights(h1SampleTierEarly, h1VolEarly);
 
       // Team scored * teamWeight + opponent allowed * oppWeight (replaces fixed 50/50).
-      let projAFT = aFT_avg * ftW.teamWeight + bFA_avg * ftW.oppWeight;
-      let projBFT = bFT_avg * ftW.teamWeight + aFA_avg * ftW.oppWeight;
-      let projA1H = a1H_avg * h1W.teamWeight + b1A_avg * h1W.oppWeight;
-      let projB1H = b1H_avg * h1W.teamWeight + a1A_avg * h1W.oppWeight;
+      // AF full rewrite: regress form means, blend attack/defense, H2H last-5, home field
+      const aFT_r = typeof afRegressMean === "function" ? afRegressMean(aFT_avg, aFT) : aFT_avg;
+      const aFA_r = typeof afRegressMean === "function" ? afRegressMean(aFA_avg, aFA) : aFA_avg;
+      const bFT_r = typeof afRegressMean === "function" ? afRegressMean(bFT_avg, bFT) : bFT_avg;
+      const bFA_r = typeof afRegressMean === "function" ? afRegressMean(bFA_avg, bFA) : bFA_avg;
+      const a1H_r = typeof afRegressMean === "function" ? afRegressMean(a1H_avg, a1H) : a1H_avg;
+      const a1A_r = typeof afRegressMean === "function" ? afRegressMean(a1A_avg, a1A) : a1A_avg;
+      const b1H_r = typeof afRegressMean === "function" ? afRegressMean(b1H_avg, b1H) : b1H_avg;
+      const b1A_r = typeof afRegressMean === "function" ? afRegressMean(b1A_avg, b1A) : b1A_avg;
 
-      if(useH2H && h2hA.length>=2 && h2hB.length>=2) {
-        const h2hA_avg = avg(h2hA);
-        const h2hB_avg = avg(h2hB);
-        const w = Math.min(0.30, 0.15 + h2hA.length*0.03);
-        projAFT = projAFT*(1-w) + h2hA_avg*w;
-        projBFT = projBFT*(1-w) + h2hB_avg*w;
+      let projAFT = aFT_r * ftW.teamWeight + bFA_r * ftW.oppWeight;
+      let projBFT = bFT_r * ftW.teamWeight + aFA_r * ftW.oppWeight;
+      let projA1H = a1H_r * h1W.teamWeight + b1A_r * h1W.oppWeight;
+      let projB1H = b1H_r * h1W.teamWeight + a1A_r * h1W.oppWeight;
+
+      // H2H last 5 only (hard-capped weight)
+      const h2hCap = (typeof AF_POINTS_MODEL !== "undefined" && AF_POINTS_MODEL.H2H_WEIGHT_CAP) ? AF_POINTS_MODEL.H2H_WEIGHT_CAP : 0.28;
+      if (useH2H && h2hA.length >= 2 && h2hB.length >= 2) {
+        const h2hA_avg = avg(h2hA.slice(0, 5));
+        const h2hB_avg = avg(h2hB.slice(0, 5));
+        const n = Math.min(5, h2hA.length, h2hB.length);
+        const w = Math.min(h2hCap, 0.12 + n * 0.03);
+        projAFT = projAFT * (1 - w) + h2hA_avg * w;
+        projBFT = projBFT * (1 - w) + h2hB_avg * w;
       }
-      if(useH2H1 && h2h1A.length>=2 && h2h1B.length>=2) {
-        const h2h1A_avg = avg(h2h1A);
-        const h2h1B_avg = avg(h2h1B);
-        const w = Math.min(0.30, 0.15 + h2h1A.length*0.03);
-        projA1H = projA1H*(1-w) + h2h1A_avg*w;
-        projB1H = projB1H*(1-w) + h2h1B_avg*w;
+      if (useH2H1 && h2h1A.length >= 2 && h2h1B.length >= 2) {
+        const h2h1A_avg = avg(h2h1A.slice(0, 5));
+        const h2h1B_avg = avg(h2h1B.slice(0, 5));
+        const n = Math.min(5, h2h1A.length, h2h1B.length);
+        const w = Math.min(h2hCap, 0.12 + n * 0.03);
+        projA1H = projA1H * (1 - w) + h2h1A_avg * w;
+        projB1H = projB1H * (1 - w) + h2h1B_avg * w;
+      }
+
+      // Home-field advantage (Team A = home in this engine's convention)
+      if (typeof afApplyHomeField === "function") {
+        const adj = afApplyHomeField(projAFT, projBFT);
+        projAFT = adj.home;
+        projBFT = adj.away;
+        const adj1 = afApplyHomeField(projA1H, projB1H);
+        // 1H gets ~45% of full-game HFA
+        projA1H = projA1H + (adj1.home - projA1H) * 0.45;
+        projB1H = projB1H + (adj1.away - projB1H) * 0.45;
       }
 
       // ---------- Points total model ----------
@@ -4285,7 +4352,16 @@ const FB_ESPN = {
         if(st==="pending"){
           // Unique per-row id (index) — prevents blank cells when signatures collide
           const uniquePid = "r"+idx+"_"+String(pId||"").slice(0,12);
-          statusHtml='<div class="tracker-disp-toggle" data-pid="'+uniquePid+'" style="font-weight:900;font-size:10px;cursor:pointer;text-decoration:underline dotted #ccc;" title="Click to settle">PENDING</div>'+
+          const _eid = String(p.eventId || "");
+          const _live = (typeof g_liveGameStatus !== "undefined" && _eid) ? g_liveGameStatus.get(_eid) : null;
+          let _liveLabel = "PENDING";
+          if (_live) {
+            if (_live.clock === "HALF") _liveLabel = "HALF";
+            else if (_live.period) _liveLabel = "Q" + _live.period + " " + (_live.clock || "LIVE");
+            else _liveLabel = _live.clock || "LIVE";
+          }
+          statusHtml='<div class="tracker-disp-toggle" data-pid="'+uniquePid+'" style="font-weight:900;font-size:10px;cursor:pointer;text-decoration:underline dotted #ccc;" title="Click to settle">'+_liveLabel+'</div>'+
+            (_live && _eid ? '<div data-live-clk="'+_eid+'" style="font-size:9px;font-weight:800;color:#49d45f;margin-top:2px;">'+(_live.clock==="HALF"?"HALF":(_live.clock||"LIVE"))+'</div>' : '')+
             '<div id="act-'+uniquePid+'" style="display:none;flex-direction:column;align-items:center;gap:2px;margin-top:-2px;">'+
             '<div style="font-size:8px;font-weight:900;opacity:0.6;margin-bottom:1px;">SETTLE</div>'+
             '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">W</button>'+
@@ -4456,8 +4532,273 @@ const FB_ESPN = {
           '</td></tr></tbody></table></div></div></div></div>';
       }
     }
-    function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');}renderTrackedPicks();setTrackerModalView('picks');}
-    function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}}
+    
+    // ---------- AF LIVE CLOCK (ported from BB patterns, ESPN football) ----------
+    const g_liveGameStatus = new Map();
+    let _liveTickTimer = null;
+    let _liveClockPollTimer = null;
+
+    function parseClockToSeconds(clockStr) {
+      if (!clockStr || clockStr === "HALF") return null;
+      const parts = String(clockStr).split(":");
+      if (parts.length === 2) {
+        const m = parseInt(parts[0], 10);
+        const s = parseInt(parts[1], 10);
+        return isFinite(m) && isFinite(s) ? m * 60 + s : null;
+      }
+      const raw = parseFloat(clockStr);
+      return isFinite(raw) ? raw : null;
+    }
+
+    function secondsToClock(secs) {
+      const safe = Math.max(0, Math.floor(Number(secs) || 0));
+      const m = Math.floor(safe / 60);
+      const s = safe % 60;
+      return m + ":" + String(s).padStart(2, "0");
+    }
+
+    function afLiveRegulationPeriods(league) {
+      // NFL / college football = 4 quarters
+      return 4;
+    }
+
+    function afTrackedLeagueScoreboardUrl(league) {
+      const slug = typeof afResolveLeagueSlug === "function"
+        ? afResolveLeagueSlug(league)
+        : String(league || "").trim();
+      if (!slug) return "";
+      return "https://site.api.espn.com/apis/site/v2/sports/football/" + encodeURIComponent(slug) + "/scoreboard";
+    }
+
+    function _tickLiveClocks() {
+      if (document.hidden) return;
+      if (g_liveGameStatus.size === 0) {
+        stopLiveClockTicker();
+        return;
+      }
+      const expiredEventIds = [];
+      document.querySelectorAll("[data-live-clk]").forEach(function (el) {
+        const eid = el.dataset.liveClk;
+        const info = g_liveGameStatus.get(eid);
+        if (!info || info.clock === "HALF") return;
+        const capturedAt = info.capturedAt || Date.now();
+        const origSecs = parseClockToSeconds(info.clock);
+        if (origSecs === null) return;
+        const elapsedSecs = Math.min((Date.now() - capturedAt) / 1000, origSecs);
+        const currentSecs = Math.max(0, origSecs - elapsedSecs);
+        if (info.clockFrozen) {
+          const p = Number(info.period || 0);
+          const frozenSecs = parseClockToSeconds(info.clock);
+          if (p === 0) el.textContent = "⏸ TIMEOUT";
+          else el.textContent = (isFinite(frozenSecs) ? secondsToClock(frozenSecs) : info.clock) + " ⏸";
+          return;
+        }
+        if (currentSecs <= 0) {
+          const regP = afLiveRegulationPeriods(info.league);
+          const p = Number(info.period || 0);
+          if (p > 0 && p < regP) el.textContent = "Q" + p + " Break";
+          else {
+            el.textContent = "Settling";
+            if (!info._expiredAt) {
+              info._expiredAt = Date.now();
+              expiredEventIds.push(eid);
+            }
+          }
+        } else {
+          const p = Number(info.period || 0);
+          if (p === 0) el.textContent = "LIVE";
+          else el.textContent = secondsToClock(currentSecs);
+        }
+      });
+      if (expiredEventIds.length) {
+        setTimeout(function () {
+          if (typeof fbCheckAndSettleActivePicks === "function") {
+            try { fbCheckAndSettleActivePicks(); } catch (_e) {}
+          }
+          if (typeof renderTrackedPicks === "function") renderTrackedPicks();
+        }, 2000);
+      }
+    }
+
+    function startLiveClockTicker() {
+      stopLiveClockTicker();
+      if (g_liveGameStatus.size === 0) return;
+      _liveTickTimer = setInterval(_tickLiveClocks, 1000);
+    }
+
+    function stopLiveClockTicker() {
+      if (_liveTickTimer) {
+        clearInterval(_liveTickTimer);
+        _liveTickTimer = null;
+      }
+    }
+
+    function scheduleLiveClockPoll() {
+      clearTimeout(_liveClockPollTimer);
+      _liveClockPollTimer = null;
+      if (g_liveGameStatus.size === 0) return;
+      _liveClockPollTimer = setTimeout(async function () {
+        _liveClockPollTimer = null;
+        await pollLiveGameClocks();
+      }, 28000);
+    }
+
+    async function pollLiveGameClocks() {
+      if (g_liveGameStatus.size === 0) return;
+      const active = Array.isArray(g_trackerState && g_trackerState.activePicks) ? g_trackerState.activePicks : [];
+      const byLeague = new Map();
+      active.forEach(function (p) {
+        if (!p || !p.eventId || !g_liveGameStatus.has(String(p.eventId))) return;
+        const lg = String(p.league || p.competition || "nfl");
+        if (!byLeague.has(lg)) byLeague.set(lg, new Set());
+        byLeague.get(lg).add(String(p.eventId));
+      });
+      if (byLeague.size === 0) {
+        g_liveGameStatus.clear();
+        stopLiveClockTicker();
+        if (typeof renderTrackedPicks === "function") renderTrackedPicks();
+        return;
+      }
+      let didChange = false;
+      for (const [league, eventIds] of byLeague) {
+        const url = afTrackedLeagueScoreboardUrl(league);
+        if (!url) continue;
+        try {
+          let data = null;
+          try {
+            if (typeof fbEspnFetchJson === "function") {
+              data = await fbEspnFetchJson(url);
+            } else if (typeof FB_ESPN !== "undefined" && FB_ESPN.fetch) {
+              data = await FB_ESPN.fetch(url);
+            } else {
+              const res = await fetch(url + (url.indexOf("?") >= 0 ? "&" : "?") + "_=" + Date.now(), { cache: "no-store" });
+              if (res.ok) data = await res.json();
+            }
+          } catch (_e) {
+            data = null;
+          }
+          if (!data) continue;
+          const events = data.events || [];
+          events.forEach(function (ev) {
+            const eid = String(ev.id || "");
+            if (!eventIds.has(eid)) return;
+            const comp = ev.competitions && ev.competitions[0];
+            if (!comp) return;
+            const completed = !!(
+              (comp.status && comp.status.type && comp.status.type.completed) ||
+              (comp.status && comp.status.type && comp.status.type.state === "post") ||
+              (comp.status && comp.status.type && comp.status.type.name === "STATUS_FINAL")
+            );
+            if (completed) {
+              g_liveGameStatus.delete(eid);
+              didChange = true;
+              // Trigger AF auto-settlement for finished games
+              if (typeof autoSettleFootballEvent === "function") {
+                try { autoSettleFootballEvent(ev); } catch (_se) {}
+              } else if (typeof fbCheckAndSettleActivePicks === "function") {
+                try { fbCheckAndSettleActivePicks(); } catch (_se) {}
+              }
+              return;
+            }
+            const state = String((comp.status && comp.status.type && comp.status.type.state) || "");
+            const statusName = String((comp.status && comp.status.type && comp.status.type.name) || "");
+            const clock = String((comp.status && comp.status.displayClock) || "");
+            const period = Number((comp.status && comp.status.period) || 0);
+            const isHalf = statusName.toUpperCase().indexOf("HALFTIME") >= 0;
+            const isLive = state === "in" || isHalf || statusName.toUpperCase().indexOf("PROGRESS") >= 0;
+            if (isLive) {
+              const existing = g_liveGameStatus.get(eid);
+              const newClock = isHalf ? "HALF" : clock;
+              if (existing && existing._expiredAt && Date.now() - existing._expiredAt > 5 * 60 * 1000) {
+                g_liveGameStatus.delete(eid);
+                didChange = true;
+                return;
+              }
+              const competitors = comp.competitors || [];
+              const home = competitors.find(function (c) { return c.homeAway === "home"; });
+              const away = competitors.find(function (c) { return c.homeAway === "away"; });
+              const homeScore = home ? parseFloat(home.score) || 0 : null;
+              const awayScore = away ? parseFloat(away.score) || 0 : null;
+              if (!existing || existing.period !== period || existing.clock !== newClock) {
+                g_liveGameStatus.set(eid, {
+                  period: period,
+                  clock: newClock,
+                  statusName: statusName,
+                  league: league,
+                  capturedAt: Date.now(),
+                  clockFrozen: false,
+                  homeScore: homeScore,
+                  awayScore: awayScore,
+                  _expiredAt: existing && existing._expiredAt ? existing._expiredAt : null
+                });
+                didChange = true;
+              } else if (existing && !existing._expiredAt && newClock !== "HALF") {
+                if (!existing.clockFrozen) {
+                  existing.clockFrozen = true;
+                  didChange = true;
+                }
+                if (homeScore !== null && (existing.homeScore !== homeScore || existing.awayScore !== awayScore)) {
+                  existing.homeScore = homeScore;
+                  existing.awayScore = awayScore;
+                  didChange = true;
+                }
+              }
+            } else if (state === "pre") {
+              g_liveGameStatus.delete(eid);
+              didChange = true;
+            }
+          });
+        } catch (err) {
+          if (typeof engineDebug === "function") {
+            engineDebug("live game status update failed", { error: err && err.message ? err.message : String(err) });
+          }
+        }
+      }
+      if (didChange && typeof renderTrackedPicks === "function") renderTrackedPicks();
+      scheduleLiveClockPoll();
+    }
+
+    /** Seed live status from ESPN events for active pending picks */
+    function afSeedLiveStatusFromEvents(events, league) {
+      if (!Array.isArray(events)) return;
+      events.forEach(function (ev) {
+        const eid = String(ev.id || "");
+        if (!eid) return;
+        const comp = ev.competitions && ev.competitions[0];
+        if (!comp) return;
+        const state = String((comp.status && comp.status.type && comp.status.type.state) || "");
+        const statusName = String((comp.status && comp.status.type && comp.status.type.name) || "");
+        const completed = !!(comp.status && comp.status.type && (comp.status.type.completed || comp.status.type.state === "post"));
+        if (completed) {
+          g_liveGameStatus.delete(eid);
+          return;
+        }
+        const isHalf = statusName.toUpperCase().indexOf("HALFTIME") >= 0;
+        const isLive = state === "in" || isHalf || statusName.toUpperCase().indexOf("PROGRESS") >= 0;
+        if (!isLive) return;
+        const clock = isHalf ? "HALF" : String((comp.status && comp.status.displayClock) || "");
+        const period = Number((comp.status && comp.status.period) || 0);
+        g_liveGameStatus.set(eid, {
+          period: period,
+          clock: clock,
+          statusName: statusName,
+          league: league || "nfl",
+          capturedAt: Date.now(),
+          clockFrozen: false,
+          homeScore: null,
+          awayScore: null,
+          _expiredAt: null
+        });
+      });
+      if (g_liveGameStatus.size) {
+        startLiveClockTicker();
+        scheduleLiveClockPoll();
+      }
+    }
+
+
+    function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');document.body.classList.add('tracker-open');}renderTrackedPicks();setTrackerModalView('picks');if(typeof startLiveClockTicker==='function')startLiveClockTicker();if(typeof scheduleLiveClockPoll==='function')scheduleLiveClockPoll();if(typeof fbCheckAndSettleActivePicks==='function'){try{fbCheckAndSettleActivePicks();}catch(_e){}}}
+    function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');document.body.classList.remove('tracker-open');}if(typeof stopLiveClockTicker==='function')stopLiveClockTicker();}
     function applyManualSettlementToTrackedPick(signature,status){
       if(!signature) return false;
       const all=[g_trackerState.activePicks||[],g_trackerState.archivedPicks||[]]; let found=null;
@@ -5051,23 +5392,20 @@ const FB_ESPN = {
 </script>
 
 
-<div id="auditorOverlay" style="display:none!important" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100000;background:rgba(0,0,0,0.97);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
-  <div id="auditorPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
-</div>
 <script>
-// EngineAuditor v2 — full-depth professional audit module for the
-// American Football Prediction Engine.
-//
-// DROP-IN REPLACEMENT for the existing `// EngineAuditor disabled in AF build
-const EngineAuditor = {
-  open: function(){}, close: function(){}, run: function(){},
-  runCategory: function(){}, setViewMode: function(){},
-  exportJSON: function(){}, exportText: function(){},
-  copyAll: function(){}, copyCurrentView: function(){}, copyFullReport: function(){},
-  isOpen: false, findings: [], categories: [],
-  health: { score: 100, label: "HEALTHY", color: "#49d45f" }
-};
-window.EngineAuditor = EngineAuditor;
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.__AF_SETTLE_TIMER) {
+    window.__AF_SETTLE_TIMER = setInterval(function () {
+      if (document.visibilityState === "hidden") return;
+      if (typeof fbCheckAndSettleActivePicks === "function") {
+        try { fbCheckAndSettleActivePicks(); } catch (_e) {}
+      }
+      if (typeof pollLiveGameClocks === "function" && typeof g_liveGameStatus !== "undefined" && g_liveGameStatus.size) {
+        try { pollLiveGameClocks(); } catch (_e) {}
+      }
+    }, 45000);
+  }
+});
 </script>
 
 </body>
