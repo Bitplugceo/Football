@@ -1594,6 +1594,11 @@ const FB_ESPN = {
       } catch (e) { return []; }
     }
     function fbWorldDateKeyFromDate(dateValue) {
+      // Align with ESPN ET calendar keys (same as fbEspnLocalDateKey / fbEspnEventDateKey)
+      if (typeof fbEspnEventDateKey === "function") {
+        const k = fbEspnEventDateKey(dateValue || new Date().toISOString());
+        if (k) return k;
+      }
       const d = new Date(dateValue || Date.now());
       if (!Number.isFinite(d.getTime())) return "";
       return d.getFullYear() + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0");
@@ -1742,10 +1747,60 @@ const FB_ESPN = {
       "nfl", "college-football", "ufl", "cfl"
     ];
     function fbEspnLocalDateKey(offset = 0) {
-      const d = new Date();
-      d.setDate(d.getDate() + Number(offset || 0));
-      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+      // ESPN NFL / college scoreboards key games on US Eastern calendar dates.
+      // Using the browser's local day (e.g. WAT) makes "Today" pull tomorrow's
+      // slate when local midnight has not crossed ET yet (and the reverse after ET midnight).
+      const off = Number(offset || 0) || 0;
+      let y, m, day;
+      try {
+        const fmt = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/New_York",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit"
+        });
+        // Build ET "now", then add offset days in UTC-safe way via noon ET anchor
+        const parts = fmt.formatToParts(new Date());
+        const get = (t) => parts.find(p => p.type === t)?.value;
+        y = Number(get("year"));
+        m = Number(get("month"));
+        day = Number(get("day"));
+        // Add offset using a UTC noon anchor so DST does not shift the calendar day
+        const anchor = new Date(Date.UTC(y, m - 1, day, 17, 0, 0)); // ~12:00 ET
+        anchor.setUTCDate(anchor.getUTCDate() + off);
+        const parts2 = fmt.formatToParts(anchor);
+        const get2 = (t) => parts2.find(p => p.type === t)?.value;
+        y = get2("year");
+        m = get2("month");
+        day = get2("day");
+      } catch (_e) {
+        const d = new Date();
+        d.setDate(d.getDate() + off);
+        y = d.getFullYear();
+        m = String(d.getMonth() + 1).padStart(2, "0");
+        day = String(d.getDate()).padStart(2, "0");
+        return `${y}${m}${day}`;
+      }
       return `${y}${m}${day}`;
+    }
+    /** Event ISO date → ESPN-style YYYYMMDD in America/New_York */
+    function fbEspnEventDateKey(iso) {
+      if (!iso) return "";
+      try {
+        const d = new Date(iso);
+        if (!isFinite(d.getTime())) return "";
+        const fmt = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/New_York",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit"
+        });
+        const parts = fmt.formatToParts(d);
+        const get = (t) => parts.find(p => p.type === t)?.value;
+        return `${get("year")}${get("month")}${get("day")}`;
+      } catch (_e) {
+        return "";
+      }
     }
     function fbEspnSetFixtureDay(offset, opts) {
       opts = opts || {};
@@ -1946,6 +2001,9 @@ const FB_ESPN = {
       const raw = Array.isArray(data && data.events) ? data.events : [];
       const seen = new Set(), clean = [];
       raw.map(function(ev){ return fbEspnNormalizeEvent(ev, slug); }).filter(Boolean).forEach(function(e){
+        // Drop events whose ET calendar day does not match the requested dates= key
+        const ek = typeof fbEspnEventDateKey === "function" ? fbEspnEventDateKey(e.date) : "";
+        if (ek && dateKey && ek !== dateKey) return;
         // For a league-specific scoreboard the requested slug is authoritative.
         e.leagueSlug = slug;
         if (!e.competitionName || e.competitionName === "Football") {
