@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -894,13 +893,10 @@ S
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "af_engine_v1_nfl_v1";
     const ENGINE_MODEL_VERSION = "af_v1_nfl_points";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
-    window.APP_BUILD_VERSION = APP_BUILD_VERSION;
     window.__APP_BUILD_VERSION = APP_BUILD_VERSION;
-    window.ENGINE_MODEL_VERSION = ENGINE_MODEL_VERSION;
     // Visible on-page build tag (mirrors the BUILD_MARKER html comment at the
     // top of this file) — lets you confirm on a phone, with no dev tools,
     // whether the site you're looking at is actually running this build or
@@ -4338,14 +4334,14 @@ const FB_ESPN = {
       if(leagueSelect) leagueSelect.value='';
       const fixtureSelect=document.getElementById('fbEspnFixtureSelect');
       if(fixtureSelect) fixtureSelect.innerHTML='<option value="">- Select match -</option>';
-      if(typeof fbEspnFixtureOffset !== 'undefined') fbEspnFixtureOffset=0;
+      fbEspnFixtureOffset=0;
       const today=document.getElementById('fbEspnDayToday'), tomorrow=document.getElementById('fbEspnDayTomorrow');
       if(today) today.classList.add('active');
       if(tomorrow) tomorrow.classList.remove('active');
       const espn=document.getElementById('espnAutoSection');
-      if(espn){ espn.classList.add('collapsed'); espn.classList.remove('fb-espn-hidden'); }
+      if(espn){ espn.classList.add('collapsed'); espn.classList.add('fb-espn-hidden'); }
       if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('', 'info');
-      if(typeof fbEspnSetCoverage==='function' && typeof FB_ESPN!=='undefined') fbEspnSetCoverage((FB_ESPN.registry||[]).length+' ESPN football competitions stored locally · Fixtures: Today + Tomorrow only');
+      if(typeof fbEspnSetCoverage==='function') fbEspnSetCoverage((FB_ESPN.registry||[]).length+' ESPN football competitions stored locally · Fixtures: Today + Tomorrow only');
     }
     function clearAll(){
       try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
