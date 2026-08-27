@@ -513,9 +513,9 @@
       <div><label>Game Total</label><input id="ftMarket" placeholder="e.g. 47.5 or 44.5-47.5" aria-label="Game Total line" /></div>
       <div><label>1st Half Total</label><input id="h1Market" placeholder="e.g. 23.5" aria-label="1st Half Total line" /></div>
       <div><label>2nd Half Total</label><input id="h2Market" placeholder="e.g. 23.5" aria-label="2nd Half Total line" /></div>
-      <div><label>Spread (Home line)</label><input id="ahLine" placeholder="e.g. -3.5" aria-label="Asian Handicap home line" /></div>
-      <div><label>Team A Total</label><input id="teamATotalLine" placeholder="e.g. 24.5" aria-label="Team A total goals line" /></div>
-      <div><label>Team B Total</label><input id="teamBTotalLine" placeholder="e.g. 24.5" aria-label="Team B total goals line" /></div>
+      <div><label>Spread (Home line)</label><input id="ahLine" placeholder="e.g. -3.5" aria-label="Spread home line" /></div>
+      <div><label>Team A Total</label><input id="teamATotalLine" placeholder="e.g. 24.5" aria-label="Team A total points line" /></div>
+      <div><label>Team B Total</label><input id="teamBTotalLine" placeholder="e.g. 24.5" aria-label="Team B total points line" /></div>
     </div>
   </div>
 
@@ -894,7 +894,7 @@
     // ---------- Minimal global state ----------
     window.__BETCEO_SESSION_ID = "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2,9);
     window.__FOOTBALL_ENGINE_BOOT_SEEN = true;
-    const APP_BUILD_VERSION = "af_engine_v2_points_h2h5";
+    const APP_BUILD_VERSION = "af_engine_v3_fb2_points_markets";
     const ENGINE_MODEL_VERSION = "af_v1_nfl_points";
     const TRACKED_PICKS_LIMIT = 500;
     const TRACKER_ARCHIVED_LIMIT = 400;
@@ -2262,7 +2262,7 @@ const FB_ESPN = {
     // signing could make a team better OR disrupt settled form) so this never
     // shifts the projection mean — it only flags "recent history is a less
     // reliable read on the CURRENT squad than usual," the same demotion the
-    // engine already applies for high goal-volatility. Manager-change keywords
+    // engine already applies for high points-volatility. Manager-change keywords
     // are matched narrowly (explicit words like "sacked"/"appoints head coach")
     // to keep the false-positive rate low — this is keyword detection, not
     // sentiment analysis, and is only trusted for that one narrow question.
@@ -3558,12 +3558,12 @@ const FB_ESPN = {
     }
     // ---------- FOOTBALL CORE V2 (restored from patched_master) ----------
     const FB2 = {
-      VERSION: "football_core_v2_1",
-      MAX_GOALS: 10,
+      VERSION: "af_core_v1_points",
+      MAX_GOALS: 12, // unused on AF live path (continuous model)
       PRIOR_STRENGTH: 4,
-      HOME_ADVANTAGE: 1.0,
-      MIN_LAMBDA: 0.08,
-      MAX_LAMBDA: 4.8,
+      HOME_ADVANTAGE: 2.4,
+      MIN_LAMBDA: 3,
+      MAX_LAMBDA: 45,
       DIXON_COLES_RHO: -0.06,
       CALIBRATION_MIN: 30,
       MONTE_CARLO_SIMS: 20000,
@@ -3775,9 +3775,9 @@ const FB_ESPN = {
     function fb2_competitionPrior(){
       const raw=fb2_competitionLabel();
       const key=String(raw).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
-      let stored=null;try{stored=JSON.parse(localStorage.getItem("FOOTBALL_COMPETITION_PROFILE_"+key)||"null");}catch(e){}
+      let stored=null;try{stored=JSON.parse(localStorage.getItem("AF_COMPETITION_PROFILE_"+key)||"null");}catch(e){}
       const auto=window.__fbAutoData||{};
-      const home=fb2_num("leagueHomeAvg",auto.context?.homeAvg??stored?.homeAvg??1.35), away=fb2_num("leagueAwayAvg",auto.context?.awayAvg??stored?.awayAvg??1.10);
+      const home=fb2_num("leagueHomeAvg",auto.context?.homeAvg??stored?.homeAvg??22.5), away=fb2_num("leagueAwayAvg",auto.context?.awayAvg??stored?.awayAvg??20.5);
       const season=clamp(fb2_num("seasonGoalFactor",auto.context?.seasonGoalFactor??stored?.seasonGoalFactor??1)||1,0.75,1.25);
       const strength=clamp(fb2_num("competitionStrength",auto.context?.strength??stored?.strength??1)||1,0.75,1.25);
       return {home:clamp(home*season*strength,0.4,2.5),away:clamp(away*season*strength,0.3,2.3),key,seasonGoalFactor:season,strength};
@@ -3785,7 +3785,7 @@ const FB_ESPN = {
     window.saveFootballCompetitionProfile=function(name,homeAvg,awayAvg,seasonGoalFactor=1,strength=1){
       const key=String(name||"football_global").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
       const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||1.35,0.4,2.5),awayAvg:clamp(Number(awayAvg)||1.10,0.3,2.3),seasonGoalFactor:clamp(Number(seasonGoalFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
-      localStorage.setItem("FOOTBALL_COMPETITION_PROFILE_"+key,JSON.stringify(profile));return profile;
+      localStorage.setItem("AF_COMPETITION_PROFILE_"+key,JSON.stringify(profile));return profile;
     };
     function fb2_modifier(team,opponent,home,context){
       // Situational attack + defense modifiers. Defense was previously frozen at 1.0.
@@ -4035,144 +4035,120 @@ const FB_ESPN = {
     };
 
     function fb2_marketRows(data,ctx,lambdas,fhLambdas,ftM,h1M,integrity,sample){
-      const rows=[];const odds={home:fb2_parseOdds("oddsHome"),draw:fb2_parseOdds("oddsDraw"),away:fb2_parseOdds("oddsAway"),over:fb2_parseOdds("oddsOverFT"),under:fb2_parseOdds("oddsUnderFT"),bttsYes:fb2_parseOdds("oddsBttsYes"),bttsNo:fb2_parseOdds("oddsBttsNo"),homeAH:fb2_parseOdds("oddsHomeAH"),awayAH:fb2_parseOdds("oddsAwayAH"),aOver:fb2_parseOdds("oddsTeamAOver"),aUnder:fb2_parseOdds("oddsTeamAUnder"),bOver:fb2_parseOdds("oddsTeamBOver"),bUnder:fb2_parseOdds("oddsTeamBUnder")};
-      let x12=fb2_1x2(ftM); const elo=lambdas.elo||{home:x12.home,draw:x12.draw,away:x12.away,weight:0}; const ew=elo.weight||0; x12={home:x12.home*(1-ew)+elo.home*ew,draw:x12.draw*(1-ew)+elo.draw*ew,away:x12.away*(1-ew)+elo.away*ew}; const xs=x12.home+x12.draw+x12.away; x12.home/=xs;x12.draw/=xs;x12.away/=xs; const btts=fb2_btts(ftM); const calH=fb2_calibrateBinary("1x2_home",x12.home).p,calD=fb2_calibrateBinary("1x2_draw",x12.draw).p,calA=fb2_calibrateBinary("1x2_away",x12.away).p;
-      const add=(key,name,prob,pickSide,oddsVal,line,projection)=>{
-        const cal=key.startsWith("1x2")?(key.endsWith("home")?calH:key.endsWith("draw")?calD:calA):fb2_calibrateBinary(key,prob).p;
-        const ev=fb2_ev(cal,oddsVal);
-        // Grade always reflects model conviction; actionable pick requires real odds + EV
-        const g=fb2_grade(cal,ev,sample,integrity);
-        // Always run the market-pick gate. fb2_marketPick already branches
-        // internally between the odds-aware EV path and the pure
-        // model-probability path when no odds exist for this market — it was
-        // being skipped entirely by the oddsVal guard that used to wrap this
-        // call, which silently forced every no-odds market straight to
-        // "NO PLAY" regardless of how strong the model's edge actually was.
-        const q=fb2_marketPick(cal,pickSide,oddsVal,sample,integrity,0.025);
-        const pick=q.pick;
-        rows.push({marketKey:key,name,prob:cal,rawProb:prob,odds:oddsVal,ev,line,projection,grade:g,pick,side:pickSide,integrity});
+      // AF live markets only — Game Total, 1H Total, Spread, Team Totals, Moneyline (no draw/BTTS/CS)
+      const rows=[];
+      const odds={
+        home:fb2_parseOdds("oddsHome"),
+        away:fb2_parseOdds("oddsAway"),
+        over:fb2_parseOdds("oddsOverFT"),
+        under:fb2_parseOdds("oddsUnderFT"),
+        aOver:fb2_parseOdds("oddsTeamAOver"),
+        aUnder:fb2_parseOdds("oddsTeamAUnder"),
+        bOver:fb2_parseOdds("oddsTeamBOver"),
+        bUnder:fb2_parseOdds("oddsTeamBUnder")
       };
-      const ftLine=parseMarketLine(fb2_text("ftMarket"));const h1Line=parseMarketLine(fb2_text("h1Market"));
-      add("1x2_home","1 — Home",x12.home,"HOME",odds.home,null,x12.home);
-      add("1x2_draw","X — Draw",x12.draw,"DRAW",odds.draw,null,x12.draw);
-      add("1x2_away","2 — Away",x12.away,"AWAY",odds.away,null,x12.away);
-      // Double Chance — single market: highest of 1X / X2 / 12
-      {
-        const d1x = x12.home+x12.draw, dx2 = x12.draw+x12.away, d12 = x12.home+x12.away;
-        if (d1x >= dx2 && d1x >= d12) add("double_1x","Double Chance",d1x,"HOME OR DRAW",null,null,d1x);
-        else if (dx2 >= d12) add("double_x2","Double Chance",dx2,"DRAW OR AWAY",null,null,dx2);
-        else add("double_12","Double Chance",d12,"HOME OR AWAY",null,null,d12);
-      }
-      // BTTS — single market: Yes or No (highest probability wins the prediction)
-      {
-        const bttsYes = btts, bttsNo = 1 - btts;
-        if (bttsYes >= bttsNo) {
-          add("btts_yes","Both Teams to Score",bttsYes,"YES",odds.bttsYes,null,bttsYes);
-        } else {
-          add("btts_no","Both Teams to Score",bttsNo,"NO",odds.bttsNo,null,bttsNo);
-        }
-      }
-      // 1H Winner — single market (Home / Draw / Away)
-      const x12h1=fb2_1x2(h1M);
-      {
-        if (x12h1.home >= x12h1.draw && x12h1.home >= x12h1.away)
-          add("h1_1x2_home","1H Winner",x12h1.home,"HOME",null,null,x12h1.home);
-        else if (x12h1.draw >= x12h1.away)
-          add("h1_1x2_draw","1H Winner",x12h1.draw,"DRAW",null,null,x12h1.draw);
-        else
-          add("h1_1x2_away","1H Winner",x12h1.away,"AWAY",null,null,x12h1.away);
-      }
-      // Home / Away 1 Up removed
-      // Highest scoring half — single market predicting 1H or 2H
-      const h2Mtmp=fb2_scoreMatrix(Math.max(0.05,lambdas.home-fhLambdas.home),Math.max(0.05,lambdas.away-fhLambdas.away));
-      const halfDist1=fb2_goalDistribution(h1M), halfDist2=fb2_goalDistribution(h2Mtmp);
-      let p1hRaw=0,p2hRaw=0;
-      for(let i=0;i<halfDist1.length;i++) for(let j=0;j<halfDist2.length;j++){ const w=(halfDist1[i]||0)*(halfDist2[j]||0); if(i>j) p1hRaw+=w; else if(i<j) p2hRaw+=w; }
-      const halfSum=(p1hRaw+p2hRaw)||1;
-      const p1HHigh=p1hRaw/halfSum, p2HHigh=p2hRaw/halfSum;
-      if (p1HHigh >= p2HHigh) {
-        add("high_1h","Highest Scoring Half",p1HHigh,"1H",null,null,p1HHigh);
+      const M = (typeof AF_POINTS_MODEL !== "undefined" ? AF_POINTS_MODEL : null) || {};
+      const homeExp = Math.max(0, Number(lambdas.home) || 0);
+      const awayExp = Math.max(0, Number(lambdas.away) || 0);
+      const ftTotal = homeExp + awayExp;
+      const fhHome = Math.max(0, Number(fhLambdas && fhLambdas.home) || homeExp * 0.48);
+      const fhAway = Math.max(0, Number(fhLambdas && fhLambdas.away) || awayExp * 0.48);
+      const h1Total = fhHome + fhAway;
+      const spreadHome = homeExp - awayExp; // expected home margin (points)
+
+      const ftVar = Math.max(M.MIN_VARIANCE_FT || 28, ftTotal * (M.OVERDISPERSION || 1.45));
+      const h1Var = Math.max(M.MIN_VARIANCE_H1 || 12, h1Total * (M.OVERDISPERSION || 1.45));
+      const teamVar = Math.max(14, Math.max(homeExp, awayExp) * (M.OVERDISPERSION || 1.45));
+      const marginVar = Math.max(20, ftVar * 0.85);
+
+      const add=function(key,name,prob,pickSide,oddsVal,line,projection){
+        const cal = Number.isFinite(prob) ? Math.max(0, Math.min(1, prob)) : 0.5;
+        const ev = fb2_ev(cal, oddsVal);
+        const g = fb2_grade(cal, ev, sample, integrity);
+        const q = fb2_marketPick(cal, pickSide, oddsVal, sample, integrity, 0.025);
+        rows.push({
+          marketKey:key, name:name, prob:cal, rawProb:prob, odds:oddsVal, ev:ev,
+          line:line, projection:projection, grade:g, pick:q.pick, side:pickSide, integrity:integrity
+        });
+      };
+
+      // --- Game Total (Over/Under) ---
+      const ftLine = parseMarketLine(fb2_text("ftMarket"));
+      if (Number.isFinite(ftLine)) {
+        const pOver = (typeof probOverLine === "function")
+          ? probOverLine(ftTotal, ftVar, ftLine)
+          : 0.5;
+        const pUnder = 1 - pOver;
+        if (pOver >= pUnder) add("ft_over", "Game Total", pOver, "OVER " + displayLine(ftLine), odds.over, ftLine, ftTotal);
+        else add("ft_under", "Game Total", pUnder, "UNDER " + displayLine(ftLine), odds.under, ftLine, ftTotal);
       } else {
-        add("high_2h","Highest Scoring Half",p2HHigh,"2H",null,null,p2HHigh);
+        add("ft_proj", "Game Total (proj)", 0.55, "PROJ " + displayLine(ftTotal), null, null, ftTotal);
       }
-      // HT/FT — single market: most likely combination
-      const htftJoint={HH:0,HD:0,HA:0,DH:0,DD:0,DA:0,AH:0,AD:0,AA:0};
-      for(let h1h=0;h1h<h1M.length;h1h++) for(let h1a=0;h1a<h1M[h1h].length;h1a++){
-        const jp1=h1M[h1h][h1a]; if(!jp1) continue; const r1=h1h>h1a?"H":h1h===h1a?"D":"A";
-        for(let h2h=0;h2h<h2Mtmp.length;h2h++) for(let h2a=0;h2a<h2Mtmp[h2h].length;h2a++){
-          const jp2=h2Mtmp[h2h][h2a]; if(!jp2) continue;
-          const rf=(h1h+h2h)>(h1a+h2a)?"H":(h1h+h2h)===(h1a+h2a)?"D":"A";
-          htftJoint[r1+rf]+=jp1*jp2;
+
+      // --- 1H Total ---
+      const h1Line = parseMarketLine(fb2_text("h1Market"));
+      if (Number.isFinite(h1Line)) {
+        const pOver = (typeof probOverLine === "function")
+          ? probOverLine(h1Total, h1Var, h1Line)
+          : 0.5;
+        const pUnder = 1 - pOver;
+        if (pOver >= pUnder) add("h1_over", "1H Total", pOver, "OVER " + displayLine(h1Line), null, h1Line, h1Total);
+        else add("h1_under", "1H Total", pUnder, "UNDER " + displayLine(h1Line), null, h1Line, h1Total);
+      }
+
+      // --- 2H Total (if line present) ---
+      const h2Line = parseMarketLine(fb2_text("h2Market") || "");
+      if (Number.isFinite(h2Line)) {
+        const h2Total = Math.max(0, ftTotal - h1Total);
+        const h2Var = Math.max(M.MIN_VARIANCE_H1 || 12, h2Total * (M.OVERDISPERSION || 1.45));
+        const pOver = (typeof probOverLine === "function") ? probOverLine(h2Total, h2Var, h2Line) : 0.5;
+        const pUnder = 1 - pOver;
+        if (pOver >= pUnder) add("h2_over", "2H Total", pOver, "OVER " + displayLine(h2Line), null, h2Line, h2Total);
+        else add("h2_under", "2H Total", pUnder, "UNDER " + displayLine(h2Line), null, h2Line, h2Total);
+      }
+
+      // --- Spread (home line; negative = home favored) ---
+      const spreadLine = parseMarketLine(fb2_text("ahLine") || fb2_text("ahMarket") || fb2_text("spreadMarket") || "");
+      if (Number.isFinite(spreadLine)) {
+        // P(home covers) ≈ P(homeMargin > -spreadLine) with continuous margin model
+        // homeMargin ~ Normal(spreadHome, sqrt(marginVar))
+        // Cover when homeMargin + spreadLine > 0 → homeMargin > -spreadLine
+        const need = -spreadLine;
+        const sd = Math.sqrt(marginVar);
+        const z = (need - spreadHome) / Math.max(0.01, sd);
+        const pHomeCovers = (typeof normalCdf === "function") ? (1 - normalCdf(z)) : 0.5;
+        const pAwayCovers = 1 - pHomeCovers;
+        if (pHomeCovers >= pAwayCovers) {
+          add("spread_home", "Spread", pHomeCovers, "HOME " + displayLine(spreadLine), odds.home, spreadLine, spreadHome);
+        } else {
+          add("spread_away", "Spread", pAwayCovers, "AWAY " + displayLine(-spreadLine), odds.away, spreadLine, spreadHome);
         }
       }
-      const htftMap=[["HH",htftJoint.HH],["HD",htftJoint.HD],["HA",htftJoint.HA],["DH",htftJoint.DH],["DD",htftJoint.DD],["DA",htftJoint.DA],["AH",htftJoint.AH],["AD",htftJoint.AD],["AA",htftJoint.AA]];
-      let htftSum=htftMap.reduce((s,x)=>s+x[1],0)||1;
-      let bestHtft=htftMap[0], bestHtftP=htftMap[0][1]/htftSum;
-      htftMap.forEach(function(pair){ const p=pair[1]/htftSum; if(p>bestHtftP){ bestHtft=pair; bestHtftP=p; } });
-      add("htft_"+bestHtft[0],"Half-Time / Full-Time",bestHtftP,"HT/FT "+bestHtft[0],null,null,bestHtftP);
-      // 1H Correct Score — single top prediction
-      const topH1=[]; for(let hh=0;hh<=3;hh++) for(let aa=0;aa<=3;aa++) topH1.push({h:hh,a:aa,p:h1M[hh]?h1M[hh][aa]:0});
-      topH1.sort(function(u,v){return v.p-u.p;});
-      if(topH1.length){
-        const sc=topH1[0];
-        add("h1_cs_"+sc.h+"_"+sc.a,"1H Correct Score",sc.p,sc.h+"-"+sc.a,null,null,sc.p);
+
+      // --- Team totals ---
+      const aTeamLine = parseMarketLine(fb2_text("teamATotalLine") || fb2_text("teamATotalMarket") || "");
+      const bTeamLine = parseMarketLine(fb2_text("teamBTotalLine") || fb2_text("teamBTotalMarket") || "");
+      if (Number.isFinite(aTeamLine)) {
+        const pOver = (typeof probOverLine === "function") ? probOverLine(homeExp, teamVar, aTeamLine) : 0.5;
+        if (pOver >= 0.5) add("team_a_over", "Home Team Total", pOver, "OVER " + displayLine(aTeamLine), odds.aOver, aTeamLine, homeExp);
+        else add("team_a_under", "Home Team Total", 1 - pOver, "UNDER " + displayLine(aTeamLine), odds.aUnder, aTeamLine, homeExp);
       }
-      // FT Total Points — single market (Over or Under the line)
-      if(Number.isFinite(ftLine)){
-        const po=fb2_probTotalOver(ftM,ftLine), pu=fb2_probTotalUnder(ftM,ftLine);
-        if(po >= pu) add("ft_over","FT Total Points "+displayLine(ftLine),po,"OVER "+displayLine(ftLine),odds.over,ftLine,lambdas.home+lambdas.away);
-        else add("ft_under","FT Total Points "+displayLine(ftLine),pu,"UNDER "+displayLine(ftLine),odds.under,ftLine,lambdas.home+lambdas.away);
+      if (Number.isFinite(bTeamLine)) {
+        const pOver = (typeof probOverLine === "function") ? probOverLine(awayExp, teamVar, bTeamLine) : 0.5;
+        if (pOver >= 0.5) add("team_b_over", "Away Team Total", pOver, "OVER " + displayLine(bTeamLine), odds.bOver, bTeamLine, awayExp);
+        else add("team_b_under", "Away Team Total", 1 - pOver, "UNDER " + displayLine(bTeamLine), odds.bUnder, bTeamLine, awayExp);
       }
-      // 1H Total Points — single market
-      if(Number.isFinite(h1Line)){
-        const po=fb2_probTotalOver(h1M,h1Line), pu=fb2_probTotalUnder(h1M,h1Line);
-        if(po >= pu) add("h1_over","1H Total Points "+displayLine(h1Line),po,"OVER "+displayLine(h1Line),null,h1Line,fhLambdas.home+fhLambdas.away);
-        else add("h1_under","1H Total Points "+displayLine(h1Line),pu,"UNDER "+displayLine(h1Line),null,h1Line,fhLambdas.home+fhLambdas.away);
-      }
-      // 2H Total Points — single market
-      const h2L={home:Math.max(0.05,lambdas.home-fhLambdas.home),away:Math.max(0.05,lambdas.away-fhLambdas.away)};
-      const h2M=fb2_scoreMatrix(h2L.home,h2L.away);
-      const h2Line=parseMarketLine(fb2_text("h2Market"));
-      if(Number.isFinite(h2Line)){
-        const po=fb2_probTotalOver(h2M,h2Line), pu=fb2_probTotalUnder(h2M,h2Line);
-        if(po >= pu) add("h2_over","2H Total Points "+displayLine(h2Line),po,"OVER "+displayLine(h2Line),null,h2Line,h2L.home+h2L.away);
-        else add("h2_under","2H Total Points "+displayLine(h2Line),pu,"UNDER "+displayLine(h2Line),null,h2Line,h2L.home+h2L.away);
-      }
-      // Correct Score — single top prediction
+
+      // --- Moneyline (no draw — AF) ---
       {
-        const topScores=[];
-        for(let hh=0;hh<=5;hh++) for(let aa=0;aa<=5;aa++) topScores.push({h:hh,a:aa,p:ftM[hh][aa]});
-        topScores.sort((u,v)=>v.p-u.p);
-        if(topScores.length){
-          const sc=topScores[0];
-          const p=fb2_calibrateBinary("correct_score",sc.p).p;
-          const q=fb2_marketPick(p,sc.h+"-"+sc.a,null,sample,integrity,0.025);
-          rows.push({marketKey:"correct_"+sc.h+"_"+sc.a,name:"Correct Score",prob:p,rawProb:sc.p,odds:null,ev:null,line:null,projection:p,grade:fb2_grade(p,null,sample,integrity),pick:q.pick==="NO PLAY"?"NO PLAY":(sc.h+"-"+sc.a),side:sc.h+"-"+sc.a,integrity});
-        }
+        const sd = Math.sqrt(marginVar);
+        const z = (0 - spreadHome) / Math.max(0.01, sd);
+        const pHome = (typeof normalCdf === "function") ? (1 - normalCdf(z)) : 0.5;
+        const pAway = 1 - pHome;
+        if (pHome >= pAway) add("ml_home", "Moneyline", pHome, "HOME", odds.home, null, homeExp);
+        else add("ml_away", "Moneyline", pAway, "AWAY", odds.away, null, awayExp);
       }
-      // Asian Handicap — single market: which side covers
-      const ah=parseMarketLine(fb2_text("ahLine"));
-      if(Number.isFinite(ah)){
-        const ha=fb2_asianHandicap(ftM,ah,true), aa=fb2_asianHandicap(ftM,-ah,false);
-        if(ha.win >= aa.win) add("ah_home","Asian Handicap",ha.win,"HOME "+displayLine(ah),odds.homeAH,ah,null);
-        else add("ah_away","Asian Handicap",aa.win,"AWAY "+displayLine(-ah),odds.awayAH,-ah,null);
-      }
-      // Team totals — single market each (Over or Under the line). Skip noise lines under 0.5.
-      const ta=parseMarketLine(fb2_text("teamATotalLine")), tb=parseMarketLine(fb2_text("teamBTotalLine"));
-      if(Number.isFinite(ta) && ta >= 0.5){
-        const p=fb2_fromMatrix(ftM,(h)=>h>ta), u=fb2_fromMatrix(ftM,(h)=>h<ta);
-        if(p >= u) add("teamA_over","Team A Total Points "+displayLine(ta),p,"OVER "+displayLine(ta),odds.aOver,ta,lambdas.home);
-        else add("teamA_under","Team A Total Points "+displayLine(ta),u,"UNDER "+displayLine(ta),odds.aUnder,ta,lambdas.home);
-      }
-      if(Number.isFinite(tb) && tb >= 0.5){
-        const p=fb2_fromMatrix(ftM,(h,a)=>a>tb), u=fb2_fromMatrix(ftM,(h,a)=>a<tb);
-        if(p >= u) add("teamB_over","Team B Total Points "+displayLine(tb),p,"OVER "+displayLine(tb),odds.bOver,tb,lambdas.away);
-        else add("teamB_under","Team B Total Points "+displayLine(tb),u,"UNDER "+displayLine(tb),odds.bUnder,tb,lambdas.away);
-      }
-      // Corners/Cards/Shots ancillary markets removed — they never had a real
-      // settlement path (ESPN's match summary isn't fetched for final corner/
-      // card/shot counts, only pre-match averages the user typed in), so they
-      // could generate a pick but could never actually resolve win/loss.
+
       return rows;
     }
     function fb2_renderRows(rows,ctx,lambdas,integrity){
@@ -4182,7 +4158,13 @@ const FB_ESPN = {
       rows.forEach((p,idx)=>{
         const tr=document.createElement("tr"),c1=document.createElement("td"),c2=document.createElement("td"),c3=document.createElement("td"),c4=document.createElement("td"),c5=document.createElement("td");
         c1.textContent=p.name;
-        c2.textContent=Number.isFinite(p.prob)?((p.prob*100).toFixed(1)+"%"):(Number.isFinite(p.projection)?displayLine(p.projection):"-");
+        if(Number.isFinite(p.projection)&&Number.isFinite(p.line)){
+          c2.textContent=displayLine(p.projection)+" (line "+displayLine(p.line)+") · "+((p.prob*100).toFixed(1)+"%");
+        } else if(Number.isFinite(p.prob)&&p.prob>0&&p.prob<1){
+          c2.textContent=(p.prob*100).toFixed(1)+"%";
+        } else {
+          c2.textContent=Number.isFinite(p.projection)?displayLine(p.projection):"-";
+        }
         var evTxt="-";
         if(Number.isFinite(p.ev)&&Number.isFinite(p.odds)&&p.odds>1&&p.ev>-0.5&&p.ev<0.8){
           evTxt=(p.ev>=0?"+":"")+(p.ev*100).toFixed(1)+"%";
@@ -4225,22 +4207,22 @@ const FB_ESPN = {
       return actionable;
     }
     function fb2_runEngine(){
-      engineDebug("Football Core V2 run started",{version:FB2.VERSION});
+      engineDebug("AF Core V1 run started",{version:FB2.VERSION});
       const data=fb2_inputFeatures(),ctx=fb2_context();
       if(!ctx.eventId) engineDebug("Fixture ID missing: prediction will use a session-generated identity and cannot be auto-settled from source events",{competition:ctx.competition});
       if(!data.A.id||!data.B.id) engineDebug("Team ID missing: ELO/team identity is name-based and source reconciliation is weaker",{home:data.A.name,away:data.B.name});
-      if(!data.A.gf.length||!data.B.gf.length){alert("Enter or auto-fill recent full-time goal data for both teams before running.");return;}
-      if(data.A.gf.length<4||data.B.gf.length<4) engineDebug("Thin football sample",{home:data.A.gf.length,away:data.B.gf.length});
+      if(!data.A.gf.length||!data.B.gf.length){alert("Enter or auto-fill recent points scored for both teams before running.");return;}
+      if(data.A.gf.length<4||data.B.gf.length<4) engineDebug("Thin AF sample",{home:data.A.gf.length,away:data.B.gf.length});
       const lambdas=fb2_lambdas(data,ctx),live=fb2_liveAdjust(lambdas);const activeL={home:live.home,away:live.away};
-      const fh=fb2_firstHalf(data,lambdas);const ftM=fb2_scoreMatrix(activeL.home,activeL.away),h1M=fb2_scoreMatrix(fh.home,fh.away);
-      const sample=Math.min(data.A.gf.length,data.B.gf.length);const volatility=Math.max(getVolatilityRatio(data.A.gf.concat(data.B.gf),1.4),getVolatilityRatio(data.A.ga.concat(data.B.ga),1.4));
+      const fh=fb2_firstHalf(data,lambdas);const ftM=null,h1M=null; // AF path: continuous points model — no soccer score matrix
+      const sample=Math.min(data.A.gf.length,data.B.gf.length);const volatility=Math.max(getVolatilityRatio(data.A.gf.concat(data.B.gf),8),getVolatilityRatio(data.A.ga.concat(data.B.ga),8));
       // Squad churn (recent transactions / a likely manager change) never
       // shifts the projection mean — direction is unknowable — but it does
-      // demote confidence the same way high goal-volatility already does,
+      // demote confidence the same way high points-volatility already does,
       // since it means recent form is a less reliable read on the CURRENT
       // squad than it would normally be.
       const churn=!!data.A.churn||!!data.B.churn;
-      const integrity=volatility>=2.2||churn;
+      const integrity=volatility>=2.5||churn;
       const rows=fb2_marketRows(data,ctx,activeL,fh,ftM,h1M,integrity,sample);
       // Reconnect trap detection into the LIVE path (was only on retired legacy)
       rows.forEach(function(p){
