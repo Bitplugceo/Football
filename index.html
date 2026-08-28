@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v1 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v2_seal_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -47,6 +48,16 @@
       --tracker-mini-head-text: #2a2f38;
     }
     #espnAutoSection.fb-espn-hidden { display: none !important; }
+    body.bb-last10-alert { background: #4a0d0d !important; }
+    body.bb-last10-alert .wrapper { outline: 4px solid #d92d2a; }
+    #last10SeriesAlert {
+      display: none; margin: 8px 0 0; padding: 10px 12px;
+      border: 2px solid #d92d2a; background: #4a0d0d; color: #fff;
+      font-size: 13px; font-weight: 700; line-height: 1.35;
+    }
+    #last10SeriesAlert.visible { display: block; }
+    .last10-short-field { border: 2px solid #d92d2a !important; background: #ffe8e8 !important; }
+
     body.tracker-open { position: fixed; width: 100%; left: 0; right: 0; overflow: hidden; }
     body.dark-mode {
       --bg: #0c0c0c;
@@ -504,6 +515,7 @@
     <button type="button" class="fetch-btn" id="fbEspnAutoFetchBtn">📡 Fetch Stats</button>
   </div>
   <div id="fetchStatus" style="font-size:10px;min-height:16px;color:var(--muted);"></div>
+  <div id="last10SeriesAlert" role="alert"></div>
 </div>
 
 <div class="section" id="marketSection">
@@ -1831,9 +1843,17 @@ const FB_ESPN = {
       if (tid) return "tournament:" + tid;
       return (window.__fbAutoData && window.__fbAutoData.context && window.__fbAutoData.context.competition) || "";
     }
+    function fbEspnRememberFixtures(events) {
+      window.__fbEspnFixtureById = {};
+      (events || []).forEach(function (e) {
+        if (e && e.id != null) window.__fbEspnFixtureById[String(e.id)] = e;
+      });
+    }
     function fbEspnGetSelectedFixture() {
       const sel = document.getElementById("fbEspnFixtureSelect");
       if (!sel || !sel.value) return null;
+      const mapped = window.__fbEspnFixtureById && window.__fbEspnFixtureById[String(sel.value)];
+      if (mapped) return mapped;
       try { return JSON.parse(sel.value); } catch (e) { return null; }
     }
     function fbEspnScoreValue(v) {
@@ -2160,6 +2180,7 @@ const FB_ESPN = {
           }
         }
         if(token!==fbEspnFixtureLoadToken) return events||[];
+        fbEspnRememberFixtures(events||[]);
         fixtureSel.innerHTML='<option value="">— Select match —</option>'+(events||[]).map(function(e){
           var when="";
           if(e.date){
@@ -2167,7 +2188,8 @@ const FB_ESPN = {
             if(!isNaN(d.getTime())) when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
           }
           var label=(when?when+" — ":"")+(e.homeName||"Home")+" vs "+(e.awayName||"Away");
-          return "<option value='"+JSON.stringify(e).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";
+          var fid=String(e.id||"").replace(/"/g,"");
+          return '<option value="'+fid+'">'+safeText(label)+'</option>';
         }).join("");
         fbEspnSetStatus((events&&events.length?events.length+" matches loaded for "+dayLabel:"No matches found for "+dayLabel)+" · world feed",events&&events.length?"ok":"info");
         fbEspnSetCoverage((FB_ESPN.registry||[]).length+" leagues stored · "+(events||[]).length+" matches shown");
@@ -2179,7 +2201,8 @@ const FB_ESPN = {
         if (typeof afSeedLiveStatusFromEvents === "function") {
           try { afSeedLiveStatusFromEvents(events, slug); } catch (_seedErr) {}
         }
-        fixtureSel.innerHTML='<option value="">'+(events.length?"— Select match —":"No matches this day (local)")+'</option>'+(events||[]).map(function(x){var when="";if(x.date){var d=new Date(x.date);if(!isNaN(d.getTime()))when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}var label=(when?when+" — ":"")+(x.homeName||"")+" vs "+(x.awayName||"");return "<option value='"+JSON.stringify(x).replace(/'/g,"&#39;")+"'>"+safeText(label)+"</option>";}).join("");
+        fbEspnRememberFixtures(events||[]);
+        fixtureSel.innerHTML='<option value="">'+(events.length?"— Select match —":"No matches this day (local)")+'</option>'+(events||[]).map(function(x){var when="";if(x.date){var d=new Date(x.date);if(!isNaN(d.getTime()))when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}var label=(when?when+" — ":"")+(x.homeName||"")+" vs "+(x.awayName||"");var fid=String(x.id||"").replace(/"/g,"");return '<option value="'+fid+'">'+safeText(label)+'</option>';}).join("");
         fbEspnSetStatus(events.length?"Using stored world fixtures while refresh is unavailable.":"World fixture refresh failed: "+(e?.message||String(e)),events.length?"info":"error");
         return events;
       }
@@ -2528,6 +2551,60 @@ const FB_ESPN = {
       return null;
     }
 
+
+    function last10SeriesFieldIds() {
+      return ["aFTScored","aFTAllowed","a1HScored","a1HAllowed","bFTScored","bFTAllowed","b1HScored","b1HAllowed"];
+    }
+    function countLast10Commas(raw) {
+      return String(raw || "").replace(/[^,]/g, "").length;
+    }
+    function auditLast10SeriesInputs() {
+      const issues = [];
+      last10SeriesFieldIds().forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const raw = String(el.value || "").trim();
+        el.classList.remove("last10-short-field");
+        if (!raw) return;
+        const commaN = countLast10Commas(raw);
+        const parts = raw.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+        if (commaN !== 9 || parts.length !== 10) {
+          el.classList.add("last10-short-field");
+          issues.push(id + " has " + parts.length + " value(s), " + commaN + " comma(s) — need 10 / 9 commas");
+        }
+      });
+      return issues;
+    }
+    function applyLast10SeriesAlert(issues) {
+      const banner = document.getElementById("last10SeriesAlert");
+      const list = issues || auditLast10SeriesInputs();
+      if (list.length) {
+        document.body.classList.add("bb-last10-alert");
+        if (banner) {
+          banner.classList.add("visible");
+          banner.textContent = "⚠ LAST-10 INCOMPLETE — " + list.length + " field(s) are not 10 games (9 commas). " + list[0];
+        }
+      } else {
+        document.body.classList.remove("bb-last10-alert");
+        if (banner) {
+          banner.classList.remove("visible");
+          banner.textContent = "";
+        }
+      }
+      return list;
+    }
+    function bindLast10SeriesGuards() {
+      if (window.__last10SeriesGuardsBound) return;
+      window.__last10SeriesGuardsBound = true;
+      last10SeriesFieldIds().forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("input", function () { applyLast10SeriesAlert(); });
+        el.addEventListener("change", function () { applyLast10SeriesAlert(); });
+      });
+    }
+    window.auditLast10SeriesInputs = auditLast10SeriesInputs;
+    window.applyLast10SeriesAlert = applyLast10SeriesAlert;
     function fbEspnFillFormFromTeamData(side, data) {
       if (!data) return;
       const set = function(id, val) {
@@ -2553,6 +2630,7 @@ const FB_ESPN = {
       if (typeof fbEspnRenderInjury === "function" && data.injuryMeta) {
         fbEspnRenderInjury(side, data.injuryMeta, data.name);
       }
+      if (typeof applyLast10SeriesAlert === "function") applyLast10SeriesAlert();
     }
 
     // H2H meetings come from schedule/season listings (fbEspnFindH2HDeep),
@@ -2625,10 +2703,9 @@ const FB_ESPN = {
           setSt("⏳ Loading ESPN competition registry…", "info");
           await fbEspnLoadRegistry();
         }
-        let slug = fbEspnGetLeague();
-        // leagueSelect stores a dropdown value like "nfl" or "nfl_pre" (see AF_LEAGUE_SLUGS)
         const leagueSel = document.getElementById("leagueSelect");
-        if (leagueSel && leagueSel.value) slug = leagueSel.value;
+        const leagueKey = (leagueSel && leagueSel.value ? String(leagueSel.value).trim() : "") || String(fbEspnGetLeague() || "").trim();
+        let slug = (typeof afResolveLeagueSlug === "function") ? afResolveLeagueSlug(leagueKey) : leagueKey;
 
         if (!slug || slug.indexOf("tournament:") === 0) {
           setSt("❌ Select a league first (e.g. NFL).", "error");
@@ -2762,7 +2839,8 @@ const FB_ESPN = {
       // screen belongs to a DIFFERENT match's data — clear the whole page
       // rather than just the team name fields, so nothing stale carries over
       // into the next prediction.
-      if(typeof clearAll==='function') clearAll();
+      if(typeof fbClearPredictionFields==='function') fbClearPredictionFields();
+      // Keep the selected league. clearAll() was wiping leagueSelect and hiding ESPN.
       // Selecting a league immediately opens ESPN Auto-Fetch, exactly like BB.
       document.querySelectorAll('.section').forEach(function(section){
         if(section.id!=='leagueSection') section.classList.add('collapsed');
@@ -3773,6 +3851,11 @@ const FB_ESPN = {
       const data=fb2_inputFeatures(),ctx=fb2_context();
       if(!ctx.eventId) engineDebug("Fixture ID missing: prediction will use a session-generated identity and cannot be auto-settled from source events",{competition:ctx.competition});
       if(!data.A.id||!data.B.id) engineDebug("Team ID missing: ELO/team identity is name-based and source reconciliation is weaker",{home:data.A.name,away:data.B.name});
+      const _last10 = (typeof applyLast10SeriesAlert === "function") ? applyLast10SeriesAlert() : [];
+      if (_last10.length) {
+        alert("Last-10 incomplete: " + _last10.length + " field(s) do not have 10 values (9 commas). Re-fetch or fill before Run.");
+        return;
+      }
       if(!data.A.gf.length||!data.B.gf.length){alert("Enter or auto-fill recent points scored for both teams before running.");return;}
       if(data.A.gf.length<4||data.B.gf.length<4) engineDebug("Thin AF sample",{home:data.A.gf.length,away:data.B.gf.length});
       const lambdas=fb2_lambdas(data,ctx);const activeL={home:lambdas.home,away:lambdas.away};
@@ -4603,6 +4686,7 @@ const FB_ESPN = {
 
       
       // ESPN day toggles + fetch (BB-style listeners)
+      if (typeof bindLast10SeriesGuards === "function") bindLast10SeriesGuards();
       const _dayToday = document.getElementById("fbEspnDayToday");
       const _dayTom = document.getElementById("fbEspnDayTomorrow");
       if (_dayToday) _dayToday.addEventListener("click", function() {
@@ -4620,7 +4704,8 @@ const FB_ESPN = {
         try {
           const v = _fixSel.value;
           if (!v) return;
-          const fx = JSON.parse(v);
+          const fx = (typeof fbEspnGetSelectedFixture === "function") ? fbEspnGetSelectedFixture() : null;
+          if (!fx) return;
           // A different match means every stat field, market line, and
           // result on screen is now stale — clear them before loading the
           // new match's identity, so nothing from the previous selection
