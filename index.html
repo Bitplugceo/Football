@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +10,7 @@ S
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v2_seal_20260829 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v3_seal_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -473,17 +472,16 @@ S
   <label>Select League</label>
   <select id="leagueSelect" class="league-box" aria-label="Select League" onchange="if(typeof fbEspnOnLeagueChange==='function')fbEspnOnLeagueChange()">
     <option value="">— Select League —</option>
-    <optgroup label="── NFL ──────────────────">
+    <optgroup label="── USA ──────────────────">
       <option value="nfl">USA - NFL</option>
       <option value="nfl_pre">USA - NFL Preseason</option>
       <option value="nfl_post">USA - NFL Playoffs</option>
-    </optgroup>
-    <optgroup label="── COLLEGE ─────────────">
-      <option value="college-football">USA - NCAA Football (FBS)</option>
-      <option value="college-football-fcs">USA - NCAA Football (FCS)</option>
-    </optgroup>
-    <optgroup label="── OTHER ───────────────">
+      <option value="college-football">USA - NCAA, Regular Season</option>
+      <option value="college-football-fcs">USA - NCAA Division I, FCS</option>
+      <option value="college-football-post">USA - NCAA Division I, FBS Postseason</option>
       <option value="ufl">USA - UFL</option>
+    </optgroup>
+    <optgroup label="── CANADA ──────────────">
       <option value="cfl">Canada - CFL</option>
     </optgroup>
   </select>
@@ -1491,6 +1489,7 @@ S
       nfl_post: "nfl",
       "college-football": "college-football",
       "college-football-fcs": "college-football",
+      "college-football-post": "college-football",
       ufl: "ufl",
       cfl: "cfl"
     };
@@ -1502,7 +1501,8 @@ S
     // Villanova-tier FCS games could never surface no matter which of the
     // two dropdown options was picked.
     const AF_LEAGUE_GROUP = {
-      "college-football": 80,
+      // SportyBet "NCAA, Regular Season" mixes FBS + FCS on one board.
+      // Do not send groups=80 for that label or FCS games disappear.
       "college-football-fcs": 81
     };
     // ESPN seasontype: 1=preseason, 2=regular, 3=postseason
@@ -1512,6 +1512,7 @@ S
       nfl_post: 3,
       "college-football": 2,
       "college-football-fcs": 2,
+      "college-football-post": 3,
       ufl: 2,
       cfl: 2
     };
@@ -1864,7 +1865,27 @@ const FB_ESPN = {
     function fbEspnIsFinished(ev) {
       const c = ev?.competitions?.[0];
       const st = c?.status || ev?.status || {};
-      return st?.type?.completed === true || st?.type?.state === "post" || st?.type?.name === "STATUS_FINAL" || st?.completed === true;
+      return st?.type?.completed === true || st?.type?.state === "post" || st?.type?.name === "STATUS_FINAL" || st?.completed === true || ev?.finished === true;
+    }
+    function fbEspnIsLive(ev) {
+      const c = ev?.competitions?.[0];
+      const st = c?.status || ev?.status || {};
+      const state = String(st?.type?.state || "").toLowerCase();
+      const name = String(st?.type?.name || "").toUpperCase();
+      return state === "in" || name.indexOf("PROGRESS") >= 0 || name === "STATUS_HALFTIME" || name === "STATUS_END_PERIOD" || name === "STATUS_DELAYED";
+    }
+    function fbEspnIsUpcoming(ev) {
+      if (!ev) return false;
+      if (fbEspnIsFinished(ev) || fbEspnIsLive(ev)) return false;
+      const raw = ev.raw || ev;
+      if (raw !== ev && (fbEspnIsFinished(raw) || fbEspnIsLive(raw))) return false;
+      const t = Date.parse(ev.date || "");
+      if (Number.isFinite(t) && t < Date.now() - 2 * 60 * 1000) return false;
+      const state = String((ev.raw && ev.raw.competitions && ev.raw.competitions[0] && ev.raw.competitions[0].status && ev.raw.competitions[0].status.type && ev.raw.competitions[0].status.type.state) || "").toLowerCase();
+      const name = String((ev.raw && ev.raw.competitions && ev.raw.competitions[0] && ev.raw.competitions[0].status && ev.raw.competitions[0].status.type && ev.raw.competitions[0].status.type.name) || "").toUpperCase();
+      if (state && state !== "pre" && state !== "") return false;
+      if (name && name !== "STATUS_SCHEDULED" && name !== "STATUS_PRE" && name !== "") return false;
+      return true;
     }
     function fbEspnCompetitors(ev) { return ev?.competitions?.[0]?.competitors || []; }
     function fbEspnResolveLeagueSlugByName(name) {
@@ -1901,6 +1922,8 @@ const FB_ESPN = {
         homeName: home?.team?.displayName || home?.team?.name || home?.team?.shortDisplayName || "Home",
         awayName: away?.team?.displayName || away?.team?.name || away?.team?.shortDisplayName || "Away",
         homeScore: h, awayScore: a, homeLines: hs, awayLines: as, finished: fbEspnIsFinished(ev),
+        statusState: String((comp?.status||ev?.status||{}).type?.state||""),
+        statusName: String((comp?.status||ev?.status||{}).type?.name||""),
         raw: ev
       };
     }
@@ -2059,6 +2082,7 @@ const FB_ESPN = {
         const localKey = fbEspnEventDateKey(e.date);
         if (localKey && localDay && localKey !== localDay) return;
         e.leagueSlug = slug;
+        e.uiLeagueKey = leagueKey || slug;
         e.seasonType = typeof afEventSeasonType === "function" ? afEventSeasonType(ev) : null;
         if (!e.competitionName || e.competitionName === "Football") {
           const meta = (FB_ESPN.registry || []).find(function (x) { return String(x.slug) === String(slug); });
@@ -2180,6 +2204,9 @@ const FB_ESPN = {
           }
         }
         if(token!==fbEspnFixtureLoadToken) return events||[];
+        events = (events||[]).filter(function(e){ return typeof fbEspnIsUpcoming==="function" ? fbEspnIsUpcoming(e) : !e.finished; });
+        events.sort(function(a,b){ return Date.parse(a.date||0) - Date.parse(b.date||0); });
+        window.__fbUiLeagueKey = leagueKey || window.__fbUiLeagueKey || "";
         fbEspnRememberFixtures(events||[]);
         fixtureSel.innerHTML='<option value="">— Select match —</option>'+(events||[]).map(function(e){
           var when="";
@@ -2201,6 +2228,8 @@ const FB_ESPN = {
         if (typeof afSeedLiveStatusFromEvents === "function") {
           try { afSeedLiveStatusFromEvents(events, slug); } catch (_seedErr) {}
         }
+        events = (events||[]).filter(function(e){ return typeof fbEspnIsUpcoming==="function" ? fbEspnIsUpcoming(e) : !e.finished; });
+        events.sort(function(a,b){ return Date.parse(a.date||0) - Date.parse(b.date||0); });
         fbEspnRememberFixtures(events||[]);
         fixtureSel.innerHTML='<option value="">'+(events.length?"— Select match —":"No matches this day (local)")+'</option>'+(events||[]).map(function(x){var when="";if(x.date){var d=new Date(x.date);if(!isNaN(d.getTime()))when=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}var label=(when?when+" — ":"")+(x.homeName||"")+" vs "+(x.awayName||"");var fid=String(x.id||"").replace(/"/g,"");return '<option value="'+fid+'">'+safeText(label)+'</option>';}).join("");
         fbEspnSetStatus(events.length?"Using stored world fixtures while refresh is unavailable.":"World fixture refresh failed: "+(e?.message||String(e)),events.length?"info":"error");
@@ -2704,15 +2733,20 @@ const FB_ESPN = {
           await fbEspnLoadRegistry();
         }
         const leagueSel = document.getElementById("leagueSelect");
-        const leagueKey = (leagueSel && leagueSel.value ? String(leagueSel.value).trim() : "") || String(fbEspnGetLeague() || "").trim();
+        const fixtureEarly = fbEspnGetSelectedFixture();
+        let leagueKey = (leagueSel && leagueSel.value ? String(leagueSel.value).trim() : "")
+          || String((fixtureEarly && (fixtureEarly.uiLeagueKey || fixtureEarly.leagueKey)) || "")
+          || String(window.__fbUiLeagueKey || "")
+          || String(fbEspnGetLeague() || "").trim();
+        if (leagueSel && leagueKey && !leagueSel.value) leagueSel.value = leagueKey;
         let slug = (typeof afResolveLeagueSlug === "function") ? afResolveLeagueSlug(leagueKey) : leagueKey;
 
         if (!slug || slug.indexOf("tournament:") === 0) {
-          setSt("❌ Select a league first (e.g. NFL).", "error");
+          setSt("❌ Select a league first (e.g. USA - NFL Preseason).", "error");
           return false;
         }
 
-        const fixture = fbEspnGetSelectedFixture();
+        const fixture = fixtureEarly || fbEspnGetSelectedFixture();
         let nameA = (document.getElementById("teamAName")?.value || document.getElementById("teamAName")?.value || "").trim();
         let nameB = (document.getElementById("teamBName")?.value || document.getElementById("teamBName")?.value || "").trim();
         let idA = (document.getElementById("ssTeamAId")?.value || "").trim();
@@ -2835,6 +2869,7 @@ const FB_ESPN = {
     async function fbEspnOnLeagueChange() {
       const leagueSel=document.getElementById('leagueSelect');
       const leagueKey=(leagueSel?.value||'').trim(); const slug=typeof afResolveLeagueSlug==='function'?afResolveLeagueSlug(leagueKey):leagueKey;
+      window.__fbUiLeagueKey = leagueKey;
       // Switching leagues means every stat field, market line, and result on
       // screen belongs to a DIFFERENT match's data — clear the whole page
       // rather than just the team name fields, so nothing stale carries over
