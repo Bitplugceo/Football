@@ -512,7 +512,7 @@
       <div><label>Game Total</label><input id="ftMarket" placeholder="e.g. 47.5 or 44.5-47.5" aria-label="Game Total line" /></div>
       <div><label>1st Half Total</label><input id="h1Market" placeholder="e.g. 23.5" aria-label="1st Half Total line" /></div>
       <div><label>2nd Half Total</label><input id="h2Market" placeholder="e.g. 23.5" aria-label="2nd Half Total line" /></div>
-      <div><label>Spread (Home line)</label><input id="spreadLine" placeholder="e.g. -3.5" aria-label="Spread home line" /></div>
+      <div><label>Handicap (Home line)</label><input id="spreadLine" placeholder="e.g. -3.5" aria-label="Handicap home line" /></div>
       <div><label>Team A Total</label><input id="teamATotalLine" placeholder="e.g. 24.5" aria-label="Team A total points line" /></div>
       <div><label>Team B Total</label><input id="teamBTotalLine" placeholder="e.g. 24.5" aria-label="Team B total points line" /></div>
     </div>
@@ -2758,6 +2758,11 @@ const FB_ESPN = {
     async function fbEspnOnLeagueChange() {
       const leagueSel=document.getElementById('leagueSelect');
       const leagueKey=(leagueSel?.value||'').trim(); const slug=typeof afResolveLeagueSlug==='function'?afResolveLeagueSlug(leagueKey):leagueKey;
+      // Switching leagues means every stat field, market line, and result on
+      // screen belongs to a DIFFERENT match's data — clear the whole page
+      // rather than just the team name fields, so nothing stale carries over
+      // into the next prediction.
+      if(typeof clearAll==='function') clearAll();
       // Selecting a league immediately opens ESPN Auto-Fetch, exactly like BB.
       document.querySelectorAll('.section').forEach(function(section){
         if(section.id!=='leagueSection') section.classList.add('collapsed');
@@ -2773,7 +2778,6 @@ const FB_ESPN = {
         if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('', 'info');
         return;
       }
-      ['teamAName','ssTeamAId','teamBName','ssTeamBId','fixtureKickoff'].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
       if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('Loading '+(leagueSel.options[leagueSel.selectedIndex]?.textContent||slug)+' matches…','info');
       if(typeof fbEspnLoadFixtures==='function') await fbEspnLoadFixtures(typeof fbEspnFixtureOffset!=='undefined'?fbEspnFixtureOffset:0);
     }
@@ -3254,7 +3258,7 @@ const FB_ESPN = {
 
     function fb2_num(id, fallback=null) {
       const el=document.getElementById(id);
-      if(el){ const n=Number(el.value); if(Number.isFinite(n)) return n; }
+      if(el && String(el.value||"").trim()!==""){ const n=Number(el.value); if(Number.isFinite(n)) return n; }
       const auto=window.__fbAutoData||{};
       const map={
         aInjuryImpact:auto.A?.injury,aSuspensionImpact:auto.A?.susp,bInjuryImpact:auto.B?.injury,bSuspensionImpact:auto.B?.susp,
@@ -3280,7 +3284,7 @@ const FB_ESPN = {
     }
     function fb2_series(id) {
       const el=document.getElementById(id); if(!el) return [];
-      return String(el.value||"").split(",").map(Number).filter(Number.isFinite).slice(0,20);
+      return String(el.value||"").split(",").map(s=>s.trim()).filter(s=>s!=="").map(Number).filter(Number.isFinite).slice(0,20);
     }
     function fb2_mean(a) { const x=(a||[]).filter(Number.isFinite); return x.length?x.reduce((s,v)=>s+v,0)/x.length:null; }
     function fb2_weighted(a) {
@@ -3377,11 +3381,11 @@ const FB_ESPN = {
       const home=fb2_num("leagueHomeAvg",auto.context?.homeAvg??stored?.homeAvg??22.5), away=fb2_num("leagueAwayAvg",auto.context?.awayAvg??stored?.awayAvg??20.5);
       const season=clamp(fb2_num("seasonPointsFactor",auto.context?.seasonPointsFactor??stored?.seasonPointsFactor??1)||1,0.75,1.25);
       const strength=clamp(fb2_num("competitionStrength",auto.context?.strength??stored?.strength??1)||1,0.75,1.25);
-      return {home:clamp(home*season*strength,0.4,2.5),away:clamp(away*season*strength,0.3,2.3),key,seasonPointsFactor:season,strength};
+      return {home:clamp(home*season*strength,8,45),away:clamp(away*season*strength,6,42),key,seasonPointsFactor:season,strength};
     }
     window.saveFootballCompetitionProfile=function(name,homeAvg,awayAvg,seasonPointsFactor=1,strength=1){
       const key=String(name||"football_global").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
-      const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||1.35,0.4,2.5),awayAvg:clamp(Number(awayAvg)||1.10,0.3,2.3),seasonPointsFactor:clamp(Number(seasonPointsFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
+      const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||22.5,8,45),awayAvg:clamp(Number(awayAvg)||20.5,6,42),seasonPointsFactor:clamp(Number(seasonPointsFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
       localStorage.setItem("AF_COMPETITION_PROFILE_"+key,JSON.stringify(profile));return profile;
     };
     function fb2_modifier(team,opponent,home,context){
@@ -3677,9 +3681,9 @@ const FB_ESPN = {
         const pHomeCovers = (typeof normalCdf === "function") ? (1 - normalCdf(z)) : 0.5;
         const pAwayCovers = 1 - pHomeCovers;
         if (pHomeCovers >= pAwayCovers) {
-          add("spread_home", "Spread", pHomeCovers, "HOME " + displayLine(spreadLine), odds.home, spreadLine, spreadHome);
+          add("spread_home", "Handicap", pHomeCovers, "HOME " + displayLine(spreadLine), odds.home, spreadLine, spreadHome);
         } else {
-          add("spread_away", "Spread", pAwayCovers, "AWAY " + displayLine(-spreadLine), odds.away, spreadLine, spreadHome);
+          add("spread_away", "Handicap", pAwayCovers, "AWAY " + displayLine(-spreadLine), odds.away, spreadLine, spreadHome);
         }
       }
 
@@ -3703,8 +3707,8 @@ const FB_ESPN = {
         const z = (0 - spreadHome) / Math.max(0.01, sd);
         const pHome = (typeof normalCdf === "function") ? (1 - normalCdf(z)) : 0.5;
         const pAway = 1 - pHome;
-        if (pHome >= pAway) add("ml_home", "Moneyline", pHome, "HOME", odds.home, null, homeExp);
-        else add("ml_away", "Moneyline", pAway, "AWAY", odds.away, null, awayExp);
+        if (pHome >= pAway) add("ml_home", "Winner", pHome, "HOME", odds.home, null, homeExp);
+        else add("ml_away", "Winner", pAway, "AWAY", odds.away, null, awayExp);
       }
 
       return rows;
@@ -3855,7 +3859,7 @@ const FB_ESPN = {
       if(typeof fbEspnSetStatus==='function') fbEspnSetStatus('', 'info');
       if(typeof fbEspnSetCoverage==='function') fbEspnSetCoverage((FB_ESPN.registry||[]).length+' ESPN football competitions stored locally · Fixtures: Today + Tomorrow only');
     }
-    function clearAll(){
+    function fbClearPredictionFields(){
       try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
       ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','a1HScored','a1HAllowed','b1HScored','b1HAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','a1HH2H','b1HH2H','ftMarket','h1Market','h2Market','fixtureKickoff',
        'spreadLine','teamATotalLine','teamBTotalLine'
@@ -3866,6 +3870,9 @@ const FB_ESPN = {
       window.__fbAutoData={context:{},A:{},B:{},market:{},h2h:[],source:'none',coverage:null};
       try { if (typeof selectedTeamIds !== 'undefined') selectedTeamIds={A:null,B:null}; } catch(_e) {}
       try { if (typeof g_lastFetchedTeams !== 'undefined') g_lastFetchedTeams={A:'',B:''}; } catch(_e) {}
+    }
+    function clearAll(){
+      fbClearPredictionFields();
       fbResetUiToFreshPage();
       engineDebug('Football engine inputs cleared — fresh BB-style UI state restored');
     }
@@ -4614,6 +4621,11 @@ const FB_ESPN = {
           const v = _fixSel.value;
           if (!v) return;
           const fx = JSON.parse(v);
+          // A different match means every stat field, market line, and
+          // result on screen is now stale — clear them before loading the
+          // new match's identity, so nothing from the previous selection
+          // leaks into this prediction.
+          if (typeof fbClearPredictionFields === "function") fbClearPredictionFields();
           const a = document.getElementById("teamAName");
           const b = document.getElementById("teamBName");
           const aId = document.getElementById("ssTeamAId");
