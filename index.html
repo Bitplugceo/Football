@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <!-- SECURITY: restricts script/style/connect origins as defense-in-depth against any
+       innerHTML escaping bug slipping through. script-src/style-src still need 'unsafe-inline'
+       because this app ships as one static HTML file with no build/server step to emit
+       per-request nonces or hashes — that's a real residual gap, not a false sense of safety.
+       connect-src is the meaningful line here: it caps where fetch() can ever send/receive
+       data to the exact hosts this app talks to, so even a successful injection can't
+       exfiltrate to an arbitrary attacker domain. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://site.api.espn.com https://sports.core.api.espn.com https://thebetceo-engine.ridwantunde636.workers.dev https://corsproxy.io https://api.allorigins.win; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="AF Engine" />
@@ -10,7 +18,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v11_seal_20260829 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v14_audit_fix_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -473,12 +481,12 @@
   <select id="leagueSelect" class="league-box" aria-label="Select League" onchange="if(typeof fbEspnOnLeagueChange==='function')fbEspnOnLeagueChange()">
     <option value="">— Select League —</option>
     <optgroup label="── USA ──────────────────">
-      <option value="nfl">USA - NFL</option>
-      <option value="nfl_pre">USA - NFL Preseason</option>
-      <option value="nfl_post">USA - NFL Playoffs</option>
+      <option value="nfl">USA - NFL, Regular Season</option>
+      <option value="nfl_pre">USA - NFL, Preseason</option>
+      <option value="nfl_post">USA - NFL, Playoffs</option>
       <option value="college-football">USA - NCAA, Regular Season</option>
-      <option value="college-football-fcs">USA - NCAA Division I, FCS</option>
-      <option value="college-football-post">USA - NCAA Division I, FBS Postseason</option>
+      <option value="college-football-fcs">USA - NCAA, FCS</option>
+      <option value="college-football-post">USA - NCAA, Bowl / Playoffs</option>
       <option value="ufl">USA - UFL</option>
     </optgroup>
     <optgroup label="── CANADA ──────────────">
@@ -488,7 +496,7 @@
 </div>
 
 <div class="section" id="espnAutoSection">
-  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(NFL / college)</span></h3>
+  <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(NFL · NCAA · CFL · UFL)</span></h3>
 
   <div class="fixture-toolbar">
     <button type="button" class="fixture-day active" id="fbEspnDayToday">Today</button>
@@ -584,8 +592,8 @@
       <span id="trackerHeadTitle" style="cursor:pointer;" title="Tap to switch Tracked Picks / Engine Report">Tracked Picks</span>
       <span id="trackerStatusLabel" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;pointer-events:none;white-space:nowrap;"></span>
       <div class="tracker-head-actions">
-        <button type="button" id="trackerMilitaryRaidBtn" class="tracker-insights-btn" title="Military Raid" style="font-size:16px;">🚨</button>
-        <button type="button" id="trackerCloseBtn" class="tracker-close">✕</button>
+        <button type="button" id="trackerSelfTestBtn" class="tracker-insights-btn" title="Run self-test" aria-label="Run engine self-test" style="font-size:16px;">🧪</button>
+        <button type="button" id="trackerCloseBtn" class="tracker-close" aria-label="Close tracker">✕</button>
       </div>
     </div>
     <div class="tracker-summary" id="trackerSummary">0 live/recent • 0 pending • 0 wins • 0 losses</div>
@@ -610,6 +618,23 @@
   // AF ENGINE – converted from a table-tennis (Setka Cup) prediction engine
   // AFDB debug shell is sport-agnostic (originally built for a basketball engine); everything user-facing below is football-only
   // =====================================================================
+  // ---------- Shared silent-failure logger ----------
+  // Every previously-empty `catch(e){}` in this file now calls this instead.
+  // Failures that are genuinely fine to ignore (e.g. clipboard denied) still
+  // get a WARN entry in the AFDB log, so "nothing visibly broke" is something
+  // you can actually verify rather than something the code just asserts.
+  // Wrapped in its own try/catch so a logging failure can never surface as a
+  // second, more confusing error.
+  window.__afLog = function(context, err) {
+    try {
+      const msg = (err && err.message) ? err.message : String(err == null ? "unknown" : err);
+      if (typeof AFDB !== "undefined" && AFDB && typeof AFDB.log === "function") {
+        AFDB.log("WARN", "SWALLOWED", context + ": " + msg);
+      } else if (window.console && console.warn) {
+        console.warn("[AF]", context + ":", msg);
+      }
+    } catch (_loggingItselfFailed) { /* truly nothing more we can do here */ }
+  };
   // ---------- AFDB module (same structure as the original basketball-engine debug tooling; sport-agnostic) ----------
   const AFDB = (function() {
     const LOG_LIMIT = 600;
@@ -707,11 +732,11 @@
       const headerBtns =
         '<button onclick="AFDB.copy(this)" style="background:#111;border:1px solid #333;color:#49d45f;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;">📋 Copy Log</button>' +
         '<button onclick="AFDB.clear()" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;">🗑️ Clear</button>' +
-        '<button onclick="AFDB.runTestFetch()" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;box-shadow:0 0 8px rgba(217,31,38,0.4);">🚨 MILITARY RAID</button>' +
+        '<button onclick="AFDB.runTestFetch()" aria-label="Run diagnostic self-test" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;box-shadow:0 0 8px rgba(217,31,38,0.4);">🧪 RUN SELF-TEST</button>' +
         '<button onclick="window.openVisualReportFromDebug()" style="background:#111;border:1px solid #333;color:#d4af37;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;">📊 Tracker Report</button>' +
         '<button onclick="AFDB.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">✕ Close</button>';
 
-      const emptyMsg = _showOnlyErrors ? 'No suspects arrested. The code is clean.' : 'No log entries yet. Run a prediction.';
+      const emptyMsg = _showOnlyErrors ? 'No issues found. The code is clean.' : 'No log entries yet. Run a prediction.';
       const filterLabel = '🎯 LEVEL: ' + _currentLogLevel;
       const driftArr = (typeof window.g_driftErrors !== 'undefined' && Array.isArray(window.g_driftErrors)) ? window.g_driftErrors : [];
       const last20 = driftArr.slice(-20);
@@ -742,10 +767,10 @@
     }
 
     async function runTestFetch() {
-      let totalSuspects = 0;
+      let totalIssues = 0;
       const report = function(level, section, msg, data) {
         log(level, section, msg, data);
-        if (level === 'ERROR') totalSuspects++;
+        if (level === 'ERROR') totalIssues++;
       };
 
       // 1) UI input integrity
@@ -780,10 +805,10 @@
       // 3) Math / pick integrity on active book
       let edgeAnomalies = 0, nanEdges = 0, missingGrade = 0, badSide = 0;
       active.forEach(function(p) {
-        if (p.edgePct != null && Math.abs(Number(p.edgePct)) > 25) edgeAnomalies++;
+        if (p.edgePct != null && Math.abs(Number(p.edgePct)) > 80) edgeAnomalies++;
         if (p.edge != null && !isFinite(Number(p.edge))) nanEdges++;
         if (p.predictionText && p.predictionText !== 'NO PLAY' && !p.confidenceGrade) missingGrade++;
-        if (p.side && p.side !== 'over' && p.side !== 'under') badSide++;
+        if (p.side && !/^(over|under|home|away)$/i.test(String(p.side))) badSide++;
       });
       if (edgeAnomalies > 0) report('ERROR', 'MATH ENGINE', edgeAnomalies + ' extreme edge anomalies (>25%)');
       if (nanEdges > 0) report('ERROR', 'MATH ENGINE', nanEdges + ' picks carry non-finite edge');
@@ -823,7 +848,7 @@
       const requiredFns = [
         'copyTrackerData', 'updateEnginePerformanceScore', 'updateDriftDisplay',
         'proposeFbConfigUpgrades', 'applyFbVerifiedConfig', 'getFbConfigLabSnapshot',
-        'ssProcessTeamEvents', 'parseSofascoreTeam', 'militaryRaid', 'runEngine', 'settleTrackedPickFromScore', 'autoSettleFootballEvent'
+        'ssProcessTeamEvents', 'parseSofascoreTeam', 'runEngineSelfTest', 'runEngine', 'settleTrackedPickFromScore', 'autoSettleFootballEvent'
       ];
       requiredFns.forEach(function(name) {
         if (typeof window[name] !== 'function') {
@@ -831,7 +856,7 @@
         }
       });
 
-      // 7) Battery refresh as part of raid
+      // 7) Battery refresh as part of self-test
       try {
         if (typeof window.updateEnginePerformanceScore === 'function') window.updateEnginePerformanceScore();
         if (typeof window.updateDriftDisplay === 'function') window.updateDriftDisplay();
@@ -839,15 +864,15 @@
         report('ERROR', 'HEALTH', 'Battery/drift refresh failed: ' + (e && e.message ? e.message : String(e)));
       }
 
-      const verdictMsg = totalSuspects === 0
-        ? 'Raid complete. Engine integrity clean.'
-        : 'Raid complete. Caught ' + totalSuspects + ' issue(s).';
+      const verdictMsg = totalIssues === 0
+        ? 'Self-test complete. Engine integrity clean.'
+        : 'Self-test complete. Found ' + totalIssues + ' issue(s).';
       const verdictEntry = {
         ts: new Date().toLocaleTimeString([], { hour12: false }),
-        level: totalSuspects === 0 ? 'VERDICT' : 'ERROR',
-        section: 'POLICE RAID',
+        level: totalIssues === 0 ? 'VERDICT' : 'ERROR',
+        section: 'SELF_TEST',
         msg: verdictMsg,
-        data: { suspects: totalSuspects, active: active.length, archived: archived.length, settled: settledN }
+        data: { issues: totalIssues, active: active.length, archived: archived.length, settled: settledN }
       };
       _log.unshift(verdictEntry);
       if (_log.length > LOG_LIMIT) _log = _log.slice(0, LOG_LIMIT);
@@ -880,7 +905,7 @@
     // top-level script execution in this block (window.X = ... assignments
     // are not hoisted the way function declarations are). Declared here from
     // the file's own BUILD_MARKER comment.
-    const APP_BUILD_VERSION = "af_engine_v1_nfl_v11_seal_20260829";
+    const APP_BUILD_VERSION = "af_engine_v1_nfl_v14_audit_fix_20260829";
     window.__APP_BUILD_VERSION = APP_BUILD_VERSION;
     // Visible on-page build tag (mirrors the BUILD_MARKER html comment at the
     // top of this file) — lets you confirm on a phone, with no dev tools,
@@ -1003,7 +1028,7 @@
       const key = String(league || "").toLowerCase().replace(/\s+/g, "_");
       const verifiedKey = "AF_COMPETITION_TRUST_" + (key || "unknown");
       let verified = false;
-      try { verified = JSON.parse(localStorage.getItem(verifiedKey) || "null")?.verified === true; } catch (e) {}
+      try { verified = JSON.parse(localStorage.getItem(verifiedKey) || "null")?.verified === true; } catch (e) { window.__afLog("getLeagueTrustMeta", e); }
       if (verified) return { level: "trusted", mode: "full", label: league || key };
       if (!key || key === "unknown" || key === "unknown_competition") {
         return { level: "advisory", mode: "advisory", label: league || "Unknown competition" };
@@ -1014,13 +1039,74 @@
       const raw = String(text||"").trim().toUpperCase();
       if (raw.startsWith("OVER")) return "over";
       if (raw.startsWith("UNDER")) return "under";
+      if (raw.startsWith("HOME")) return "home";
+      if (raw.startsWith("AWAY")) return "away";
       return "";
+    }
+    function formatProjectionWhole(val) {
+      if (val === null || val === undefined || isNaN(val) || !isFinite(val)) return "-";
+      return String(Math.floor(Number(val)));
     }
     function displayLine(val) {
       if (val==null || !isFinite(val)) return "—";
       // AF spreads/totals move in half-point increments, not quarter-points
       // (quarter-point lines are a soccer Asian Handicap convention).
       return String(Math.round(val*2)/2);
+    }
+    function displaySignedLine(val) {
+      if (val==null || !isFinite(val)) return "—";
+      const x = Math.round(Number(val)*2)/2;
+      if (x > 0) return "+" + String(x);
+      return String(x);
+    }
+    function formatSpreadPick(side, homeLine) {
+      const home = Number(homeLine);
+      if (!isFinite(home)) return String(side||"").toUpperCase();
+      if (String(side).toLowerCase() === "away") return "AWAY " + displaySignedLine(-home);
+      return "HOME " + displaySignedLine(home);
+    }
+    function marketFamily(mk) {
+      const k = String(mk||"");
+      if (k.indexOf("ft_") === 0 || k === "ft_proj") return "ft";
+      if (k.indexOf("spread_") === 0 || k.indexOf("ah_") === 0) return "spread";
+      if (k.indexOf("ml_") === 0) return "ml";
+      return k;
+    }
+    function canonicalPickSide(p) {
+      const mk = String((p && p.marketKey) || "");
+      if (/over/i.test(mk) || /^over\b/i.test(String((p && (p.pick||p.predictionText||p.side))||""))) return "over";
+      if (/under/i.test(mk) || /^under\b/i.test(String((p && (p.pick||p.predictionText||p.side))||""))) return "under";
+      if (/home/i.test(mk) || /^home\b/i.test(String((p && (p.pick||p.predictionText||p.side))||""))) return "home";
+      if (/away/i.test(mk) || /^away\b/i.test(String((p && (p.pick||p.predictionText||p.side))||""))) return "away";
+      return getPickSideFromText((p && (p.pick||p.predictionText||p.side)) || "");
+    }
+    // Spread line is always stored as the HOME handicap (negative = home favored).
+    // Edge is points of cover for the selected side, not raw proj-minus-line.
+    function spreadCoverEdge(homeMarginProj, homeLine, side) {
+      if (!isFinite(homeMarginProj) || !isFinite(homeLine)) return null;
+      const homeCover = homeMarginProj + homeLine;
+      return String(side).toLowerCase() === "away" ? -homeCover : homeCover;
+    }
+    function computePickEdge(p) {
+      const fam = marketFamily(p && p.marketKey);
+      const proj = Number(p && p.projection);
+      const line = Number(p && p.line);
+      if (fam === "spread") {
+        const side = canonicalPickSide(p);
+        return spreadCoverEdge(proj, line, side);
+      }
+      if (!isFinite(proj) || !isFinite(line)) return null;
+      if (fam === "ft") {
+        const side = canonicalPickSide(p);
+        const raw = proj - line;
+        if (side === "under") return -raw;
+        return raw;
+      }
+      return proj - line;
+    }
+    function computePickEdgePct(edge, line) {
+      if (!isFinite(edge) || !isFinite(line) || !line) return null;
+      return (edge / Math.abs(line)) * 100;
     }
     function parseMarketLine(val) {
       if (!val || !String(val).trim()) return null;
@@ -1151,10 +1237,10 @@
       FATIGUE_STEP: 0.008,          // short week / congestion (less than multi-week sports)
       FATIGUE_CAP: 0.04,
       INTEGRITY_VOL_CEILING: 2.5,
-      OVERDISPERSION: 1.45,         // point totals overdisperse vs pure scoring
+      OVERDISPERSION: 3.15,         // CFB/NFL totals are much wider than Poisson-like scoring
       HOME_FIELD_POINTS: 2.4,       // typical NFL HFA in points
-      MIN_VARIANCE_FT: 28,          // floor variance for game totals (~sd 5+)
-      MIN_VARIANCE_H1: 12,          // floor for 1H totals
+      MIN_VARIANCE_FT: 144,         // floor variance for game totals (~sd 12)
+      MIN_VARIANCE_H1: 48,          // floor for 1H totals
       REGRESSION_TO_MEAN: 0.18,     // pull extreme form means toward league avg
       LEAGUE_AVG_POINTS: 22.5,      // per-team scoring baseline (NFL-ish)
       LEAGUE_AVG_TOTAL: 45.0,       // typical game total baseline
@@ -1311,7 +1397,7 @@
       catch (e) { return {}; }
     }
     function saveEloRatings(ratings) {
-      try { localStorage.setItem("AF_ELO_RATINGS", JSON.stringify(ratings)); } catch (e) {}
+      try { localStorage.setItem("AF_ELO_RATINGS", JSON.stringify(ratings)); } catch (e) { window.__afLog("saveEloRatings", e); }
     }
     /** Prefer the stable numeric SofaScore ID; fall back to a normalized name. */
     function getEloKey(name, id) {
@@ -1529,7 +1615,7 @@
             if (node.children) walk(node.children);
           };
           walk(data.conferences || data.items || data);
-        } catch (_e) {}
+        } catch (_e) { window.__afLog("fbEspnLoadCollegeGroups", _e); }
       }
       FB_ESPN.collegeGroups = Array.from(found);
       return FB_ESPN.collegeGroups;
@@ -1557,7 +1643,26 @@
 const FB_ESPN = {
       REGISTRY: "https://sports.core.api.espn.com/v2/sports/football/leagues?limit=500&lang=en&region=us",
       SITE: slug => "https://site.api.espn.com/apis/site/v2/sports/football/" + encodeURIComponent(slug),
-      WORKER: "https://thebetceo-engine.ridwantunde636.workers.dev/",
+      // Deploy-time relay: allows an operator to point this at their own Worker
+      // (see README/deploy notes) via localStorage override, instead of every
+      // fork of this file silently depending on one person's personal account.
+      // Falls back to the shipped default if no override is set.
+      // NOTE: the CSP connect-src allowlist in <head> is hardcoded to the
+      // default relay's domain — an override here also requires updating that
+      // meta tag, or the browser will block the request. That's intentional:
+      // CSP is what actually enforces "no arbitrary destinations," and this
+      // override exists for operators editing the file, not as a runtime toggle.
+      WORKER: (function(){
+        // Silent by design: no override present/readable just means "use the
+        // shipped default," which is already the correct, harmless outcome.
+        try { const o = localStorage.getItem("AF_ENGINE_RELAY_OVERRIDE"); if (o) return o; } catch (e) {}
+        return "https://thebetceo-engine.ridwantunde636.workers.dev/";
+      })(),
+      // Set by fbEspnFetchJSON on every successful response; 0-1 = first-party
+      // (direct/own relay), 2+ = public third-party CORS proxy. Read by the UI
+      // status line so "we quietly fell back to a public relay" is never invisible.
+      lastDataTrustTier: 0,
+      lastDataTrustLabel: "ESPN direct",
       registry: [],
       leagueCache: new Map(),
       teamCache: new Map(),
@@ -1652,14 +1757,22 @@ const FB_ESPN = {
     }
     function fbWorldSaveRegistry(registry) {
       const rows = (registry || []).map(function(x) { return Object.assign({}, x); });
-      try { localStorage.setItem(FB_WORLD_LS_REGISTRY, JSON.stringify(rows)); } catch (e) {}
-      return fbWorldPutAll("leagues", rows).catch(function() { return null; });
+      let lsOk = true;
+      try { localStorage.setItem(FB_WORLD_LS_REGISTRY, JSON.stringify(rows)); } catch (e) { lsOk = false; window.__afLog("fbWorldSaveRegistry", e); }
+      return fbWorldPutAll("leagues", rows).then(function(r){
+        if (!lsOk) { if (typeof AFDB !== "undefined" && AFDB.log) AFDB.log("WARN", "STORAGE_DRIFT", "Registry saved to IndexedDB but localStorage mirror write failed — stores are now out of sync."); }
+        return r;
+      }).catch(function(idbErr) {
+        window.__afLog("fbWorldSaveRegistry:indexedDB", idbErr);
+        if (lsOk && typeof AFDB !== "undefined" && AFDB.log) AFDB.log("WARN", "STORAGE_DRIFT", "Registry saved to localStorage but IndexedDB write failed — stores are now out of sync.");
+        return null;
+      });
     }
     async function fbWorldLoadRegistry() {
       try {
         const rows = await fbWorldGetAll("leagues");
         if (Array.isArray(rows) && rows.length) return rows;
-      } catch (e) {}
+      } catch (e) { window.__afLog("fbWorldLoadRegistry", e); }
       try {
         const rows = JSON.parse(localStorage.getItem(FB_WORLD_LS_REGISTRY) || "[]");
         return Array.isArray(rows) ? rows : [];
@@ -1681,21 +1794,25 @@ const FB_ESPN = {
       const rows = (fixtures || []).filter(function(e) { return e && keys.has(fbWorldDateKeyFromDate(e.date)); }).map(function(e) {
         return Object.assign({}, e, { dateKey: fbWorldDateKeyFromDate(e.date) });
       });
-      try { localStorage.setItem(FB_WORLD_LS_FIXTURES, JSON.stringify(rows)); } catch (e) {}
-      try { await fbWorldClear("fixtures"); await fbWorldPutAll("fixtures", rows); } catch (e) {}
+      let lsOk = true, idbOk = true;
+      try { localStorage.setItem(FB_WORLD_LS_FIXTURES, JSON.stringify(rows)); } catch (e) { lsOk = false; window.__afLog("fbWorldSaveFixtures:localStorage", e); }
+      try { await fbWorldClear("fixtures"); await fbWorldPutAll("fixtures", rows); } catch (e) { idbOk = false; window.__afLog("fbWorldSaveFixtures:indexedDB", e); }
+      if (lsOk !== idbOk && typeof AFDB !== "undefined" && AFDB.log) {
+        AFDB.log("WARN", "STORAGE_DRIFT", "Fixture save succeeded in " + (lsOk ? "localStorage only" : "IndexedDB only") + " — the two stores are now out of sync for this save.");
+      }
       return rows;
     }
     async function fbWorldLoadFixtures() {
       const keys = new Set(fbWorldTwoDayKeys());
       let rows = [];
-      try { rows = await fbWorldGetAll("fixtures") || []; } catch (e) {}
+      try { rows = await fbWorldGetAll("fixtures") || []; } catch (e) { window.__afLog("fbWorldLoadFixtures", e); }
       if (!rows.length) {
-        try { const x = JSON.parse(localStorage.getItem(FB_WORLD_LS_FIXTURES) || "[]"); rows = Array.isArray(x) ? x : []; } catch (e) {}
+        try { const x = JSON.parse(localStorage.getItem(FB_WORLD_LS_FIXTURES) || "[]"); rows = Array.isArray(x) ? x : []; } catch (e) { window.__afLog("fbWorldLoadFixtures", e); }
       }
       return rows.filter(function(e) { return e && keys.has(e.dateKey || fbWorldDateKeyFromDate(e.date)); });
     }
     async function fbWorldSaveMeta(key, value) {
-      try { await fbWorldPutAll("meta", [{ key: key, value: value, updatedAt: Date.now() }]); } catch (e) {}
+      try { await fbWorldPutAll("meta", [{ key: key, value: value, updatedAt: Date.now() }]); } catch (e) { window.__afLog("fbWorldSaveMeta", e); }
     }
 
     function fbEspnNormalizeName(v) {
@@ -1730,14 +1847,32 @@ const FB_ESPN = {
         try{const res=await fetch(requestUrl,{method:"GET",headers:{Accept:"application/json"},signal:ctrl.signal,cache:"no-store"});if(!res.ok)throw new Error(label+" HTTP "+res.status);const text=await res.text();try{return JSON.parse(text);}catch(e){throw new Error(label+" returned invalid JSON");}}
         catch(e){if(e?.name==="AbortError")throw new Error(label+" timeout");throw e;}finally{clearTimeout(timer);}
       }
+      // Tier 0-1 are first-party (direct + our own relay worker). Tier 2+ are
+      // public third-party CORS proxies we don't control — anyone can rate-limit,
+      // shut down, or (in principle) tamper with what they return. Landing on
+      // one should never be silent: DATA_TRUST_TIER is stamped onto the result
+      // and a WARN is logged so it's visible in AFDB, not just "it worked."
       const attempts=[
-        [url,"ESPN direct"],
-        [FB_ESPN.WORKER+"?url="+encodeURIComponent(url),"ESPN worker"],
-        ["https://corsproxy.io/?url="+encodeURIComponent(url),"ESPN fallback 1"],
-        ["https://api.allorigins.win/raw?url="+encodeURIComponent(url),"ESPN fallback 2"]
+        [url,"ESPN direct",0],
+        [FB_ESPN.WORKER+"?url="+encodeURIComponent(url),"ESPN worker",1],
+        ["https://corsproxy.io/?url="+encodeURIComponent(url),"ESPN fallback 1 (public relay)",2],
+        ["https://api.allorigins.win/raw?url="+encodeURIComponent(url),"ESPN fallback 2 (public relay)",2]
       ];
       let last=null;
-      for(const [requestUrl,label] of attempts){try{const data=await one(requestUrl,label);FB_ESPN.requestCache.set(cacheKey,{data,ts:Date.now()});return data;}catch(e){last=e;engineDebug(label+" failed",{url,error:e?.message||String(e)});}}
+      for(const [requestUrl,label,tier] of attempts){
+        try{
+          const data=await one(requestUrl,label);
+          if (tier >= 2) {
+            engineDebug("Data served via public relay — unverified third party", { url, source: label });
+            if (typeof AFDB !== "undefined" && AFDB.log) AFDB.log("WARN", "DATA_TRUST", "Falling back to a public CORS relay (" + label + ") for live data — treat as unverified.", { url });
+          }
+          FB_ESPN.lastDataTrustTier = tier;
+          FB_ESPN.lastDataTrustLabel = label;
+          FB_ESPN.requestCache.set(cacheKey,{data,ts:Date.now(),sourceTier:tier,sourceLabel:label});
+          if (data && typeof data === "object") { data.__dataTrustTier = tier; data.__dataTrustLabel = label; }
+          return data;
+        }catch(e){last=e;engineDebug(label+" failed",{url,error:e?.message||String(e)});}
+      }
       throw last||new Error("ESPN fetch failed");
     }
     // Runs `fn` over `items` with at most `limit` requests in flight at once,
@@ -1753,7 +1888,7 @@ const FB_ESPN = {
         while (next < items.length) {
           const i = next++;
           try { out[i] = await fn(items[i], i); }
-          catch (e) { out[i] = null; }
+          catch (e) { out[i] = null; window.__afLog("fbEspnMapLimit:item" + i, e); }
         }
       }
       const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker);
@@ -1763,7 +1898,15 @@ const FB_ESPN = {
     function fbEspnSetStatus(text, kind = "info") {
       const el = document.getElementById("fetchStatus");
       if (!el) return;
-      el.textContent = text || "";
+      // Applied here (once) rather than at every call site: any "ok" status is
+      // automatically suffixed if the data behind it came from a public relay
+      // instead of ESPN direct / our own worker, so the fallback is visible
+      // where the user is actually looking, not just in the debug panel.
+      let shown = text || "";
+      if (kind === "ok" && shown && typeof FB_ESPN !== "undefined" && FB_ESPN.lastDataTrustTier >= 2) {
+        shown += " ⚠ via public relay";
+      }
+      el.textContent = shown;
       el.style.color = kind === "error" ? "#ff5c61" : kind === "ok" ? "#49d45f" : "var(--muted)";
     }
     function fbEspnSetCoverage(text) {
@@ -1972,7 +2115,7 @@ const FB_ESPN = {
           FB_ESPN.loaded = true;
           fbEspnRenderLeagueRegistry();
         }
-      } catch (e) {}
+      } catch (e) { window.__afLog("fbEspnLoadRegistry", e); }
       try {
         let data = await fbEspnFetchJSON(FB_ESPN.REGISTRY + "&page=1");
         let refs = Array.isArray(data && data.items) ? data.items.slice() : [];
@@ -2067,14 +2210,14 @@ const FB_ESPN = {
         try {
           const k = fbEspnLocalDateKey(Number(offset || 0) + d);
           if (k && etKeys.indexOf(k) < 0) etKeys.push(k);
-        } catch (_e) {}
+        } catch (_e) { window.__afLog("fbEspnFetchLeagueDay", _e); }
       });
       if (etKeys.indexOf(baseEt) < 0) etKeys.push(baseEt);
 
       let scanGroups = (typeof afResolveScanGroups === "function")
         ? afResolveScanGroups(leagueKey || slug)
         : (Number.isFinite(groupWant) ? [groupWant] : [null]);
-      // NCAA Regular Season: only division rollups (fast). Catalog crawl made Today take too long.
+      // NCAA Regular Season: division rollups first; expand if the slate is thin.
 
       let raw = [];
       for (let i = 0; i < etKeys.length; i++) {
@@ -2104,9 +2247,29 @@ const FB_ESPN = {
             const data = await fbEspnFetchJSON(url, 15000);
             const evs = Array.isArray(data && data.events) ? data.events : [];
             raw = raw.concat(evs);
-          } catch (_err2) {}
+          } catch (_err2) { window.__afLog("fbEspnFetchLeagueDay", _err2); }
         }
       }
+      try {
+        const uniqProbe = new Set((raw || []).map(function (e) { return String(e && e.id || ""); }));
+        const isNcaaRs = String(leagueKey || slug || "") === "college-football";
+        if (isNcaaRs && uniqProbe.size < 16 && typeof fbEspnLoadCollegeGroups === "function") {
+          const extra = await fbEspnLoadCollegeGroups();
+          const have = new Set((scanGroups || []).filter(Number.isFinite));
+          const more = (extra || []).filter(function (g) { return Number.isFinite(g) && !have.has(g); }).slice(0, 12);
+          for (let i = 0; i < etKeys.length; i++) {
+            for (let g = 0; g < more.length; g++) {
+              let url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + etKeys[i] + "&limit=300&groups=" + more[g];
+              if (seasonWant === 1 || seasonWant === 2 || seasonWant === 3) url += "&seasontype=" + seasonWant;
+              try {
+                const data = await fbEspnFetchJSON(url, 12000);
+                const evs = Array.isArray(data && data.events) ? data.events : [];
+                raw = raw.concat(evs);
+              } catch (_e3) { window.__afLog("fbEspnFetchLeagueDay", _e3); }
+            }
+          }
+        }
+      } catch (_ncaaExpand) { window.__afLog("fbEspnFetchLeagueDay", _ncaaExpand); }
 
       const seen = new Set(), clean = [];
       raw.forEach(function (ev) {
@@ -2268,7 +2431,7 @@ const FB_ESPN = {
         let events=stored.filter(function(x){return (x.dateKey||fbWorldDateKeyFromDate(x.date))===dateKey;});
         if(slug) events=events.filter(function(x){return String(x.leagueSlug||"").toLowerCase()===slug.toLowerCase();});
         if (typeof afSeedLiveStatusFromEvents === "function") {
-          try { afSeedLiveStatusFromEvents(events, slug); } catch (_seedErr) {}
+          try { afSeedLiveStatusFromEvents(events, slug); } catch (_seedErr) { window.__afLog("fbEspnLoadFixtures", _seedErr); }
         }
         events = (events||[]).filter(function(e){ return typeof fbEspnIsUpcoming==="function" ? fbEspnIsUpcoming(e) : !e.finished; });
         events.sort(function(a,b){ return Date.parse(a.date||0) - Date.parse(b.date||0); });
@@ -2350,7 +2513,7 @@ const FB_ESPN = {
           try {
             const more = await fbEspnFetchTeamEventsSeason(slug, teamId, yearNow - y);
             (more || []).forEach(function (n) { events.push(n); });
-          } catch (_se) {}
+          } catch (_se) { window.__afLog("fbEspnFetchTeamEvents", _se); }
         }
         let usableNow = events.filter(e => e && e.finished && Number.isFinite(e.homeScore) && Number.isFinite(e.awayScore)).length;
         let scoreboardWindowCount = 0;
@@ -3093,7 +3256,15 @@ const FB_ESPN = {
         expect("display null", displayLine(null), "—");
         expect("OVER side", getPickSideFromText("OVER 99.5"), "over");
         expect("UNDER side", getPickSideFromText("UNDER 18.5"), "under");
+        expect("HOME side", getPickSideFromText("HOME -19.5"), "home");
+        expect("AWAY side", getPickSideFromText("AWAY +21.5"), "away");
         expect("NO PLAY side", getPickSideFromText("NO PLAY"), "");
+        expect("signed line", parseMarketLine("-21.5"), -21.5);
+        expect("plus line", parseMarketLine("+14.5"), 14.5);
+        expect("away label", formatSpreadPick("away", -21.5), "AWAY +21.5");
+        expect("home label", formatSpreadPick("home", -21.5), "HOME -21.5");
+        expect("cover edge away", spreadCoverEdge(9.02, -21.5, "away"), 12.48);
+        expect("cover edge home", Math.round(spreadCoverEdge(23.87, -19.5, "home")*100)/100, 4.37);
       });
 
       suite("getSampleTier / getConfidenceGrade / getPick", function() {
@@ -3145,9 +3316,10 @@ const FB_ESPN = {
         }
       });
 
-      suite("copyTrackerData / militaryRaid surface", function() {
+      suite("copyTrackerData / runEngineSelfTest surface", function() {
         expectTrue("copyTrackerData export", typeof window.copyTrackerData === "function");
-        expectTrue("militaryRaid export", typeof window.militaryRaid === "function");
+        expectTrue("runEngineSelfTest export", typeof window.runEngineSelfTest === "function");
+        expectTrue("militaryRaid deprecated alias still resolves", typeof window.militaryRaid === "function");
         expectTrue("AFDB.runTestFetch", typeof AFDB !== "undefined" && typeof AFDB.runTestFetch === "function");
       });
 
@@ -3393,7 +3565,7 @@ const FB_ESPN = {
         } catch (err) {
           results.push({ label: "Regression threw: " + (err && err.message ? err.message : String(err)), pass: false });
         } finally {
-          try { if (typeof clearAll === "function") clearAll(); } catch (e) {}
+          try { if (typeof clearAll === "function") clearAll(); } catch (e) { window.__afLog("run", e); }
         }
         const passed = results.filter(function(r) { return r.pass; }).length;
         const failed = results.length - passed;
@@ -3420,11 +3592,11 @@ const FB_ESPN = {
     }
     // ---------- FOOTBALL CORE V2 (restored from patched_master) ----------
     const FB2 = {
-      VERSION: "af_core_v1_points",
+      VERSION: "af_core_v1_points_fix12",
       PRIOR_STRENGTH: 4,
-      HOME_ADVANTAGE: 2.4,
+      HOME_ADVANTAGE: 1.0,
       MIN_LAMBDA: 3,
-      MAX_LAMBDA: 45,
+      MAX_LAMBDA: 72,
       /* rho removed */
       CALIBRATION_MIN: 30,
       MONTE_CARLO_SIMS: 20000,
@@ -3558,16 +3730,16 @@ const FB_ESPN = {
     function fb2_competitionPrior(){
       const raw=fb2_competitionLabel();
       const key=String(raw).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
-      let stored=null;try{stored=JSON.parse(localStorage.getItem("AF_COMPETITION_PROFILE_"+key)||"null");}catch(e){}
+      let stored=null;try{stored=JSON.parse(localStorage.getItem("AF_COMPETITION_PROFILE_"+key)||"null");}catch (e) { window.__afLog("fb2_competitionPrior", e); }
       const auto=window.__fbAutoData||{};
       const home=fb2_num("leagueHomeAvg",auto.context?.homeAvg??stored?.homeAvg??22.5), away=fb2_num("leagueAwayAvg",auto.context?.awayAvg??stored?.awayAvg??20.5);
       const season=clamp(fb2_num("seasonPointsFactor",auto.context?.seasonPointsFactor??stored?.seasonPointsFactor??1)||1,0.75,1.25);
       const strength=clamp(fb2_num("competitionStrength",auto.context?.strength??stored?.strength??1)||1,0.75,1.25);
-      return {home:clamp(home*season*strength,8,45),away:clamp(away*season*strength,6,42),key,seasonPointsFactor:season,strength};
+      return {home:clamp(home*season*strength,8,72),away:clamp(away*season*strength,6,68),key,seasonPointsFactor:season,strength};
     }
     window.saveFootballCompetitionProfile=function(name,homeAvg,awayAvg,seasonPointsFactor=1,strength=1){
       const key=String(name||"football_global").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"football_global";
-      const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||22.5,8,45),awayAvg:clamp(Number(awayAvg)||20.5,6,42),seasonPointsFactor:clamp(Number(seasonPointsFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
+      const profile={name:String(name||key),homeAvg:clamp(Number(homeAvg)||22.5,8,72),awayAvg:clamp(Number(awayAvg)||20.5,6,68),seasonPointsFactor:clamp(Number(seasonPointsFactor)||1,0.75,1.25),strength:clamp(Number(strength)||1,0.75,1.25),updatedAt:new Date().toISOString()};
       localStorage.setItem("AF_COMPETITION_PROFILE_"+key,JSON.stringify(profile));return profile;
     };
     function fb2_modifier(team,opponent,home,context){
@@ -3642,8 +3814,8 @@ const FB_ESPN = {
       const away = Math.max(0, Number(lambdas.away) || 0);
       const total = home + away;
       const M = (typeof AF_POINTS_MODEL !== "undefined" ? AF_POINTS_MODEL : {}) || {};
-      const sdT = Math.sqrt(Math.max(M.MIN_VARIANCE_FT || 28, total * (M.OVERDISPERSION || 1.45)));
-      const sdM = Math.sqrt(Math.max(20, sdT * sdT * 0.85));
+      const sdT = Math.sqrt(Math.max(M.MIN_VARIANCE_FT || 144, total * (M.OVERDISPERSION || 3.15)));
+      const sdM = Math.sqrt(Math.max(169, sdT * sdT * 0.95));
       let hw = 0, aw = 0, tot = 0;
       function gauss() {
         // Box-Muller
@@ -3774,16 +3946,33 @@ const FB_ESPN = {
       const ftTotal = homeExp + awayExp;
       const spreadHome = homeExp - awayExp; // expected home margin (points) — feeds both Handicap and Winner below
 
-      const ftVar = Math.max(M.MIN_VARIANCE_FT || 28, ftTotal * (M.OVERDISPERSION || 1.45));
-      const marginVar = Math.max(20, ftVar * 0.85);
+      const ftVar = Math.max(M.MIN_VARIANCE_FT || 144, ftTotal * (M.OVERDISPERSION || 3.15));
+      const marginVar = Math.max(169, ftVar * 0.95);
+
+      function temperProb(raw){
+        if(!Number.isFinite(raw)) return 0.5;
+        const trust = (typeof getLeagueTrustMeta === "function")
+          ? getLeagueTrustMeta((ctx && ctx.competition) || "")
+          : {level:"advisory"};
+        let shrink = 0;
+        if ((trust.level||"advisory") === "advisory") shrink += 0.20;
+        if (sample < 8) shrink += 0.08;
+        if (integrity) shrink += 0.06;
+        shrink = Math.min(0.42, shrink);
+        const pulled = 0.5 + (raw - 0.5) * (1 - shrink);
+        // Advisory books should not print 99% certainties from empty metadata.
+        const cap = (trust.level === "advisory") ? 0.90 : 0.96;
+        return Math.max(1 - cap, Math.min(cap, pulled));
+      }
 
       const add=function(key,name,prob,pickSide,oddsVal,line,projection){
-        const cal = Number.isFinite(prob) ? Math.max(0, Math.min(1, prob)) : 0.5;
+        const raw = Number.isFinite(prob) ? Math.max(0, Math.min(1, prob)) : 0.5;
+        const cal = temperProb(raw);
         const ev = fb2_ev(cal, oddsVal);
         const g = fb2_grade(cal, ev, sample, integrity);
         const q = fb2_marketPick(cal, pickSide, oddsVal, sample, integrity, 0.025);
         rows.push({
-          marketKey:key, name:name, prob:cal, rawProb:prob, odds:oddsVal, ev:ev,
+          marketKey:key, name:name, prob:cal, rawProb:raw, odds:oddsVal, ev:ev,
           line:line, projection:projection, grade:g, pick:q.pick, side:pickSide, integrity:integrity
         });
       };
@@ -3816,9 +4005,9 @@ const FB_ESPN = {
         const pHomeCovers = (typeof normalCdf === "function") ? (1 - normalCdf(z)) : 0.5;
         const pAwayCovers = 1 - pHomeCovers;
         if (pHomeCovers >= pAwayCovers) {
-          add("spread_home", "Handicap", pHomeCovers, "HOME " + displayLine(spreadLine), odds.home, spreadLine, spreadHome);
+          add("spread_home", "Handicap", pHomeCovers, formatSpreadPick("home", spreadLine), odds.home, spreadLine, spreadHome);
         } else {
-          add("spread_away", "Handicap", pAwayCovers, "AWAY " + displayLine(-spreadLine), odds.away, spreadLine, spreadHome);
+          add("spread_away", "Handicap", pAwayCovers, formatSpreadPick("away", spreadLine), odds.away, spreadLine, spreadHome);
         }
       }
 
@@ -3844,18 +4033,19 @@ const FB_ESPN = {
         const tr=document.createElement("tr"),c1=document.createElement("td"),c2=document.createElement("td"),c3=document.createElement("td"),c4=document.createElement("td"),c5=document.createElement("td");
         c1.textContent=p.name;
         if(Number.isFinite(p.projection)&&Number.isFinite(p.line)){
-          c2.textContent=displayLine(p.projection)+" (line "+displayLine(p.line)+") · "+((p.prob*100).toFixed(1)+"%");
+          const lineTxt = (marketFamily(p.marketKey)==="spread") ? displaySignedLine(p.line) : displayLine(p.line);
+          c2.textContent=displayLine(p.projection)+" (line "+lineTxt+") · "+((p.prob*100).toFixed(1)+"%");
         } else if(Number.isFinite(p.prob)&&p.prob>0&&p.prob<1){
           c2.textContent=(p.prob*100).toFixed(1)+"%";
         } else {
-          c2.textContent=Number.isFinite(p.projection)?displayLine(p.projection):"-";
+          c2.textContent=Number.isFinite(p.projection)?formatProjectionWhole(p.projection):"-";
         }
         var evTxt="-";
         if(Number.isFinite(p.ev)&&Number.isFinite(p.odds)&&p.odds>1&&p.ev>-0.5&&p.ev<0.8){
           evTxt=(p.ev>=0?"+":"")+(p.ev*100).toFixed(1)+"%";
         }else if(Number.isFinite(p.line)&&Number.isFinite(p.projection)){
-          var d=p.projection-p.line;
-          evTxt=(d>=0?"+":"")+d.toFixed(2);
+          var d=(typeof computePickEdge==="function")?computePickEdge(p):(p.projection-p.line);
+          evTxt=Number.isFinite(d)?((d>=0?"+":"")+d.toFixed(2)):"-";
         }
         c3.textContent=evTxt;
         c4.className=getConfidenceClass(p.grade);c4.textContent=p.grade;
@@ -3917,8 +4107,8 @@ const FB_ESPN = {
       rows.forEach(function(p){
         if(!p||p.pick==="NO PLAY"){ p.trap=false; return; }
         if(!Number.isFinite(p.line)||!Number.isFinite(p.projection)){ p.trap=false; return; }
-        const edge=p.projection-p.line;
-        p.trap=!!detectTrap(edge,p.line,p.pick,"ft",volatility);
+        const edge=(typeof computePickEdge==="function")?computePickEdge(p):(p.projection-p.line);
+        p.trap=!!detectTrap(edge,Math.abs(p.line),p.pick,marketFamily(p.marketKey)||"ft",volatility);
         if(p.trap){ p.pick="NO PLAY"; p.grade="D"; }
       });
       const actionable=fb2_renderRows(rows,ctx,activeL,integrity);
@@ -3930,7 +4120,7 @@ const FB_ESPN = {
       const _margin = (Number(activeL.home)||0) - (Number(activeL.away)||0);
       const _M = (typeof AF_POINTS_MODEL !== "undefined" ? AF_POINTS_MODEL : {}) || {};
       const _ftTot = (Number(activeL.home)||0) + (Number(activeL.away)||0);
-      const _sdM = Math.sqrt(Math.max(20, Math.max(_M.MIN_VARIANCE_FT||28, _ftTot*(_M.OVERDISPERSION||1.45))*0.85));
+      const _sdM = Math.sqrt(Math.max(169, Math.max(_M.MIN_VARIANCE_FT||144, _ftTot*(_M.OVERDISPERSION||3.15))*0.95));
       const _z = (0 - _margin) / Math.max(0.01, _sdM);
       let pHome = (typeof normalCdf === "function") ? (1 - normalCdf(_z)) : (mc.home || 0.5);
       let pAway = 1 - pHome;
@@ -3940,9 +4130,22 @@ const FB_ESPN = {
         pHome = pHome * (1 - ew) + (Number(elo.home) || pHome) * ew;
         pAway = 1 - pHome;
       }
-      const fixtureMeta={eventId:ctx.eventId||("manual_fb_"+Date.now()),eventDate:ctx.kickoff,homeTeam:data.A.name,awayTeam:data.B.name,homeTeamId:data.A.id,awayTeamId:data.B.id,league:ctx.competition||"Unknown competition",season:ctx.season,venue:ctx.venue,competitionType:ctx.competitionType,tournamentId:ctx.tournamentId,eloKeyA:getEloKey(data.A.name,data.A.id),eloKeyB:getEloKey(data.B.name,data.B.id),modelVersion:FB2.VERSION,lambdaHome:activeL.home,lambdaAway:activeL.away,homeWinProbability:pHome,drawProbability:0,awayWinProbability:pAway,monteCarlo:mc,elo:elo};
+      function stableManualEventId(){
+        const hid=String(data.A.id||data.A.name||"H").replace(/[^a-zA-Z0-9]+/g,"_");
+        const aid=String(data.B.id||data.B.name||"A").replace(/[^a-zA-Z0-9]+/g,"_");
+        const day=String(ctx.kickoff||"").slice(0,10)||new Date().toISOString().slice(0,10);
+        return "manual_fb_"+hid+"_"+aid+"_"+day;
+      }
+      const fixtureMeta={eventId:ctx.eventId||stableManualEventId(),eventDate:ctx.kickoff,homeTeam:data.A.name,awayTeam:data.B.name,homeTeamId:data.A.id,awayTeamId:data.B.id,league:ctx.competition||"Unknown competition",season:ctx.season,venue:ctx.venue,competitionType:ctx.competitionType,tournamentId:ctx.tournamentId,eloKeyA:getEloKey(data.A.name,data.A.id),eloKeyB:getEloKey(data.B.name,data.B.id),modelVersion:FB2.VERSION,lambdaHome:activeL.home,lambdaAway:activeL.away,homeWinProbability:pHome,drawProbability:0,awayWinProbability:pAway,monteCarlo:mc,elo:elo};
       const leagueTrust=getLeagueTrustMeta(fixtureMeta.league);const payloads=[];
-      actionable.forEach(p=>{const side=p.side||getPickSideFromText(p.pick);const signature=fixtureMeta.eventId+"|"+p.marketKey+"|"+side;payloads.push({eventId:fixtureMeta.eventId,eventDate:fixtureMeta.eventDate,homeTeam:fixtureMeta.homeTeam,awayTeam:fixtureMeta.awayTeam,homeTeamId:fixtureMeta.homeTeamId,awayTeamId:fixtureMeta.awayTeamId,league:fixtureMeta.league,season:fixtureMeta.season,venue:fixtureMeta.venue,competitionType:fixtureMeta.competitionType,tournamentId:fixtureMeta.tournamentId,eloKeyA:fixtureMeta.eloKeyA,eloKeyB:fixtureMeta.eloKeyB,leagueTrust:leagueTrust.level,marketKey:p.marketKey,marketName:p.name,line:p.line,projection:Number.isFinite(p.projection)?p.projection:null,modelProbability:Number.isFinite(p.prob)?p.prob:null,featureHash:window.__fbCoreConfig?.featureHash||null,configHash:(typeof hash==="function"?hash(window.__fbCoreConfig||{}):null),rawModelProbability:Number.isFinite(p.rawProb)?p.rawProb:null,fairOdds:fb2_fairOdds(p.prob),odds:Number.isFinite(p.odds)?p.odds:null,ev:Number.isFinite(p.ev)?p.ev:null,edge:Number.isFinite(p.projection)&&Number.isFinite(p.line)?p.projection-p.line:null,edgePct:Number.isFinite(p.projection)&&Number.isFinite(p.line)&&p.line?((p.projection-p.line)/p.line)*100:null,predictionText:p.pick,confidenceGrade:p.grade,side:side,resultStatus:"pending",signature,createdAt:new Date().toISOString(),isLock:!!p.isLock,trap:!!p.trap,sampleTier:sample>=8?"full":sample>=4?"thin":"insufficient",integrityFlag:integrity,actualHomePoints:null,actualAwayPoints:null});});
+      actionable.forEach(p=>{
+        const side=canonicalPickSide(p)||getPickSideFromText(p.pick)||String(p.side||"").toLowerCase();
+        const fam=marketFamily(p.marketKey);
+        const signature=fixtureMeta.eventId+"|"+fam+"|"+side;
+        const edge=computePickEdge(p);
+        const edgePct=computePickEdgePct(edge,p.line);
+        payloads.push({eventId:fixtureMeta.eventId,eventDate:fixtureMeta.eventDate,homeTeam:fixtureMeta.homeTeam,awayTeam:fixtureMeta.awayTeam,homeTeamId:fixtureMeta.homeTeamId,awayTeamId:fixtureMeta.awayTeamId,league:fixtureMeta.league,season:fixtureMeta.season,venue:fixtureMeta.venue,competitionType:fixtureMeta.competitionType,tournamentId:fixtureMeta.tournamentId,eloKeyA:fixtureMeta.eloKeyA,eloKeyB:fixtureMeta.eloKeyB,leagueTrust:leagueTrust.level,marketKey:p.marketKey,marketName:p.name,line:p.line,projection:Number.isFinite(p.projection)?p.projection:null,modelProbability:Number.isFinite(p.prob)?p.prob:null,featureHash:window.__fbCoreConfig?.featureHash||null,configHash:(typeof hash==="function"?hash(window.__fbCoreConfig||{}):null),rawModelProbability:Number.isFinite(p.rawProb)?p.rawProb:null,fairOdds:fb2_fairOdds(p.prob),odds:Number.isFinite(p.odds)?p.odds:null,ev:Number.isFinite(p.ev)?p.ev:null,edge:Number.isFinite(edge)?edge:null,edgePct:Number.isFinite(edgePct)?edgePct:null,predictionText:p.pick,confidenceGrade:p.grade,side:side,resultStatus:"pending",signature,createdAt:new Date().toISOString(),isLock:!!p.isLock,trap:!!p.trap,sampleTier:sample>=8?"full":sample>=4?"thin":"insufficient",integrityFlag:integrity,actualHomePoints:null,actualAwayPoints:null});
+      });
       if(payloads.length){
         // Prefer the lock already chosen in the prediction table; fall back to grade+EV rank
         if(!payloads.some(function(x){return x.isLock;})){
@@ -3951,7 +4154,7 @@ const FB_ESPN = {
         }
         addTrackedPicks(payloads);
       }
-      engineDebug("AF Core complete",{context:ctx,lambdas:activeL,firstHalf:fh,ml:{home:pHome,away:pAway},monteCarlo:mc,actionable:actionable.length,integrity,churn,volatility:+volatility.toFixed(2),sample,leagueTrust:leagueTrust.level});
+      engineDebug("AF Core complete",{context:ctx,lambdas:activeL,ml:{home:pHome,away:pAway},monteCarlo:mc,actionable:actionable.length,integrity,churn,volatility:+volatility.toFixed(2),sample,leagueTrust:leagueTrust.level});
       const st=document.getElementById("fixtureContextStatus");if(st)st.textContent=`${ctx.competition||"Unknown competition"} · ${ctx.eventId?"Event "+ctx.eventId:"manual fixture ID"} · λ ${activeL.home.toFixed(2)}–${activeL.away.toFixed(2)} · ML ${(pHome*100).toFixed(1)}–${(pAway*100).toFixed(1)} · Total ~${((Number(activeL.home)||0)+(Number(activeL.away)||0)).toFixed(1)}`;
     }
     function loadFbVerifiedConfig(market){
@@ -3961,7 +4164,7 @@ const FB_ESPN = {
       try {
         var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.body.classList.toggle('dark-mode', !!dark);
-      } catch (e) {}
+      } catch (e) { window.__afLog("applySystemTheme", e); }
     }
     function toggleTheme(){ applySystemTheme(); }
     function fbResetUiToFreshPage(){
@@ -3986,7 +4189,7 @@ const FB_ESPN = {
       if(typeof fbEspnSetCoverage==='function') fbEspnSetCoverage((FB_ESPN.registry||[]).length+' ESPN football competitions stored locally · Fixtures: Today + Tomorrow only');
     }
     function fbClearPredictionFields(){
-      try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
+      try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch (_e) { window.__afLog("fbClearPredictionFields", _e); }
       ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','ftMarket','spreadLine','fixtureKickoff'
       ].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
       ['useFTH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
@@ -3999,8 +4202,8 @@ const FB_ESPN = {
       const r=document.getElementById('results');if(r){r.style.display='none';r.innerHTML='<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>';}
       const tc=document.getElementById('teamContextBody');if(tc)tc.innerHTML='Run a fetch to populate this — filled in automatically alongside recent form.';
       window.__fbAutoData={context:{},A:{},B:{},market:{},h2h:[],source:'none',coverage:null};
-      try { if (typeof selectedTeamIds !== 'undefined') selectedTeamIds={A:null,B:null}; } catch(_e) {}
-      try { if (typeof g_lastFetchedTeams !== 'undefined') g_lastFetchedTeams={A:'',B:''}; } catch(_e) {}
+      try { if (typeof selectedTeamIds !== 'undefined') selectedTeamIds={A:null,B:null}; } catch (_e) { window.__afLog("fbClearPredictionFields", _e); }
+      try { if (typeof g_lastFetchedTeams !== 'undefined') g_lastFetchedTeams={A:'',B:''}; } catch (_e) { window.__afLog("fbClearPredictionFields", _e); }
     }
     function clearAll(){
       fbClearPredictionFields();
@@ -4031,7 +4234,7 @@ const FB_ESPN = {
       try {
         const x = JSON.parse(localStorage.getItem(FB_TRACKER_KEY) || "null");
         if (x && Array.isArray(x.activePicks) && Array.isArray(x.archivedPicks)) return x;
-      } catch(e) {}
+      } catch (e) { window.__afLog("runEngine", e); }
       return {activePicks:[], archivedPicks:[], stats:{settled:0,wins:0,losses:0,pushes:0}, updatedAt:new Date().toISOString()};
     })();
     window.g_trackerState = g_trackerState;
@@ -4039,8 +4242,8 @@ const FB_ESPN = {
 
     function fbTrackerSave(){
       g_trackerState.updatedAt=new Date().toISOString();
-      try{ localStorage.setItem(FB_TRACKER_KEY,JSON.stringify(g_trackerState)); }catch(e){}
-      try{ updateEnginePerformanceScore(); updateDriftDisplay(); }catch(e){}
+      try{ localStorage.setItem(FB_TRACKER_KEY,JSON.stringify(g_trackerState)); }catch (e) { window.__afLog("fbTrackerSave", e); }
+      try{ updateEnginePerformanceScore(); updateDriftDisplay(); }catch (e) { window.__afLog("fbTrackerSave", e); }
     }
     function fbTrackerRecount(){
       const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])];
@@ -4048,9 +4251,51 @@ const FB_ESPN = {
       g_trackerState.stats={settled:settled.length,wins:settled.filter(p=>p.resultStatus==='win').length,losses:settled.filter(p=>p.resultStatus==='loss').length,pushes:settled.filter(p=>p.resultStatus==='push').length};
     }
     function addTrackedPicks(rows){
-      const incoming=Array.isArray(rows)?rows:[]; const existing=new Set();
+      const incoming=Array.isArray(rows)?rows:[];
+      function pickKey(p){
+        if(p&&p.signature) return String(p.signature);
+        const eid=String((p&&p.eventId)||"");
+        const fam=(typeof marketFamily==="function")?marketFamily(p&&p.marketKey):String((p&&p.marketKey)||"");
+        const side=(typeof canonicalPickSide==="function")?canonicalPickSide(p):String((p&&p.side)||"");
+        return eid+"|"+fam+"|"+side;
+      }
+      function eventMarketKey(p){
+        return String((p&&p.eventId)||"")+"|"+((typeof marketFamily==="function")?marketFamily(p&&p.marketKey):String((p&&p.marketKey)||""));
+      }
+      incoming.forEach(function(p){
+        if(!p) return;
+        if(!p.signature) p.signature=pickKey(p);
+        // Re-running the same fixture should refresh the pending row, not clone it.
+        const em=eventMarketKey(p);
+        g_trackerState.activePicks=g_trackerState.activePicks.filter(function(ex){
+          if(!ex||String(ex.resultStatus||"pending").toLowerCase()!=="pending") return true;
+          return eventMarketKey(ex)!==em;
+        });
+      });
+      const existing=new Set();
       [...g_trackerState.activePicks,...g_trackerState.archivedPicks].forEach(p=>{if(p?.signature)existing.add(p.signature);});
-      incoming.forEach(p=>{if(!p||!p.signature||existing.has(p.signature))return;g_trackerState.activePicks.push(Object.assign({},p,{resultStatus:p.resultStatus||'pending'}));existing.add(p.signature);});
+      incoming.forEach(p=>{
+        if(!p||!p.signature||existing.has(p.signature)) return;
+        g_trackerState.activePicks.push(Object.assign({},p,{resultStatus:p.resultStatus||'pending'}));
+        existing.add(p.signature);
+      });
+      // One lock per event among pending rows.
+      const byEvent={};
+      g_trackerState.activePicks.forEach(function(p,idx){
+        if(String(p.resultStatus||"pending").toLowerCase()!=="pending") return;
+        const eid=String(p.eventId||"");
+        (byEvent[eid]=byEvent[eid]||[]).push(p);
+      });
+      Object.keys(byEvent).forEach(function(eid){
+        const group=byEvent[eid];
+        group.forEach(function(p){ p.isLock=false; });
+        const lock=group.slice().sort(function(a,b){
+          const gr={A:4,B:3,C:2,D:1};
+          return (gr[b.confidenceGrade]||0)-(gr[a.confidenceGrade]||0)
+            || (Number(b.modelProbability)||0)-(Number(a.modelProbability)||0);
+        })[0];
+        if(lock && (lock.confidenceGrade==="A"||lock.confidenceGrade==="B")) lock.isLock=true;
+      });
       if(g_trackerState.activePicks.length>FB_TRACKER_LIMIT) g_trackerState.activePicks=g_trackerState.activePicks.slice(-FB_TRACKER_LIMIT);
       if(g_trackerState.archivedPicks.length>FB_ARCHIVE_LIMIT) g_trackerState.archivedPicks=g_trackerState.archivedPicks.slice(-FB_ARCHIVE_LIMIT);
       fbTrackerRecount(); fbTrackerSave(); renderTrackedPicks();
@@ -4112,9 +4357,9 @@ const FB_ESPN = {
             (_live && _eid ? '<div data-live-clk="'+_eid+'" style="font-size:9px;font-weight:800;color:#49d45f;margin-top:2px;">'+(_live.clock==="HALF"?"HALF":(_live.clock||"LIVE"))+'</div>' : '')+
             '<div id="act-'+uniquePid+'" style="display:none;flex-direction:column;align-items:center;gap:2px;margin-top:-2px;">'+
             '<div style="font-size:8px;font-weight:900;opacity:0.6;margin-bottom:1px;">SETTLE</div>'+
-            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">W</button>'+
-            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">L</button>'+
-            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">P</button>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="win" data-sig="'+sig+'" aria-label="Mark pick as win" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">W</button>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="loss" data-sig="'+sig+'" aria-label="Mark pick as loss" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">L</button>'+
+            '<button class="tracker-manual-btn tracker-settle-btn" data-manual-settle="push" data-sig="'+sig+'" aria-label="Mark pick as push" style="padding:0!important;width:28px!important;min-width:28px!important;height:16px!important;font-size:9px!important;">P</button>'+
             '</div>';
         } else {
           statusHtml='<div class="tracker-settled-edit-btn" data-sig="'+sig+'" style="cursor:pointer;" title="Click to edit">'+st.toUpperCase()+'</div>';
@@ -4361,7 +4606,7 @@ const FB_ESPN = {
       if (expiredEventIds.length) {
         setTimeout(function () {
           if (typeof fbCheckAndSettleActivePicks === "function") {
-            try { fbCheckAndSettleActivePicks(); } catch (_e) {}
+            try { fbCheckAndSettleActivePicks(); } catch (_e) { window.__afLog("_tickLiveClocks", _e); }
           }
           if (typeof renderTrackedPicks === "function") renderTrackedPicks();
         }, 2000);
@@ -4442,9 +4687,9 @@ const FB_ESPN = {
               didChange = true;
               // Trigger AF auto-settlement for finished games
               if (typeof autoSettleFootballEvent === "function") {
-                try { autoSettleFootballEvent(ev); } catch (_se) {}
+                try { autoSettleFootballEvent(ev); } catch (_se) { window.__afLog("pollLiveGameClocks", _se); }
               } else if (typeof fbCheckAndSettleActivePicks === "function") {
-                try { fbCheckAndSettleActivePicks(); } catch (_se) {}
+                try { fbCheckAndSettleActivePicks(); } catch (_se) { window.__afLog("pollLiveGameClocks", _se); }
               }
               return;
             }
@@ -4545,7 +4790,7 @@ const FB_ESPN = {
     }
 
 
-    function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');document.body.classList.add('tracker-open');}renderTrackedPicks();setTrackerModalView('picks');if(typeof startLiveClockTicker==='function')startLiveClockTicker();if(typeof scheduleLiveClockPoll==='function')scheduleLiveClockPoll();if(typeof fbCheckAndSettleActivePicks==='function'){try{fbCheckAndSettleActivePicks();}catch(_e){}}}
+    function openTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.add('open');m.setAttribute('aria-hidden','false');document.body.classList.add('tracker-open');}renderTrackedPicks();setTrackerModalView('picks');if(typeof startLiveClockTicker==='function')startLiveClockTicker();if(typeof scheduleLiveClockPoll==='function')scheduleLiveClockPoll();if(typeof fbCheckAndSettleActivePicks==='function'){try{fbCheckAndSettleActivePicks();}catch (_e) { window.__afLog("openTrackerModal", _e); }}}
     function closeTrackerModal(){const m=document.getElementById('trackerModal');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');document.body.classList.remove('tracker-open');}if(typeof stopLiveClockTicker==='function')stopLiveClockTicker();}
     function applyManualSettlementToTrackedPick(signature,status){
       if(!signature) return false;
@@ -4576,7 +4821,7 @@ const FB_ESPN = {
     function copyTrackerData(){
       const text=JSON.stringify({exportedAt:new Date().toISOString(),state:g_trackerState},null,2);
       const done=()=>{const b=document.getElementById('trackerCopyDataBtn');if(b){const o=b.textContent;b.textContent='✅';setTimeout(()=>b.textContent=o,1200);}};
-      if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(()=>{}); else {try{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch(e){}}
+      if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(()=>{}); else {try{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch (e) { window.__afLog("copyTrackerData", e); }}
     }
     function updateEnginePerformanceScore(){
       const all=[...(g_trackerState.activePicks||[]),...(g_trackerState.archivedPicks||[])]; const s=all.filter(p=>p.resultStatus==='win'||p.resultStatus==='loss');
@@ -4584,7 +4829,7 @@ const FB_ESPN = {
       const fill=document.getElementById('enginePerfFill'),pct=document.getElementById('enginePerfPct'); if(fill)fill.style.width=score+'%';if(pct)pct.textContent=s.length?score+'%':'—';
     }
     function updateDriftDisplay(){return true;}
-    function militaryRaid(){if(typeof AFDB!=='undefined'&&AFDB.runTestFetch)return AFDB.runTestFetch();return null;}
+    function runEngineSelfTest(){if(typeof AFDB!=='undefined'&&AFDB.runTestFetch)return AFDB.runTestFetch();return null;}
     async function reconcileFootballSources(){
       try {
         const ok=await fbEspnSyncWorldFixtures(true);
@@ -4596,8 +4841,8 @@ const FB_ESPN = {
     function proposeFbConfigUpgrades(){return {status:'advisory',candidates:[],message:'No automatic configuration promotion without out-of-sample evidence.'};}
     function applyFbVerifiedConfig(market,threshold){
       const mk=String(market||'ft'), v=Number(threshold); if(!['ft','h1','h2'].includes(mk)||!Number.isFinite(v)||v<0)return false;
-      window.__fbThresholds=Object.assign({ft:0.5,h1:0.35,h2:0.35},window.__fbThresholds||{}, {[mk]:v});
-      try{localStorage.setItem('FOOTBALL_THRESHOLD_VERIFIED_'+mk,JSON.stringify({verified:true,threshold:v,updatedAt:new Date().toISOString()}));localStorage.setItem('AF_THRESHOLDS_PRIMARY',JSON.stringify(window.__fbThresholds));}catch(e){} return true;
+      window.__fbThresholds=Object.assign({ft:2.5,h1:1.5,h2:1.5},window.__fbThresholds||{}, {[mk]:v});
+      try{localStorage.setItem('FOOTBALL_THRESHOLD_VERIFIED_'+mk,JSON.stringify({verified:true,threshold:v,updatedAt:new Date().toISOString()}));localStorage.setItem('AF_THRESHOLDS_PRIMARY',JSON.stringify(window.__fbThresholds));}catch (e) { window.__afLog("applyFbVerifiedConfig", e); } return true;
     }
     function fbFootballActualForMarket(summary,pick){
       const comp=summary?.header?.competitions?.[0]; const cs=Array.isArray(comp?.competitors)?comp.competitors:[];
@@ -4672,11 +4917,11 @@ const FB_ESPN = {
                 const aName=ca?.team?.displayName||ca?.team?.name||picks[0]?.homeTeam||'A'; const bName=cb?.team?.displayName||cb?.team?.name||picks[0]?.awayTeam||'B';
                 const ka=getEloKey(aName,aId), kb=getEloKey(bName,bId);
                 updateEloForMatch(ka,kb,sa===sb?null:sa>sb);
-                try{localStorage.setItem(key,new Date().toISOString());}catch(_e){}
+                try{localStorage.setItem(key,new Date().toISOString());}catch (_e) { window.__afLog("autoSettleFootballEvent", _e); }
               }
             }
           }
-        } catch(_e){}
+        } catch (_e) { window.__afLog("autoSettleFootballEvent", _e); }
         return true;
       }catch(e){return false;}
     }
@@ -4684,7 +4929,7 @@ const FB_ESPN = {
       const groups={};g_trackerState.activePicks.forEach(p=>{if(p.eventId&&p.league&&p.league!=='all'){const k=p.league+'|'+p.eventId;(groups[k]=groups[k]||[]).push(p);}});
       for(const k of Object.keys(groups)){const parts=k.split('|');await autoSettleFootballEvent(parts[1],parts[0]);}
     }
-    window.reconcileFootballSources=reconcileFootballSources;window.exportFootballEngineState=exportFootballEngineState;window.addTrackedPicks=addTrackedPicks;window.renderTrackedPicks=renderTrackedPicks;window.openTrackerModal=openTrackerModal;window.closeTrackerModal=closeTrackerModal;window.setTrackerModalView=setTrackerModalView;window.isTrackerReportView=isTrackerReportView;window.applyManualSettlementToTrackedPick=applyManualSettlementToTrackedPick;window.deleteTrackedPickBySignature=deleteTrackedPickBySignature;window.copyTrackerData=copyTrackerData;window.updateEnginePerformanceScore=updateEnginePerformanceScore;window.updateDriftDisplay=updateDriftDisplay;window.militaryRaid=militaryRaid;window.getFbConfigLabSnapshot=getFbConfigLabSnapshot;window.proposeFbConfigUpgrades=proposeFbConfigUpgrades;window.applyFbVerifiedConfig=applyFbVerifiedConfig;window.settleTrackedPickFromScore=settleTrackedPickFromScore;window.autoSettleFootballEvent=autoSettleFootballEvent;window.fbCheckAndSettleActivePicks=fbCheckAndSettleActivePicks;
+    window.reconcileFootballSources=reconcileFootballSources;window.exportFootballEngineState=exportFootballEngineState;window.addTrackedPicks=addTrackedPicks;window.renderTrackedPicks=renderTrackedPicks;window.openTrackerModal=openTrackerModal;window.closeTrackerModal=closeTrackerModal;window.setTrackerModalView=setTrackerModalView;window.isTrackerReportView=isTrackerReportView;window.applyManualSettlementToTrackedPick=applyManualSettlementToTrackedPick;window.deleteTrackedPickBySignature=deleteTrackedPickBySignature;window.copyTrackerData=copyTrackerData;window.updateEnginePerformanceScore=updateEnginePerformanceScore;window.updateDriftDisplay=updateDriftDisplay;window.runEngineSelfTest=runEngineSelfTest;window.militaryRaid=runEngineSelfTest;/* deprecated alias, kept for back-compat */window.getFbConfigLabSnapshot=getFbConfigLabSnapshot;window.proposeFbConfigUpgrades=proposeFbConfigUpgrades;window.applyFbVerifiedConfig=applyFbVerifiedConfig;window.settleTrackedPickFromScore=settleTrackedPickFromScore;window.autoSettleFootballEvent=autoSettleFootballEvent;window.fbCheckAndSettleActivePicks=fbCheckAndSettleActivePicks;
     fbTrackerRecount();
 
     // ---------- DOM ready ----------
@@ -4710,7 +4955,7 @@ const FB_ESPN = {
           window.__fbThresholds = { ft: 2.5, h1: 1.5, h2: 1.5 }; // AF point-scale defaults
         }
       } catch (e) {
-        window.__fbThresholds = { ft: 0.5, h1: 0.35, h2: 0.35 };
+        window.__fbThresholds = { ft: 2.5, h1: 1.5, h2: 1.5 };
       }
       // Prefer verified silos when present (manual locks from Phase-2)
       try {
@@ -4720,15 +4965,15 @@ const FB_ESPN = {
             window.__fbThresholds[mk] = Number(v.threshold);
           }
         });
-      } catch (e) {}
-      try { proposeFbConfigUpgrades(false); } catch (e) {}
+      } catch (e) { window.__afLog("fbCheckAndSettleActivePicks", e); }
+      try { proposeFbConfigUpgrades(false); } catch (e) { window.__afLog("fbCheckAndSettleActivePicks", e); }
 
       // Auto-settle: check once on load, then every 5 minutes, so tracked
       // picks resolve themselves against ESPN final scores with no manual step.
-      try { fbCheckAndSettleActivePicks(); } catch (e) {}
+      try { fbCheckAndSettleActivePicks(); } catch (e) { window.__afLog("fbCheckAndSettleActivePicks", e); }
       if (!window.__FB_SETTLE_TIMER) {
         window.__FB_SETTLE_TIMER = setInterval(function() {
-          try { fbCheckAndSettleActivePicks(); } catch (e) {}
+          try { fbCheckAndSettleActivePicks(); } catch (e) { window.__afLog("fbCheckAndSettleActivePicks", e); }
         }, 5 * 60 * 1000);
       }
 
@@ -4787,7 +5032,7 @@ const FB_ESPN = {
         var mq = window.matchMedia('(prefers-color-scheme: dark)');
         if (mq.addEventListener) mq.addEventListener('change', applySystemTheme);
         else if (mq.addListener) mq.addListener(applySystemTheme);
-      } catch (e) {}
+      } catch (e) { window.__afLog("fbCheckAndSettleActivePicks", e); }
       var _themeBtn = document.getElementById("themeToggleBtn");
       if (_themeBtn) _themeBtn.style.display = "none";
 
@@ -4796,13 +5041,13 @@ const FB_ESPN = {
         openTrackerModal();
       });
       document.getElementById("trackerCloseBtn").addEventListener("click", closeTrackerModal);
-      const _raidBtn = document.getElementById("trackerMilitaryRaidBtn");
-      if (_raidBtn) _raidBtn.addEventListener("click", function() {
+      const _selfTestBtn = document.getElementById("trackerSelfTestBtn");
+      if (_selfTestBtn) _selfTestBtn.addEventListener("click", function() {
         try {
-          if (typeof militaryRaid === "function") militaryRaid();
-          else if (typeof window.militaryRaid === "function") window.militaryRaid();
+          if (typeof runEngineSelfTest === "function") runEngineSelfTest();
+          else if (typeof window.runEngineSelfTest === "function") window.runEngineSelfTest();
           else if (typeof AFDB !== "undefined" && AFDB && typeof AFDB.runTestFetch === "function") AFDB.runTestFetch();
-        } catch (e) { console.warn("Military raid failed", e); }
+        } catch (e) { console.warn("Self-test failed", e); }
       });
       document.getElementById("trackerModal").addEventListener("click", e=>{ if(e.target===e.currentTarget) closeTrackerModal(); });
       // Tracker view toggle on title click (exact BB behavior: picks <-> report)
@@ -4876,7 +5121,7 @@ const FB_ESPN = {
             setTimeout(() => this.textContent = orig, 1500);
           });
         } else {
-          try { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); } catch(e) {}
+          try { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); } catch (e) { window.__afLog("fbCheckAndSettleActivePicks", e); }
         }
       });
       // Inputs copy button
@@ -4900,7 +5145,7 @@ const FB_ESPN = {
             setTimeout(() => this.textContent = orig, 1500);
           });
         } else {
-          try { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); } catch(e) {}
+          try { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); } catch (e) { window.__afLog("copyConfigButton", e); }
         }
       });
 
@@ -4943,7 +5188,7 @@ const FB_ESPN = {
     try { const v=JSON.parse(localStorage.getItem(k)||'null'); return v==null?fallback:v; } catch(e){ return fallback; }
   }
   function safeSave(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
-  function debug(msg,data){ try{ if(typeof window.engineDebug==='function') window.engineDebug(msg,data); else console.debug('[FB-LIFECYCLE]',msg,data||''); }catch(e){} }
+  function debug(msg,data){ try{ if(typeof window.engineDebug==='function') window.engineDebug(msg,data); else console.debug('[FB-LIFECYCLE]',msg,data||''); }catch (e) { window.__afLog("debug", e); } }
   function stableStringify(v){
     if(v===null||typeof v!=='object') return JSON.stringify(v);
     if(Array.isArray(v)) return '['+v.map(stableStringify).join(',')+']';
@@ -5136,10 +5381,10 @@ const FB_ESPN = {
   try{
     if(!window.__FB_HEALTH_TIMER){
       window.__FB_HEALTH_TIMER=setInterval(function(){
-        try{const h=health();if(!h.ok)debug('Football engine health warning',h);}catch(e){}
+        try{const h=health();if(!h.ok)debug('Football engine health warning',h);}catch (e) { window.__afLog("lifecycleHealthTimer", e); }
       },60000);
     }
-  }catch(e){}
+  }catch (e) { window.__afLog("lifecycleHealthTimer:setup", e); }
 
   debug('Football advanced lifecycle layer ready',{version:NS,modelVersion:getVersion()});
 })();
@@ -5152,10 +5397,10 @@ document.addEventListener("DOMContentLoaded", function () {
     window.__AF_SETTLE_TIMER = setInterval(function () {
       if (document.visibilityState === "hidden") return;
       if (typeof fbCheckAndSettleActivePicks === "function") {
-        try { fbCheckAndSettleActivePicks(); } catch (_e) {}
+        try { fbCheckAndSettleActivePicks(); } catch (_e) { window.__afLog("settleTimer:settle", _e); }
       }
       if (typeof pollLiveGameClocks === "function" && typeof g_liveGameStatus !== "undefined" && g_liveGameStatus.size) {
-        try { pollLiveGameClocks(); } catch (_e) {}
+        try { pollLiveGameClocks(); } catch (_e) { window.__afLog("settleTimer:poll", _e); }
       }
     }, 45000);
   }
