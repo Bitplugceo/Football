@@ -1,3 +1,4 @@
+W
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v8_seal_20260829 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v9_seal_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -911,7 +912,7 @@
     // top-level script execution in this block (window.X = ... assignments
     // are not hoisted the way function declarations are). Declared here from
     // the file's own BUILD_MARKER comment.
-    const APP_BUILD_VERSION = "af_engine_v1_nfl_v1";
+    const APP_BUILD_VERSION = "af_engine_v1_nfl_v9_seal_20260829";
     window.__APP_BUILD_VERSION = APP_BUILD_VERSION;
     // Visible on-page build tag (mirrors the BUILD_MARKER html comment at the
     // top of this file) — lets you confirm on a phone, with no dev tools,
@@ -2363,13 +2364,20 @@ const FB_ESPN = {
       const usableFromPrimary = events.filter(e => fbEspnIsUsableLeagueMatch(e, slug) && e.finished && Number.isFinite(e.homeScore) && Number.isFinite(e.awayScore)).length;
       if (usableFromPrimary < 8) {
         const yearNow = new Date().getFullYear();
+        // Current season + up to 2 prior seasons, but stop as soon as we've
+        // banked 8 usable (finished, scored) games — no need to fetch a 3rd
+        // season's schedule for a team that already cleared the threshold
+        // after 1 or 2.
         for (let y = 0; y < 3; y++) {
+          const usableSoFar = events.filter(e => e && e.finished && Number.isFinite(e.homeScore) && Number.isFinite(e.awayScore)).length;
+          if (usableSoFar >= 8) break;
           try {
             const more = await fbEspnFetchTeamEventsSeason(slug, teamId, yearNow - y);
             (more || []).forEach(function (n) { events.push(n); });
           } catch (_se) {}
         }
         let usableNow = events.filter(e => e && e.finished && Number.isFinite(e.homeScore) && Number.isFinite(e.awayScore)).length;
+        let scoreboardWindowCount = 0;
         if (usableNow < 8 && slug === "college-football") {
         const now = new Date();
         const jobs = [];
@@ -2385,6 +2393,7 @@ const FB_ESPN = {
           });
         }
         const results = await Promise.allSettled(jobs.map(function (u) { return fbEspnFetchJSON(u, 15000); }));
+        scoreboardWindowCount = jobs.length;
         results.forEach(r => {
           if (r.status !== "fulfilled") return;
           const rows = Array.isArray(r.value?.events) ? r.value.events : [];
@@ -2402,7 +2411,16 @@ const FB_ESPN = {
         // boundary, 0 events from /schedule, recovered fine via scoreboard
         // windows). A genuine fetch failure still logs as ERROR below, since
         // scheduleError.message keeps whatever wording the real error has.
-        engineDebug("ESPN team-schedule scoreboard fallback used", {league:slug,teamId,events:events.length,windows:windows.length,note:scheduleError?("primary schedule request threw: "+(scheduleError.message||String(scheduleError))):("primary schedule call returned only "+usableFromPrimary+" usable game(s) (normal at a season boundary) — merged in "+events.length+" total via scoreboard windows")});
+        // FIX (was: `windows.length` — `windows` was never declared anywhere in
+        // this function; the array of scoreboard-window request URLs built above
+        // is called `jobs`, and it's scoped inside the college-football-only
+        // block, so it wasn't even reachable here. That ReferenceError aborted
+        // fbEspnFetchTeamEvents before it could return, which is why auto-fetch
+        // died with "Can't find variable: windows" and last-10 never filled.
+        // `scoreboardWindowCount` is declared in the outer scope above and set
+        // to `jobs.length` only when the college-football fallback actually ran
+        // (it stays 0 for NFL/UFL/CFL, where this fallback never fires).
+        engineDebug("ESPN team-schedule scoreboard fallback used", {league:slug,teamId,events:events.length,scoreboardWindows:scoreboardWindowCount,note:scheduleError?("primary schedule request threw: "+(scheduleError.message||String(scheduleError))):("primary schedule call returned only "+usableFromPrimary+" usable game(s) (normal at a season boundary) — merged in "+events.length+" total via scoreboard windows")});
       }
       const unique=[]; const seen=new Set();
       events.forEach(e=>{
@@ -2877,6 +2895,9 @@ const FB_ESPN = {
         const cutoff = fixtureDate ? Date.parse(fixtureDate) : Date.now();
         let h2hRecent = fbEspnFindH2H(dataA.events || [], dataB.events || [], String(teamA.id), String(teamB.id), cutoff);
         setSt("⏳ Loading up to 5 H2H meetings across historical seasons…", "info");
+        // maxSeasonsBack capped at 3 (not 8/10): fbEspnFindH2HDeep walks one
+        // full season-schedule fetch per team per season it looks back, so a
+        // higher cap here was the slow "8 seasons x 2 teams" H2H walk.
         let h2h = await fbEspnFindH2HDeep(
           slug,
           String(teamA.id),
@@ -2885,7 +2906,7 @@ const FB_ESPN = {
           dataA.events || [],
           dataB.events || [],
           10,
-          10
+          3
         );
         // Deep search is authoritative; if a transient historical request failed,
         // retain the already-fetched recent meetings instead of dropping H2H entirely.
