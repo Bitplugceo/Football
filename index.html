@@ -1,4 +1,3 @@
-W
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +10,7 @@ W
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v9_seal_20260829 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v10_seal_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -521,11 +520,6 @@ W
     <h3>Market Lines</h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
       <div><label>Game Total</label><input id="ftMarket" placeholder="e.g. 47.5 or 44.5-47.5" aria-label="Game Total line" /></div>
-      <div><label>1st Half Total</label><input id="h1Market" placeholder="e.g. 23.5" aria-label="1st Half Total line" /></div>
-      <div><label>2nd Half Total</label><input id="h2Market" placeholder="e.g. 23.5" aria-label="2nd Half Total line" /></div>
-      <div><label>Handicap (Home line)</label><input id="spreadLine" placeholder="e.g. -3.5" aria-label="Handicap home line" /></div>
-      <div><label>Team A Total</label><input id="teamATotalLine" placeholder="e.g. 24.5" aria-label="Team A total points line" /></div>
-      <div><label>Team B Total</label><input id="teamBTotalLine" placeholder="e.g. 24.5" aria-label="Team B total points line" /></div>
     </div>
   </div>
 
@@ -539,16 +533,6 @@ W
       <div>
         <label>Points Allowed</label>
         <input id="aFTAllowed" placeholder="e.g. 20,17,24,14,21" aria-label="Team A full-time points allowed, last 10 (recent to oldest)" />
-      </div>
-    </div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
-      <div>
-        <label>1H Points Scored</label>
-        <input id="a1HScored" placeholder="e.g. 14,10,17,7,13" aria-label="Team A 1st-half points scored, last 10 (recent to oldest)" />
-      </div>
-      <div>
-        <label>1H Points Allowed</label>
-        <input id="a1HAllowed" placeholder="e.g. 10,7,14,3,10" aria-label="Team A 1st-half points allowed, last 10 (recent to oldest)" />
       </div>
     </div>
     <div style="margin-top:6px;display:none;">
@@ -568,16 +552,6 @@ W
         <input id="bFTAllowed" placeholder="e.g. 27,21,31,17,24" aria-label="Team B full-time points allowed, last 10 (recent to oldest)" />
       </div>
     </div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px;">
-      <div>
-        <label>1H Points Scored</label>
-        <input id="b1HScored" placeholder="e.g. 7,10,14,3,10" aria-label="Team B 1st-half points scored, last 10 (recent to oldest)" />
-      </div>
-      <div>
-        <label>1H Points Allowed</label>
-        <input id="b1HAllowed" placeholder="e.g. 10,3,14,7,10" aria-label="Team B 1st-half points allowed, last 10 (recent to oldest)" />
-      </div>
-    </div>
     <div style="margin-top:6px;display:none;">
       <label>Matches in Last 7 Days <span style="font-size:10px;color:#888;">(fixture-congestion signal)</span></label>
       <input id="bFixtureLoad7d" type="number" min="0" step="1" placeholder="e.g. 0" style="max-width:120px;" aria-label="Team B matches played in last 7 days" />
@@ -589,13 +563,6 @@ W
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
       <input id="aFTH2H" placeholder="last 5 H2H points" placeholder="Team A game points vs B" aria-label="Team A full-time points scored in head-to-head meetings vs Team B" />
       <input id="bFTH2H" placeholder="Team B game points vs A" aria-label="Team B full-time points scored in head-to-head meetings vs Team A" />
-    </div>
-    <div id="h2h1HSection" style="margin-top:6px;">
-      <label><input type="checkbox" id="use1HH2H" aria-label="Use 1H H2H (min 2 games)" /> Use 1H H2H (min 2 games)</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-        <input id="a1HH2H" placeholder="Team A 1H points vs B" aria-label="Team A 1st-half points scored in head-to-head meetings vs Team B" />
-        <input id="b1HH2H" placeholder="Team B 1H points vs A" aria-label="Team B 1st-half points scored in head-to-head meetings vs Team A" />
-      </div>
     </div>
   </div>
 </div>
@@ -781,7 +748,7 @@ W
       };
 
       // 1) UI input integrity
-      const inputsToCheck = ['aFTScored', 'bFTScored', 'a1HScored', 'b1HScored', 'aFTAllowed', 'bFTAllowed', 'a1HAllowed', 'b1HAllowed', 'ftMarket', 'h1Market'];
+      const inputsToCheck = ['aFTScored', 'bFTScored', 'aFTAllowed', 'bFTAllowed', 'ftMarket'];
       inputsToCheck.forEach(function(id) {
         const el = document.getElementById(id);
         const val = el ? el.value.trim() : '';
@@ -912,7 +879,7 @@ W
     // top-level script execution in this block (window.X = ... assignments
     // are not hoisted the way function declarations are). Declared here from
     // the file's own BUILD_MARKER comment.
-    const APP_BUILD_VERSION = "af_engine_v1_nfl_v9_seal_20260829";
+    const APP_BUILD_VERSION = "af_engine_v1_nfl_v10_seal_20260829";
     window.__APP_BUILD_VERSION = APP_BUILD_VERSION;
     // Visible on-page build tag (mirrors the BUILD_MARKER html comment at the
     // top of this file) — lets you confirm on a phone, with no dev tools,
@@ -1923,7 +1890,15 @@ const FB_ESPN = {
     function fbEspnIsFinished(ev) {
       const c = ev?.competitions?.[0];
       const st = c?.status || ev?.status || {};
-      return st?.type?.completed === true || st?.type?.state === "post" || st?.type?.name === "STATUS_FINAL" || st?.completed === true || ev?.finished === true;
+      const name = String(st?.type?.name || "").toUpperCase();
+      // ESPN's `completed`/`state==="post"` flags are already OT-agnostic (they
+      // just mean "game over"), but as a defensive belt-and-braces check also
+      // match on the type NAME containing "FINAL" — some ESPN feeds label an
+      // overtime-decided game with a variant name (e.g. STATUS_FINAL_OT /
+      // STATUS_FINAL_OVERTIME) rather than the plain STATUS_FINAL this used to
+      // require exactly, which would otherwise make OT games look "not
+      // finished" and drop them out of last-10 / H2H entirely.
+      return st?.type?.completed === true || st?.type?.state === "post" || name.indexOf("FINAL") >= 0 || st?.completed === true || ev?.finished === true;
     }
     function fbEspnIsLive(ev) {
       const c = ev?.competitions?.[0];
@@ -2547,11 +2522,19 @@ const FB_ESPN = {
     // The /teams/{id}/schedule and /scoreboard listings ESPN uses for football
     // generally omit `linescores` on their competitor entries (that field is
     // only reliably populated on the single-event summary/boxscore payload).
-    // fbEspnBuildTeamData's e.homeLines/awayLines therefore come back empty
-    // almost every time, which is why 1st-half inputs were never auto-filled.
-    // This pulls the same linescores field from the summary endpoint instead,
-    // which mirrors the standard competition/competitors shape.
-    function fbEspnHalfPointsFromSummary(summary, teamId) {
+    // This pulls linescores from the summary endpoint instead, which mirrors
+    // the standard competition/competitors shape.
+    //
+    // Why this matters: the schedule/scoreboard "score" field ESPN normally
+    // gives us is the game's FINAL score — inclusive of any overtime points.
+    // "Last 10 (Points)" is a regulation-time (FT = Q1-Q4) stat, so a game
+    // decided 30-27 in OT must contribute its regulation score, not the
+    // OT-inflated final, or a team that grinds out close games in OT will
+    // look like it scores/allows more than it actually does in regulation.
+    // Also confirms the halves split for anyone reading this later: American
+    // football halves are Q1+Q2 = 1st half, Q3+Q4 = 2nd half; any periods
+    // after the 4th are overtime and are excluded from the regulation total.
+    function fbEspnRegulationScore(summary, teamId) {
       const comp = summary?.header?.competitions?.[0];
       const cs = Array.isArray(comp?.competitors) ? comp.competitors : [];
       if (cs.length < 2) return null;
@@ -2560,8 +2543,16 @@ const FB_ESPN = {
       if (!mine || !opp) return null;
       const lines = c => Array.isArray(c?.linescores) ? c.linescores.map(fbEspnScoreValue).filter(Number.isFinite) : [];
       const myL = lines(mine), oppL = lines(opp);
-      if (!myL.length || !oppL.length) return null;
-      return { my: myL[0], opp: oppL[0] };
+      // Need all 4 quarters recorded on both sides to safely strip overtime —
+      // anything less isn't a trustworthy regulation breakdown, so the caller
+      // falls back to the schedule-level final score instead of guessing.
+      if (myL.length < 4 || oppL.length < 4) return null;
+      const sum4 = arr => arr.slice(0, 4).reduce((s, x) => s + x, 0);
+      return {
+        my: sum4(myL),
+        opp: sum4(oppL),
+        wentToOT: myL.length > 4 || oppL.length > 4
+      };
     }
     function fbEspnRenderInjury(side, meta, teamName) { return; }
 
@@ -2577,27 +2568,24 @@ const FB_ESPN = {
       chosen.forEach(e=>{const mineHome=e.homeId===team.id;const hs=mineHome?e.homeScore:e.awayScore;const as=mineHome?e.awayScore:e.homeScore;scored.push(hs);allowed.push(as);if(!lastGameDate)lastGameDate=e.date;});
       const allLast7=events.filter(e=>{const t=Date.parse(e.date||"");return Number.isFinite(t)&&cutoff-t<=7*86400000&&cutoff>=t;}).length;
       const restDays=lastGameDate?Math.max(0,Math.floor((cutoff-Date.parse(lastGameDate))/86400000)-1):null;
-      // 1st-half points live in ESPN's per-event summary/boxscore payload, so
-      // fetch it once per recent game and derive the 1H split from that
-      // single fetch — no extra requests needed.
-      // Full 10-game window (matches "Last 10 (Points)" FT), fetched in small
-      // concurrency-limited batches (fbEspnMapLimit) rather than one big
-      // Promise.all — that burst-of-10-at-once pattern is what used to trip
-      // the free CORS-proxy fallbacks and break the whole auto-fetch. Batching
-      // gets the full 10-game 1H sample without the rate-limit risk.
+      // Confirm regulation-only (Q1-4) totals per game via the per-event
+      // summary/boxscore, same fetch this used to make for 1st-half splits —
+      // no extra network cost, just repurposed toward stripping OT points.
+      // Concurrency-limited (fbEspnMapLimit, ≤4 at once) same as before.
       const advRefs=chosen.slice(0,10);
       const summaries=await fbEspnMapLimit(advRefs, 4, e=>fbEspnFetchSummary(slug,e.id).catch(()=>null));
-      const h1s=[],h1a=[];
+      let otAdjusted=0;
       advRefs.forEach((e,i)=>{
-        const fromSummary=summaries[i]?fbEspnHalfPointsFromSummary(summaries[i],team.id):null;
-        if(fromSummary){h1s.push(fromSummary.my);h1a.push(fromSummary.opp);return;}
-        // Fallback for the rare case a schedule/scoreboard event does carry
-        // linescores directly, or the summary fetch failed for this game.
-        const mineHome=e.homeId===team.id;
-        if(e.homeLines.length>=2&&e.awayLines.length>=2){const mh=mineHome?e.homeLines:e.awayLines,ma=mineHome?e.awayLines:e.homeLines;h1s.push(mh[0]);h1a.push(ma[0]);}
+        const reg = summaries[i] ? fbEspnRegulationScore(summaries[i], team.id) : null;
+        if (!reg) return; // no usable boxscore — keep the schedule-level final score from above
+        scored[i]=reg.my; allowed[i]=reg.opp;
+        if (reg.wentToOT) otAdjusted++;
       });
+      if (otAdjusted && typeof engineDebug === "function") {
+        engineDebug("ESPN last-10: regulation score confirmed (OT stripped) on " + otAdjusted + " game(s)", { league: slug, teamId: team.id });
+      }
       const injury=await fbEspnFetchInjuryMeta(slug,team.id);
-      return {id:team.id,name:team.name,scored,allowed,h1Scored:h1s,h1Allowed:h1a,matchesLast7d:allLast7,lastGameDate,restDays,injury:injury.impact,injuryMeta:injury,events};
+      return {id:team.id,name:team.name,scored,allowed,matchesLast7d:allLast7,lastGameDate,restDays,injury:injury.impact,injuryMeta:injury,events};
     }
     function fbEspnFindH2H(eventsA,eventsB,idA,idB,cutoff) {
       const map=new Map(); [...eventsA,...eventsB].forEach(e=>{if(e.homeId!==idA&&e.awayId!==idA&&e.homeId!==idB&&e.awayId!==idB)return;if(!e.finished||!Number.isFinite(e.homeScore)||!Number.isFinite(e.awayScore))return;const hasA=(e.homeId===idA||e.awayId===idA),hasB=(e.homeId===idB||e.awayId===idB);if(hasA&&hasB)map.set(e.id,e);});
@@ -2674,7 +2662,7 @@ const FB_ESPN = {
 
 
     function last10SeriesFieldIds() {
-      return ["aFTScored","aFTAllowed","a1HScored","a1HAllowed","bFTScored","bFTAllowed","b1HScored","b1HAllowed"];
+      return ["aFTScored","aFTAllowed","bFTScored","bFTAllowed"];
     }
     function countLast10Commas(raw) {
       return String(raw || "").replace(/[^,]/g, "").length;
@@ -2736,8 +2724,6 @@ const FB_ESPN = {
       const prefix = side === "A" ? "a" : "b";
       set(prefix + "FTScored", (data.scored || []).slice(0, 10).join(","));
       set(prefix + "FTAllowed", (data.allowed || []).slice(0, 10).join(","));
-      set(prefix + "1HScored", (data.h1Scored || []).slice(0, 10).join(","));
-      set(prefix + "1HAllowed", (data.h1Allowed || []).slice(0, 10).join(","));
       set(side === "A" ? "aFixtureLoad7d" : "bFixtureLoad7d", data.matchesLast7d != null ? data.matchesLast7d : "");
       // name / id sync
       const nameEl = document.getElementById(side === "A" ? "teamAName" : "teamBName");
@@ -2755,33 +2741,42 @@ const FB_ESPN = {
     }
 
     // H2H meetings come from schedule/season listings (fbEspnFindH2HDeep),
-    // which — same as team recent-form — generally don't carry linescores,
-    // so 1st-half H2H needs its own per-game summary fetch, same as the
-    // team-level 1H sample above. Batched for the same rate-limit reason.
-    async function fbEspnFetchH2H1H(slug, h2h, idA) {
+    // whose score field is the game's FINAL score — inclusive of OT points
+    // when a meeting went to overtime. This confirms the regulation-only
+    // (Q1-4) score per H2H meeting via the same per-game summary/boxscore
+    // fetch fbEspnBuildTeamData uses for team-level last-10, so a 30-27(OT)
+    // head-to-head result contributes 30/27-minus-OT-points, not the final.
+    // Batched (fbEspnMapLimit, ≤4 at once) for the same rate-limit reason.
+    async function fbEspnFetchH2HRegulation(slug, h2h, idA) {
       const summaries = await fbEspnMapLimit(h2h, 4, e => fbEspnFetchSummary(slug, e.id).catch(() => null));
-      const aH1 = [], bH1 = [];
+      const aFT = [], bFT = [];
       h2h.forEach(function(e, i) {
         const s = summaries[i];
-        if (!s) return;
-        // idA is team A's actual ESPN team id, which is stable across every
-        // historical meeting regardless of which side was home in that game —
-        // fbEspnHalfPointsFromSummary matches on that id, not on home/away.
-        const half = fbEspnHalfPointsFromSummary(s, idA);
-        if (!half) return;
-        aH1.push(half.my);
-        bH1.push(half.opp);
-      });
-      return { aH1, bH1 };
-    }
-    function fbEspnFillH2H(h2h, idA, h2h1) {
-      if (!h2h || !h2h.length) return false;
-      const aFT = [], bFT = [];
-      h2h.forEach(function(e) {
+        const reg = s ? fbEspnRegulationScore(s, idA) : null;
+        if (reg) { aFT.push(reg.my); bFT.push(reg.opp); return; }
+        // No usable boxscore for this meeting — fall back to the schedule-level
+        // final score (rare; may still include OT points for this one game).
         const aIsHome = String(e.homeId) === String(idA);
         aFT.push(aIsHome ? e.homeScore : e.awayScore);
         bFT.push(aIsHome ? e.awayScore : e.homeScore);
       });
+      return { aFT, bFT };
+    }
+    function fbEspnFillH2H(h2h, idA, h2hReg) {
+      if (!h2h || !h2h.length) return false;
+      let aFT = (h2hReg && Array.isArray(h2hReg.aFT) && h2hReg.aFT.length === h2h.length) ? h2hReg.aFT.slice() : null;
+      let bFT = (h2hReg && Array.isArray(h2hReg.bFT) && h2hReg.bFT.length === h2h.length) ? h2hReg.bFT.slice() : null;
+      if (!aFT || !bFT) {
+        // Regulation-adjusted fetch didn't come back aligned with h2h (e.g.
+        // summary fetch failed outright) — fall back to schedule-level final
+        // scores rather than losing H2H entirely.
+        aFT = []; bFT = [];
+        h2h.forEach(function(e) {
+          const aIsHome = String(e.homeId) === String(idA);
+          aFT.push(aIsHome ? e.homeScore : e.awayScore);
+          bFT.push(aIsHome ? e.awayScore : e.homeScore);
+        });
+      }
       const set = function(id, val) {
         const el = document.getElementById(id);
         if (el) el.value = val;
@@ -2794,16 +2789,6 @@ const FB_ESPN = {
       if (tag) tag.style.display = "inline";
       const sec = document.getElementById("h2hSection");
       if (sec) sec.classList.remove("collapsed");
-      // 1st-half H2H — separate sample, filled only when the per-game summary
-      // fetch actually resolved enough games (min 2, same floor as FT H2H).
-      const aH1 = (h2h1 && h2h1.aH1) || [];
-      const bH1 = (h2h1 && h2h1.bH1) || [];
-      if (aH1.length >= 2 && bH1.length >= 2) {
-        set("a1HH2H", aH1.join(","));
-        set("b1HH2H", bH1.join(","));
-        const cb1 = document.getElementById("use1HH2H");
-        if (cb1) cb1.checked = true;
-      }
       return true;
     }
 
@@ -2911,12 +2896,12 @@ const FB_ESPN = {
         // Deep search is authoritative; if a transient historical request failed,
         // retain the already-fetched recent meetings instead of dropping H2H entirely.
         if (!h2h.length && h2hRecent.length) h2h = h2hRecent;
-        let h2h1 = { aH1: [], bH1: [] };
-        if (h2h.length >= 2) {
-          setSt("⏳ Loading 1st-half splits for " + h2h.length + " H2H meeting(s)…", "info");
-          h2h1 = await fbEspnFetchH2H1H(slug, h2h, String(teamA.id));
+        let h2hReg = { aFT: [], bFT: [] };
+        if (h2h.length) {
+          setSt("⏳ Confirming regulation-time scores for " + h2h.length + " H2H meeting(s)…", "info");
+          h2hReg = await fbEspnFetchH2HRegulation(slug, h2h, String(teamA.id));
         }
-        const h2hOk = fbEspnFillH2H(h2h, String(teamA.id), h2h1);
+        const h2hOk = fbEspnFillH2H(h2h, String(teamA.id), h2hReg);
 
         // Market odds from selected fixture if present
         if (fixture && fixture.odds) {
@@ -2929,23 +2914,17 @@ const FB_ESPN = {
           A: dataA,
           B: dataB,
           h2h: h2h,
-          h2h1: h2h1,
           market: {},
           coverage: {
             aFT: (dataA.scored || []).length,
             bFT: (dataB.scored || []).length,
-            h2h: h2h.length,
-            h2h1H: (h2h1.aH1 || []).length,
-            a1H: (dataA.h1Scored || []).length,
-            b1H: (dataB.h1Scored || []).length
+            h2h: h2h.length
           }
         };
 
         const msg =
-          "✅ ESPN auto-fetch OK — A: " + (dataA.scored || []).length + " FT, " +
-          (dataA.h1Scored || []).length + " 1H · B: " + (dataB.scored || []).length + " FT, " +
-          (dataB.h1Scored || []).length + " 1H · H2H: " + h2h.length +
-          " (" + (h2h1.aH1 || []).length + " w/ 1H split) " +
+          "✅ ESPN auto-fetch OK — A: " + (dataA.scored || []).length + " FT · B: " +
+          (dataB.scored || []).length + " FT · H2H: " + h2h.length +
           (h2hOk ? " (filled)" : " (none found)");
         setSt(msg, "ok");
         if (typeof engineDebug === "function") {
@@ -3309,7 +3288,7 @@ const FB_ESPN = {
 
     // ---------- Golden regression harness (football point-total scenarios) ----------
     window.REGRESSION_TEST_SUITE = (function() {
-      const GOLDEN_KEY = "FOOTBALL_REGRESSION_GOLDEN_V2";
+      const GOLDEN_KEY = "FOOTBALL_REGRESSION_GOLDEN_V3";
       const TOLERANCE = 0.25;
       const SCENARIOS = [
         {
@@ -3319,25 +3298,20 @@ const FB_ESPN = {
             aFTAllowed: "1,2,0,3,1,2,1,0,2,1",
             bFTScored: "1,2,0,3,1,2,1,2,0,1",
             bFTAllowed: "2,0,3,1,2,0,2,1,3,1",
-            a1HScored: "", a1HAllowed: "", b1HScored: "", b1HAllowed: "",
-            aFTH2H: "", bFTH2H: "", a1HH2H: "", b1HH2H: "",
-            ftMarket: "2.5", h1Market: ""
+            aFTH2H: "", bFTH2H: "",
+            ftMarket: "2.5"
           }
         },
         {
-          name: "league_h1_with_h2h",
+          name: "league_ft_with_h2h",
           fields: {
             aFTScored: "1,2,1,0,2",
             aFTAllowed: "1,0,2,1,1",
             bFTScored: "2,1,0,2,1",
             bFTAllowed: "1,2,1,0,2",
-            a1HScored: "1,0,1,1,1",
-            a1HAllowed: "0,1,0,0,1",
-            b1HScored: "0,1,0,1,1",
-            b1HAllowed: "1,0,1,0,1",
-            aFTH2H: "", bFTH2H: "",
-            a1HH2H: "1,1,0", b1HH2H: "0,1,1",
-            ftMarket: "", h1Market: "1.5"
+            aFTH2H: "17,20,14",
+            bFTH2H: "14,10,21",
+            ftMarket: ""
           }
         }
       ];
@@ -3355,7 +3329,7 @@ const FB_ESPN = {
       }
       function extractSnapshot() {
         const rows = document.querySelectorAll("#results tr");
-        const out = { ftProj: null, ftEdge: null, ftGrade: null, h1Proj: null, h1Edge: null, h1Grade: null };
+        const out = { ftProj: null, ftEdge: null, ftGrade: null, winnerProb: null, winnerGrade: null };
         for (let i = 1; i < rows.length; i++) {
           const cells = rows[i].querySelectorAll("td");
           if (cells.length < 5) continue;
@@ -3363,15 +3337,16 @@ const FB_ESPN = {
           const proj = parseFloat(cells[1].textContent);
           const edge = parseFloat(String(cells[2].textContent).replace("+", ""));
           const grade = String(cells[3].textContent || "").trim();
-          // Live V2 names: "FT Over 2.5", "FT Under 2.5", "1H Over 1.5", …
-          if (name.indexOf("ft over") >= 0 || name.indexOf("ft under") >= 0 || name.indexOf("full-time") >= 0 || name.indexOf("full time") >= 0) {
+          // Live names: "Game Total" (Over/Under) and "Winner" (moneyline) — the
+          // only two markets this engine emits.
+          if (name.indexOf("game total") >= 0) {
             out.ftProj = isFinite(proj) ? proj : null;
             out.ftEdge = isFinite(edge) ? edge : null;
             out.ftGrade = grade || null;
-          } else if (name.indexOf("1h over") >= 0 || name.indexOf("1h under") >= 0) {
-            out.h1Proj = isFinite(proj) ? proj : null;
-            out.h1Edge = isFinite(edge) ? edge : null;
-            out.h1Grade = grade || null;
+          } else if (name.indexOf("winner") >= 0) {
+            const prob = parseFloat(cells[1].textContent);
+            out.winnerProb = isFinite(prob) ? prob : null;
+            out.winnerGrade = grade || null;
           }
         }
         return out;
@@ -3385,9 +3360,7 @@ const FB_ESPN = {
       async function runScenario(scenario, goldenStore, results) {
         Object.keys(scenario.fields).forEach(function(id) { setVal(id, scenario.fields[id]); });
         const useFt = document.getElementById("useFTH2H");
-        const use1h = document.getElementById("use1HH2H");
         if (useFt) useFt.checked = !!(scenario.fields.aFTH2H && scenario.fields.aFTH2H.length);
-        if (use1h) use1h.checked = !!(scenario.fields.a1HH2H && String(scenario.fields.a1HH2H).split(",").filter(Boolean).length >= 2);
         if (typeof runEngine === "function") runEngine();
         else if (typeof window.runEngine === "function") window.runEngine();
         const snap = extractSnapshot();
@@ -3548,8 +3521,8 @@ const FB_ESPN = {
     function fb2_parseOdds(id){ const n=fb2_num(id,null); if(n!=null&&n>1)return n; const v=Number(window.__fbAutoData?.market?.[id]); return Number.isFinite(v)&&v>1?v:null; }
     function fb2_inputFeatures(){
       const auto=window.__fbAutoData||{};
-      const A={name:fb2_text("ssTeamAName","Home"),id:fb2_text("ssTeamAId"),gf:fb2_series("aFTScored"),ga:fb2_series("aFTAllowed"),h1gf:fb2_series("a1HScored"),h1ga:fb2_series("a1HAllowed")};
-      const B={name:fb2_text("ssTeamBName","Away"),id:fb2_text("ssTeamBId"),gf:fb2_series("bFTScored"),ga:fb2_series("bFTAllowed"),h1gf:fb2_series("b1HScored"),h1ga:fb2_series("b1HAllowed")};
+      const A={name:fb2_text("ssTeamAName","Home"),id:fb2_text("ssTeamAId"),gf:fb2_series("aFTScored"),ga:fb2_series("aFTAllowed")};
+      const B={name:fb2_text("ssTeamBName","Away"),id:fb2_text("ssTeamBId"),gf:fb2_series("bFTScored"),ga:fb2_series("bFTAllowed")};
       [A,B].forEach((t,i)=>{ const p=i===0?"a":"b",src=i===0?(auto.A||{}):(auto.B||{}); t.injury=Number.isFinite(src.injury)?src.injury:(fb2_num(p+"InjuryImpact",0)||0);t.churn=!!src.churn;t.susp=Number.isFinite(src.susp)?src.susp:(fb2_num(p+"SuspensionImpact",0)||0);t.lineup=Number.isFinite(src.lineup)?src.lineup:fb2_num(p+"LineupStrength",100);t.rotation=Number.isFinite(src.rotation)?src.rotation:(fb2_num(p+"RotationPenalty",0)||0);t.rest=Number.isFinite(src.restDays)?src.restDays:fb2_num(p+"RestDays",null);t.travel=Number.isFinite(src.travel)?src.travel:(fb2_num(p+"TravelKm",0)||0);t.manager=Number.isFinite(src.manager)?src.manager:(fb2_num(p+"ManagerChange",0)||0);t.motivation=Number.isFinite(src.motivation)?src.motivation:fb2_pct(p+"Motivation",50);t.load7=Number.isFinite(src.matchesLast7d)?src.matchesLast7d:(fb2_num(p+"FixtureLoad7d",0)||0); });
       return {A,B};
     }
@@ -3655,30 +3628,9 @@ const FB_ESPN = {
       if(typeof engineDebug==="function") engineDebug("fb2_lambdas",{home:+home.toFixed(3),away:+away.toFixed(3),total:+(home+away).toFixed(3),aGF,bGF,aGA,bGA,prior});
       return {home,away,homeModifier:AMod,awayModifier:BMod,elo};
     }
-    function fb2_firstHalf(data,lambdas){
-      const a=fb2_weighted(data.A.h1gf),b=fb2_weighted(data.B.h1gf),ag=fb2_weighted(data.A.h1ga),bg=fb2_weighted(data.B.h1ga);
-      const observed=[a,b,ag,bg].filter(Number.isFinite);
-      const full=Math.max(0.2,lambdas.home+lambdas.away);
-      let total;
-      if(!observed.length){
-        // No 1H series — use typical first-half share of FT (≈43%)
-        total=full*0.43;
-      } else {
-        // Build from observed 1H rates without the old destructive *0.5
-        total=0;
-        if(a!=null) total+=0.30*a;
-        if(b!=null) total+=0.30*b;
-        if(ag!=null) total+=0.20*ag;
-        if(bg!=null) total+=0.20*bg;
-        if(total<=0) total=full*0.43;
-        total=0.75*total+0.25*full*0.43;
-      }
-      total=clamp(total,full*0.28,full*0.55); // keep 1H as a sensible fraction of FT
-      const share=lambdas.home/Math.max(0.01,full);
-      const out={home:Math.max(0.08,total*share),away:Math.max(0.08,total*(1-share))};
-      if(typeof engineDebug==="function") engineDebug("fb2_firstHalf",{total:+total.toFixed(3),home:+out.home.toFixed(3),away:+out.away.toFixed(3),observed:observed.length});
-      return out;
-    }
+    // fb2_firstHalf (1st-half lambda split) removed along with the 1H/2H
+    // markets — this engine now deals in full-time total points and the
+    // winner alone.
     function fb2_seededRng(seed){let s=(Number(seed)>>>0)||123456789;return()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return(s>>>0)/4294967296;};}
     function fb2_samplescoring(lambda,rng){let L=Math.exp(-lambda),k=0,p=1;do{k++;p*=rng();}while(p>L&&k<40);return k-1;}
     function fb2_monteCarlo(lambdas, seed=1){
@@ -3804,31 +3756,24 @@ const FB_ESPN = {
       engineDebug("Football candidate promoted to canary",{candidate:c});return true;
     };
 
-    function fb2_marketRows(data,ctx,lambdas,fhLambdas,ftM,h1M,integrity,sample){
-      // AF live markets only — Game Total, 1H Total, Spread, Team Totals, Moneyline (AF markets only)
+    function fb2_marketRows(data,ctx,lambdas,integrity,sample){
+      // AF live markets — Game Total (FT) and Winner (moneyline) only. 1H/2H
+      // totals, Spread, and Team Totals were removed: this engine now deals
+      // in full-time total points and the winner alone, nothing else.
       const rows=[];
       const odds={
         home:fb2_parseOdds("oddsHome"),
         away:fb2_parseOdds("oddsAway"),
         over:fb2_parseOdds("oddsOverFT"),
-        under:fb2_parseOdds("oddsUnderFT"),
-        aOver:fb2_parseOdds("oddsTeamAOver"),
-        aUnder:fb2_parseOdds("oddsTeamAUnder"),
-        bOver:fb2_parseOdds("oddsTeamBOver"),
-        bUnder:fb2_parseOdds("oddsTeamBUnder")
+        under:fb2_parseOdds("oddsUnderFT")
       };
       const M = (typeof AF_POINTS_MODEL !== "undefined" ? AF_POINTS_MODEL : null) || {};
       const homeExp = Math.max(0, Number(lambdas.home) || 0);
       const awayExp = Math.max(0, Number(lambdas.away) || 0);
       const ftTotal = homeExp + awayExp;
-      const fhHome = Math.max(0, Number(fhLambdas && fhLambdas.home) || homeExp * 0.48);
-      const fhAway = Math.max(0, Number(fhLambdas && fhLambdas.away) || awayExp * 0.48);
-      const h1Total = fhHome + fhAway;
-      const spreadHome = homeExp - awayExp; // expected home margin (points)
+      const spreadHome = homeExp - awayExp; // expected home margin (points) — used only to derive win probability below
 
       const ftVar = Math.max(M.MIN_VARIANCE_FT || 28, ftTotal * (M.OVERDISPERSION || 1.45));
-      const h1Var = Math.max(M.MIN_VARIANCE_H1 || 12, h1Total * (M.OVERDISPERSION || 1.45));
-      const teamVar = Math.max(14, Math.max(homeExp, awayExp) * (M.OVERDISPERSION || 1.45));
       const marginVar = Math.max(20, ftVar * 0.85);
 
       const add=function(key,name,prob,pickSide,oddsVal,line,projection){
@@ -3855,61 +3800,9 @@ const FB_ESPN = {
         add("ft_proj", "Game Total (proj)", 0.55, "PROJ " + displayLine(ftTotal), null, null, ftTotal);
       }
 
-      // --- 1H Total ---
-      const h1Line = parseMarketLine(fb2_text("h1Market"));
-      if (Number.isFinite(h1Line)) {
-        const pOver = (typeof probOverLine === "function")
-          ? probOverLine(h1Total, h1Var, h1Line)
-          : 0.5;
-        const pUnder = 1 - pOver;
-        if (pOver >= pUnder) add("h1_over", "1H Total", pOver, "OVER " + displayLine(h1Line), null, h1Line, h1Total);
-        else add("h1_under", "1H Total", pUnder, "UNDER " + displayLine(h1Line), null, h1Line, h1Total);
-      }
-
-      // --- 2H Total (if line present) ---
-      const h2Line = parseMarketLine(fb2_text("h2Market") || "");
-      if (Number.isFinite(h2Line)) {
-        const h2Total = Math.max(0, ftTotal - h1Total);
-        const h2Var = Math.max(M.MIN_VARIANCE_H1 || 12, h2Total * (M.OVERDISPERSION || 1.45));
-        const pOver = (typeof probOverLine === "function") ? probOverLine(h2Total, h2Var, h2Line) : 0.5;
-        const pUnder = 1 - pOver;
-        if (pOver >= pUnder) add("h2_over", "2H Total", pOver, "OVER " + displayLine(h2Line), null, h2Line, h2Total);
-        else add("h2_under", "2H Total", pUnder, "UNDER " + displayLine(h2Line), null, h2Line, h2Total);
-      }
-
-      // --- Spread (home line; negative = home favored) ---
-      const spreadLine = parseMarketLine(fb2_text("spreadLine") || "");
-      if (Number.isFinite(spreadLine)) {
-        // P(home covers) ≈ P(homeMargin > -spreadLine) with continuous margin model
-        // homeMargin ~ Normal(spreadHome, sqrt(marginVar))
-        // Cover when homeMargin + spreadLine > 0 → homeMargin > -spreadLine
-        const need = -spreadLine;
-        const sd = Math.sqrt(marginVar);
-        const z = (need - spreadHome) / Math.max(0.01, sd);
-        const pHomeCovers = (typeof normalCdf === "function") ? (1 - normalCdf(z)) : 0.5;
-        const pAwayCovers = 1 - pHomeCovers;
-        if (pHomeCovers >= pAwayCovers) {
-          add("spread_home", "Handicap", pHomeCovers, "HOME " + displayLine(spreadLine), odds.home, spreadLine, spreadHome);
-        } else {
-          add("spread_away", "Handicap", pAwayCovers, "AWAY " + displayLine(-spreadLine), odds.away, spreadLine, spreadHome);
-        }
-      }
-
-      // --- Team totals ---
-      const aTeamLine = parseMarketLine(fb2_text("teamATotalLine") || fb2_text("teamATotalMarket") || "");
-      const bTeamLine = parseMarketLine(fb2_text("teamBTotalLine") || fb2_text("teamBTotalMarket") || "");
-      if (Number.isFinite(aTeamLine)) {
-        const pOver = (typeof probOverLine === "function") ? probOverLine(homeExp, teamVar, aTeamLine) : 0.5;
-        if (pOver >= 0.5) add("team_a_over", "Home Team Total", pOver, "OVER " + displayLine(aTeamLine), odds.aOver, aTeamLine, homeExp);
-        else add("team_a_under", "Home Team Total", 1 - pOver, "UNDER " + displayLine(aTeamLine), odds.aUnder, aTeamLine, homeExp);
-      }
-      if (Number.isFinite(bTeamLine)) {
-        const pOver = (typeof probOverLine === "function") ? probOverLine(awayExp, teamVar, bTeamLine) : 0.5;
-        if (pOver >= 0.5) add("team_b_over", "Away Team Total", pOver, "OVER " + displayLine(bTeamLine), odds.bOver, bTeamLine, awayExp);
-        else add("team_b_under", "Away Team Total", 1 - pOver, "UNDER " + displayLine(bTeamLine), odds.bUnder, bTeamLine, awayExp);
-      }
-
-      // --- Moneyline (no draw — AF) ---
+      // --- Winner (moneyline, no draw — AF). A winner pick has no market
+      // line to compare against (unlike a total or spread), so `line` stays
+      // null here on purpose. ---
       {
         const sd = Math.sqrt(marginVar);
         const z = (0 - spreadHome) / Math.max(0.01, sd);
@@ -3989,7 +3882,6 @@ const FB_ESPN = {
       if(!data.A.gf.length||!data.B.gf.length){alert("Enter or auto-fill recent points scored for both teams before running.");return;}
       if(data.A.gf.length<4||data.B.gf.length<4) engineDebug("Thin AF sample",{home:data.A.gf.length,away:data.B.gf.length});
       const lambdas=fb2_lambdas(data,ctx);const activeL={home:lambdas.home,away:lambdas.away};
-      const fh=fb2_firstHalf(data,lambdas);const ftM=null,h1M=null; // AF path: continuous points model — no discrete score matrix
       const sample=Math.min(data.A.gf.length,data.B.gf.length);const volatility=Math.max(getVolatilityRatio(data.A.gf.concat(data.B.gf),8),getVolatilityRatio(data.A.ga.concat(data.B.ga),8));
       // Squad churn (recent transactions / a likely manager change) never
       // shifts the projection mean — direction is unknowable — but it does
@@ -3998,14 +3890,13 @@ const FB_ESPN = {
       // squad than it would normally be.
       const churn=!!data.A.churn||!!data.B.churn;
       const integrity=volatility>=2.5||churn;
-      const rows=fb2_marketRows(data,ctx,activeL,fh,ftM,h1M,integrity,sample);
+      const rows=fb2_marketRows(data,ctx,activeL,integrity,sample);
       // Reconnect trap detection into the LIVE path (was only on retired legacy)
       rows.forEach(function(p){
         if(!p||p.pick==="NO PLAY"){ p.trap=false; return; }
         if(!Number.isFinite(p.line)||!Number.isFinite(p.projection)){ p.trap=false; return; }
         const edge=p.projection-p.line;
-        const mk=String(p.marketKey||"").indexOf("h1")===0?"h1":"ft";
-        p.trap=!!detectTrap(edge,p.line,p.pick,mk,volatility);
+        p.trap=!!detectTrap(edge,p.line,p.pick,"ft",volatility);
         if(p.trap){ p.pick="NO PLAY"; p.grade="D"; }
       });
       const actionable=fb2_renderRows(rows,ctx,activeL,integrity);
@@ -4074,10 +3965,9 @@ const FB_ESPN = {
     }
     function fbClearPredictionFields(){
       try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
-      ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','a1HScored','a1HAllowed','b1HScored','b1HAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','a1HH2H','b1HH2H','ftMarket','h1Market','h2Market','fixtureKickoff',
-       'spreadLine','teamATotalLine','teamBTotalLine'
+      ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','ftMarket','fixtureKickoff'
       ].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
-      ['useFTH2H','use1HH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
+      ['useFTH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
       document.querySelectorAll(".autofill-indicator").forEach(function(el){ el.style.display = "none"; });
       document.querySelectorAll(".last10-short-field").forEach(function(el){ el.classList.remove("last10-short-field"); });
       document.body.classList.remove("bb-last10-alert");
@@ -4972,9 +4862,8 @@ const FB_ESPN = {
         const ids = [
           "teamAName", "ssTeamAId", "teamBName", "ssTeamBId",
           "aFTScored", "aFTAllowed", "bFTScored", "bFTAllowed",
-          "a1HScored", "a1HAllowed", "b1HScored", "b1HAllowed",
-          "aFTH2H", "bFTH2H", "a1HH2H", "b1HH2H",
-          "ftMarket", "h1Market", "h2Market"
+          "aFTH2H", "bFTH2H",
+          "ftMarket"
         ];
         const data = {};
         ids.forEach(id => {
