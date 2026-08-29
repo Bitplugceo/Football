@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v3_seal_20260829 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v5_seal_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -1804,6 +1804,24 @@ const FB_ESPN = {
       }
       return `${y}${m}${day}`;
     }
+    function fbEspnViewerDateKeyFromOffset(offset) {
+      const d = new Date();
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() + (Number(offset) || 0));
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + m + day;
+    }
+    function fbEspnViewerDateKey(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (!isFinite(d.getTime())) return "";
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + m + day;
+    }
     /** Event ISO date → ESPN-style YYYYMMDD in America/New_York */
     function fbEspnEventDateKey(iso) {
       if (!iso) return "";
@@ -1992,20 +2010,9 @@ const FB_ESPN = {
       }
     }
     function fbEspnRenderLeagueRegistry() {
-      const sel=document.getElementById("leagueSelect"); if(!sel) return;
-      const current=sel.value || "";
-      const groups={};
-      (FB_ESPN.registry||[]).forEach(function(x){ const c=x.country||"Other"; (groups[c]=groups[c]||[]).push(x); });
-      let html='<option value="">- Select League -</option>';
-      Object.keys(groups).sort().forEach(function(country){
-        html+='<optgroup label="'+safeText(country)+'">';
-        groups[country].sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(x){
-          html+='<option value="'+String(x.slug).replace(/"/g,"&quot;")+'">'+safeText(x.name)+'</option>';
-        });
-        html+='</optgroup>';
-      });
-      sel.innerHTML=html;
-      if(current && Array.from(sel.options).some(function(o){return o.value===current;})) sel.value=current;
+      // Do NOT rebuild #leagueSelect. ESPN's world registry was replacing the
+      // SportyBet labels with NFL/UFL/XFL/CFL slug names on every boot.
+      return;
     }
     async function fbEspnLoadLeagueMeta(slug) {
       if(!slug)return null;
@@ -2067,6 +2074,16 @@ const FB_ESPN = {
           }
         }
       }
+      if (!raw.length && (seasonWant === 1 || seasonWant === 2 || seasonWant === 3)) {
+        for (let i = 0; i < etKeys.length; i++) {
+          const url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + etKeys[i] + "&limit=300";
+          try {
+            const data = await fbEspnFetchJSON(url, 15000);
+            const evs = Array.isArray(data && data.events) ? data.events : [];
+            raw = raw.concat(evs);
+          } catch (_err2) {}
+        }
+      }
 
       const seen = new Set(), clean = [];
       raw.forEach(function (ev) {
@@ -2079,8 +2096,10 @@ const FB_ESPN = {
         const e = fbEspnNormalizeEvent(ev, slug);
         if (!e) return;
         // Today/Tomorrow = ESPN's ET calendar day of kickoff (matches the day ESPN buckets the game under)
-        const localKey = fbEspnEventDateKey(e.date);
-        if (localKey && localDay && localKey !== localDay) return;
+        // Bucket Today/Tomorrow on the viewer's clock (SportyBet), not ET.
+        const viewKey = fbEspnViewerDateKey(e.date);
+        const viewDay = fbEspnViewerDateKeyFromOffset(offset);
+        if (viewKey && viewDay && viewKey !== viewDay) return;
         e.leagueSlug = slug;
         e.uiLeagueKey = leagueKey || slug;
         e.seasonType = typeof afEventSeasonType === "function" ? afEventSeasonType(ev) : null;
