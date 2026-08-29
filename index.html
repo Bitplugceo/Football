@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v10_seal_20260829 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v11_seal_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -520,6 +520,7 @@
     <h3>Market Lines</h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
       <div><label>Game Total</label><input id="ftMarket" placeholder="e.g. 47.5 or 44.5-47.5" aria-label="Game Total line" /></div>
+      <div><label>Handicap (Home line)</label><input id="spreadLine" placeholder="e.g. -21.5" aria-label="Handicap home line" /></div>
     </div>
   </div>
 
@@ -879,7 +880,7 @@
     // top-level script execution in this block (window.X = ... assignments
     // are not hoisted the way function declarations are). Declared here from
     // the file's own BUILD_MARKER comment.
-    const APP_BUILD_VERSION = "af_engine_v1_nfl_v10_seal_20260829";
+    const APP_BUILD_VERSION = "af_engine_v1_nfl_v11_seal_20260829";
     window.__APP_BUILD_VERSION = APP_BUILD_VERSION;
     // Visible on-page build tag (mirrors the BUILD_MARKER html comment at the
     // top of this file) — lets you confirm on a phone, with no dev tools,
@@ -3757,9 +3758,9 @@ const FB_ESPN = {
     };
 
     function fb2_marketRows(data,ctx,lambdas,integrity,sample){
-      // AF live markets — Game Total (FT) and Winner (moneyline) only. 1H/2H
-      // totals, Spread, and Team Totals were removed: this engine now deals
-      // in full-time total points and the winner alone, nothing else.
+      // AF live markets — Game Total (FT), Handicap (Spread), and Winner
+      // (moneyline) only. 1H/2H totals and Team Totals stay removed: this
+      // engine deals in full-time total points, the spread, and the winner.
       const rows=[];
       const odds={
         home:fb2_parseOdds("oddsHome"),
@@ -3771,7 +3772,7 @@ const FB_ESPN = {
       const homeExp = Math.max(0, Number(lambdas.home) || 0);
       const awayExp = Math.max(0, Number(lambdas.away) || 0);
       const ftTotal = homeExp + awayExp;
-      const spreadHome = homeExp - awayExp; // expected home margin (points) — used only to derive win probability below
+      const spreadHome = homeExp - awayExp; // expected home margin (points) — feeds both Handicap and Winner below
 
       const ftVar = Math.max(M.MIN_VARIANCE_FT || 28, ftTotal * (M.OVERDISPERSION || 1.45));
       const marginVar = Math.max(20, ftVar * 0.85);
@@ -3798,6 +3799,27 @@ const FB_ESPN = {
         else add("ft_under", "Game Total", pUnder, "UNDER " + displayLine(ftLine), odds.under, ftLine, ftTotal);
       } else {
         add("ft_proj", "Game Total (proj)", 0.55, "PROJ " + displayLine(ftTotal), null, null, ftTotal);
+      }
+
+      // --- Handicap / Spread (home line; negative = home favored). Books
+      // settle this "incl. overtime" off the final score, same as Winner —
+      // stripping OT only applies to the historical inputs feeding the
+      // model, not to how the live market itself resolves. ---
+      const spreadLine = parseMarketLine(fb2_text("spreadLine") || "");
+      if (Number.isFinite(spreadLine)) {
+        // P(home covers) ≈ P(homeMargin > -spreadLine) with continuous margin model
+        // homeMargin ~ Normal(spreadHome, sqrt(marginVar))
+        // Cover when homeMargin + spreadLine > 0 → homeMargin > -spreadLine
+        const need = -spreadLine;
+        const sd = Math.sqrt(marginVar);
+        const z = (need - spreadHome) / Math.max(0.01, sd);
+        const pHomeCovers = (typeof normalCdf === "function") ? (1 - normalCdf(z)) : 0.5;
+        const pAwayCovers = 1 - pHomeCovers;
+        if (pHomeCovers >= pAwayCovers) {
+          add("spread_home", "Handicap", pHomeCovers, "HOME " + displayLine(spreadLine), odds.home, spreadLine, spreadHome);
+        } else {
+          add("spread_away", "Handicap", pAwayCovers, "AWAY " + displayLine(-spreadLine), odds.away, spreadLine, spreadHome);
+        }
       }
 
       // --- Winner (moneyline, no draw — AF). A winner pick has no market
@@ -3965,7 +3987,7 @@ const FB_ESPN = {
     }
     function fbClearPredictionFields(){
       try { if (typeof fbEspnFixtureLoadToken !== 'undefined') fbEspnFixtureLoadToken++; } catch(_e) {}
-      ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','ftMarket','fixtureKickoff'
+      ['teamAName','ssTeamAId','teamBName','ssTeamBId','aFTScored','aFTAllowed','bFTScored','bFTAllowed','aFixtureLoad7d','bFixtureLoad7d','aFTH2H','bFTH2H','ftMarket','spreadLine','fixtureKickoff'
       ].forEach(function(id){const e=document.getElementById(id);if(e)e.value='';});
       ['useFTH2H'].forEach(function(id){const e=document.getElementById(id);if(e)e.checked=false;});
       document.querySelectorAll(".autofill-indicator").forEach(function(el){ el.style.display = "none"; });
@@ -4863,7 +4885,7 @@ const FB_ESPN = {
           "teamAName", "ssTeamAId", "teamBName", "ssTeamBId",
           "aFTScored", "aFTAllowed", "bFTScored", "bFTAllowed",
           "aFTH2H", "bFTH2H",
-          "ftMarket"
+          "ftMarket", "spreadLine"
         ];
         const data = {};
         ids.forEach(id => {
