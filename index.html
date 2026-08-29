@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: af_engine_v1_nfl_v5_seal_20260829 — bump this string on every deploy.
+  <!-- BUILD_MARKER: af_engine_v1_nfl_v7_seal_20260829 — bump this string on every deploy.
        If the value shown in the on-page footer/console does not match this file,
        the browser (iOS home-screen apps in particular) is serving a stale cached
        copy of the JS — force a hard refresh / remove & re-add the home-screen icon.
@@ -1501,9 +1502,14 @@
     // Villanova-tier FCS games could never surface no matter which of the
     // two dropdown options was picked.
     const AF_LEAGUE_GROUP = {
-      // SportyBet "NCAA, Regular Season" mixes FBS + FCS on one board.
-      // Do not send groups=80 for that label or FCS games disappear.
       "college-football-fcs": 81
+    };
+    // SportyBet "NCAA, Regular Season" is FBS + FCS + some D-II.
+    // ESPN's default college-football scoreboard is a short FBS featured list.
+    const AF_LEAGUE_SCAN_GROUPS = {
+      "college-football": [80, 81, 90, 56, 23, 35, 22, 11],
+      "college-football-fcs": [81],
+      "college-football-post": [80, 90]
     };
     // ESPN seasontype: 1=preseason, 2=regular, 3=postseason
     const AF_LEAGUE_SEASON_TYPE = {
@@ -1523,8 +1529,42 @@
     }
     function afResolveSeasonType(val) {
       const k = String(val || "").trim();
+      // NCAA regular-season board must not drop week-0 / untagged games.
+      if (k === "college-football") return null;
       if (AF_LEAGUE_SEASON_TYPE[k] != null) return AF_LEAGUE_SEASON_TYPE[k];
-      return null; // no filter
+      return null;
+    }
+    function afResolveScanGroups(val) {
+      const k = String(val || "").trim();
+      if (AF_LEAGUE_SCAN_GROUPS[k]) return AF_LEAGUE_SCAN_GROUPS[k].slice();
+      const one = (typeof afResolveLeagueGroup === "function") ? afResolveLeagueGroup(k) : null;
+      return Number.isFinite(one) ? [one] : [null];
+    }
+    async function fbEspnLoadCollegeGroups() {
+      if (Array.isArray(FB_ESPN.collegeGroups) && FB_ESPN.collegeGroups.length) return FB_ESPN.collegeGroups;
+      const found = new Set(AF_LEAGUE_SCAN_GROUPS["college-football"] || [80, 81, 90]);
+      const urls = [
+        FB_ESPN.SITE("college-football") + "/scoreboard/conferences",
+        "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/seasons/2026/types/2/groups?limit=200"
+      ];
+      for (let u = 0; u < urls.length; u++) {
+        try {
+          const data = await fbEspnFetchJSON(urls[u], 12000);
+          const walk = function (node) {
+            if (!node) return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            const id = Number(node.groupId || node.id || node.group_id);
+            if (Number.isFinite(id) && id > 0) found.add(id);
+            if (node.subGroups) walk(node.subGroups);
+            if (node.conferences) walk(node.conferences);
+            if (node.items) walk(node.items);
+            if (node.children) walk(node.children);
+          };
+          walk(data.conferences || data.items || data);
+        } catch (_e) {}
+      }
+      FB_ESPN.collegeGroups = Array.from(found);
+      return FB_ESPN.collegeGroups;
     }
     function afResolveLeagueGroup(val) {
       const k = String(val || "").trim();
@@ -2039,7 +2079,7 @@ const FB_ESPN = {
       const groupWant = (typeof afResolveLeagueGroup === "function")
         ? afResolveLeagueGroup(leagueKey || slug)
         : null;
-      const cacheKey = "league:" + String(slug) + ":" + localDay + ":st" + String(seasonWant || "any") + ":gr" + String(groupWant || "any");
+      const cacheKey = "league:" + String(slug) + ":" + localDay + ":st" + String(seasonWant || "any") + ":scan:" + String(leagueKey || slug);
       const cached = FB_ESPN.eventCache.get(cacheKey);
       if (!force && Array.isArray(cached) && Date.now() - Number(cached._updatedAt || 0) < 120000) return cached;
       if (!slug || slug === "all") return [];
@@ -2055,22 +2095,35 @@ const FB_ESPN = {
       });
       if (etKeys.indexOf(baseEt) < 0) etKeys.push(baseEt);
 
+      let scanGroups = (typeof afResolveScanGroups === "function")
+        ? afResolveScanGroups(leagueKey || slug)
+        : (Number.isFinite(groupWant) ? [groupWant] : [null]);
+      if (slug === "college-football" && String(leagueKey || "") === "college-football" && typeof fbEspnLoadCollegeGroups === "function") {
+        try {
+          const seeds = AF_LEAGUE_SCAN_GROUPS["college-football"] || [];
+          const all = await fbEspnLoadCollegeGroups();
+          const extra = (all || []).filter(function (id) { return seeds.indexOf(id) < 0; }).slice(0, 24);
+          scanGroups = seeds.concat(extra);
+        } catch (_g) {}
+      }
       let raw = [];
       for (let i = 0; i < etKeys.length; i++) {
-        let url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + etKeys[i] + "&limit=300";
-        if (seasonWant === 1 || seasonWant === 2 || seasonWant === 3) {
-          url += "&seasontype=" + seasonWant;
-        }
-        if (Number.isFinite(groupWant)) {
-          url += "&groups=" + groupWant;
-        }
-        try {
-          const data = await fbEspnFetchJSON(url, 15000);
-          const evs = Array.isArray(data && data.events) ? data.events : [];
-          raw = raw.concat(evs);
-        } catch (_err) {
-          if (typeof engineDebug === "function") {
-            engineDebug("scoreboard day fetch failed", { slug: slug, date: etKeys[i], error: String(_err && _err.message || _err) });
+        for (let g = 0; g < scanGroups.length; g++) {
+          let url = FB_ESPN.SITE(slug) + "/scoreboard?dates=" + etKeys[i] + "&limit=300";
+          if (seasonWant === 1 || seasonWant === 2 || seasonWant === 3) {
+            url += "&seasontype=" + seasonWant;
+          }
+          if (Number.isFinite(scanGroups[g])) {
+            url += "&groups=" + scanGroups[g];
+          }
+          try {
+            const data = await fbEspnFetchJSON(url, 15000);
+            const evs = Array.isArray(data && data.events) ? data.events : [];
+            raw = raw.concat(evs);
+          } catch (_err) {
+            if (typeof engineDebug === "function") {
+              engineDebug("scoreboard day fetch failed", { slug: slug, date: etKeys[i], group: scanGroups[g], error: String(_err && _err.message || _err) });
+            }
           }
         }
       }
