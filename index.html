@@ -1,4 +1,3 @@
-Z
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -375,11 +374,7 @@ Z
     <div class="tracker-head">
       <span id="trackerHeadTitle" style="cursor:pointer;" title="Tap to switch Tracked Picks / Engine Report">Tracked Picks</span>
       <div class="tracker-head-actions">
-        <button type="button" id="trackerCopyDataBtn" class="tracker-insights-btn" title="Copy tracker data">📑</button>
-        <span class="engine-battery" title="Rolling engine performance">
-          <span class="engine-battery-shell"><span class="engine-battery-fill" id="enginePerfFill" style="width:0%"></span></span>
-          <span class="engine-battery-pct" id="enginePerfPct">—</span>
-        </span>
+        <button type="button" id="trackerMilitaryRaidBtn" class="tracker-insights-btn" title="Military Raid">🚨</button>
         <button type="button" id="trackerCloseBtn" class="tracker-close" aria-label="Close">✕</button>
       </div>
     </div>
@@ -427,6 +422,14 @@ Z
     requestCache: new Map(),
     lastTrust: "ESPN direct"
   };
+
+  function esc(s){
+    return String(s==null?"":s)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
 
   const LOG = [];
   function log(level, section, msg, data){
@@ -1065,7 +1068,6 @@ Z
       }
 
       applyLast10Alert();
-      ["teamASection","teamBSection","h2hSection"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.remove("collapsed"); });
       const aName = document.getElementById("teamAName").value || "Team A";
       const bName = document.getElementById("teamBName").value || "Team B";
       const notes = [];
@@ -1598,9 +1600,6 @@ Z
       const fx = fixtureCache[Number(this.value)];
       if (!fx) return;
       applyFixture(fx);
-      ["marketSection","teamASection","teamBSection","h2hSection"].forEach(function(id){
-        const el=document.getElementById(id); if(el) el.classList.remove("collapsed");
-      });
       autoFetch();
     });
     document.getElementById("autoFetchBtn").addEventListener("click", autoFetch);
@@ -1631,11 +1630,8 @@ Z
     if (headTitle) headTitle.addEventListener("click", function(){
       setTrackerModalView(__trackerView==="report" ? "picks" : "report");
     });
-    const copyBtn = document.getElementById("trackerCopyDataBtn");
-    if (copyBtn) copyBtn.addEventListener("click", function(){
-      const text = JSON.stringify({ exportedAt:new Date().toISOString(), state:g_trackerState }, null, 2);
-      if (navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ copyBtn.textContent="✅"; setTimeout(function(){ copyBtn.textContent="📑"; },1200); });
-    });
+    const raidBtn = document.getElementById("trackerMilitaryRaidBtn");
+    if (raidBtn) raidBtn.addEventListener("click", function(){ if (typeof runSelfTest==="function") runSelfTest(); });
     const afdbBtn = document.getElementById("bbdbBtn");
     if (afdbBtn) afdbBtn.addEventListener("click", function(){ if (window.AFDB) AFDB.open(); });
     const errBtn = document.getElementById("headerErrorBtn");
