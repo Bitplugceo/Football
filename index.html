@@ -1,8 +1,9 @@
+A
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://site.api.espn.com https://sports.core.api.espn.com https://thebetceo-engine.ridwantunde636.workers.dev https://corsproxy.io https://api.allorigins.win; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -95,7 +96,6 @@
     .fixture-day.active { background: #49a443 !important; color: #fff !important; border-color: #49a443 !important; }
     body.dark-mode .fixture-day { background: #1c1c1c !important; color: #f2f2f2 !important; border-color: #333 !important; }
     body.dark-mode .fixture-day.active { background: #49a443 !important; color: #fff !important; border-color: #49a443 !important; }
-    .pitcher-box { background: var(--panel-soft); border: 1px solid var(--panel-border); padding: 8px; margin: 6px 0; font-size: 11px; line-height: 1.45; display: none; }
     .actions { text-align: center; padding-bottom: 20px; }
     #runBtn, #clearBtn { opacity: 1 !important; border: none !important; cursor: pointer !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 700 !important; width: auto !important; }
     #runBtn { background: #3a9c35 !important; color: #fff !important; }
@@ -289,7 +289,6 @@
     <button class="fetch-btn" id="autoFetchBtn" type="button">📡 Fetch Stats</button>
     <div id="fetchStatus"></div>
     <div id="last10SeriesAlert" role="alert"></div>
-    <div class="pitcher-box" id="pitcherBox"></div>
   </div>
 
   <div class="section" id="marketSection">
@@ -297,21 +296,21 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <div>
         <label>Total (incl. extra innings)</label>
-        <input id="ftMarket" placeholder="8.5" aria-label="Game total runs" />
+        <input id="ftMarket" placeholder="7.5 - 9.5" aria-label="Game total runs" />
       </div>
       <div>
         <label>Handicap (Home, signed)</label>
-        <input id="spreadLine" placeholder="-1.5" aria-label="Home run line" />
+        <input id="spreadLine" placeholder="-1.5" aria-label="Handicap (Home, signed)" />
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
       <div>
         <label>Team A Total (incl. extra innings)</label>
-        <input id="aTeamTotal" placeholder="4.5" aria-label="Home team total runs" />
+        <input id="aTeamTotal" placeholder="3.5 - 5.5" aria-label="Home team total runs" />
       </div>
       <div>
         <label>Team B Total (incl. extra innings)</label>
-        <input id="bTeamTotal" placeholder="3.5" aria-label="Away team total runs" />
+        <input id="bTeamTotal" placeholder="3.5 - 5.5" aria-label="Away team total runs" />
       </div>
     </div>
   </div>
@@ -345,11 +344,11 @@
   </div>
 
   <div class="section" id="h2hSection">
-    <h3>H2H (Last 5) <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled</span></h3>
+    <h3>H2H (Last 10) <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled</span></h3>
     <label><input type="checkbox" id="useFTH2H" aria-label="Use Game H2H (min 2 games)" /> Use Game H2H (min 2 games)</label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-      <input id="aFTH2H" placeholder="Team A runs vs B" aria-label="Team A H2H runs" />
-      <input id="bFTH2H" placeholder="Team B runs vs A" aria-label="Team B H2H runs" />
+      <input id="aFTH2H" placeholder="5,3,7,2,4,6,1,8,3,5" aria-label="Team A H2H runs last 10" />
+      <input id="bFTH2H" placeholder="4,1,6,3,2,5,7,2,4,3" aria-label="Team B H2H runs last 10" />
     </div>
   </div>
 </div>
@@ -906,18 +905,10 @@
     document.getElementById("fixtureKickoff").value = fx.date||"";
     document.getElementById("fixtureEventId").value = fx.id||"";
     document.getElementById("fixtureVenue").value = fx.venue||"";
-    if (finite(fx.odds.total)) document.getElementById("ftMarket").value = displayLine(fx.odds.total);
-    if (finite(fx.odds.spread)) document.getElementById("spreadLine").value = displaySigned(fx.odds.spread);
     window.__bbAuto.venue = fx.venue||"";
     window.__bbAuto.weather = fx.weather||null;
     window.__bbAuto.pitchers = { home: fx.homePitcher, away: fx.awayPitcher };
-    window.__bbAuto.odds = fx.odds;
-    const box = document.getElementById("pitcherBox");
-    const hp = fx.homePitcher||{}, ap = fx.awayPitcher||{};
-    box.style.display = "block";
-    box.innerHTML = "<b>Probable starters</b><br>Home: "+esc(hp.name||"—")+(finite(hp.era)?" · ERA "+hp.era.toFixed(2):"")+"<br>Away: "+esc(ap.name||"—")+(finite(ap.era)?" · ERA "+ap.era.toFixed(2):"")+
-      (fx.venue?"<br>Park: "+esc(fx.venue)+" · factor "+parkFactor(fx.venue).toFixed(2):"")+
-      (fx.weather?"<br>Weather: "+esc(fx.weather.displayValue||"")+(finite(fx.weather.temperature)?" · "+fx.weather.temperature+"°":""):"");
+    window.__bbAuto.odds = fx.odds || {};
   }
 
   function lastCompletedForm(events, teamId){
@@ -977,7 +968,7 @@
       markAuto("bAutoTag", formB.length>0);
 
       // H2H: games in A's schedule against B
-      const h2h = formA.filter(function(g){ return g.oppId===String(bId); }).slice(0,5);
+      const h2h = formA.filter(function(g){ return g.oppId===String(bId); }).slice(0,10);
       // Also hunt deeper in full schedules
       const deepA = lastCompletedForm(pair[0], aId);
       // rebuild from full lists not sliced
@@ -990,24 +981,13 @@
           allA.push({ a:fx.awayScore, b:fx.homeScore, date:fx.date });
       });
       allA.sort(function(x,y){ return Date.parse(y.date||0)-Date.parse(x.date||0); });
-      const h = allA.slice(0,5);
+      const h = allA.slice(0,10);
       if (h.length){
         fillSeriesInput("aFTH2H", h.map(function(x){return x.a;}));
         fillSeriesInput("bFTH2H", h.map(function(x){return x.b;}));
         document.getElementById("useFTH2H").checked = h.length>=2;
         markAuto("h2hAutoTag", true);
       }
-
-      // Team totals default to ~ half of game total if ESPN didn't supply them
-      const gt = parseLine(document.getElementById("ftMarket").value);
-      if (finite(gt)){
-        if (!parseLine(document.getElementById("aTeamTotal").value))
-          document.getElementById("aTeamTotal").value = displayLine(Math.round(gt*0.52*2)/2);
-        if (!parseLine(document.getElementById("bTeamTotal").value))
-          document.getElementById("bTeamTotal").value = displayLine(Math.round(gt*0.48*2)/2);
-      }
-      if (!parseLine(document.getElementById("spreadLine").value))
-        document.getElementById("spreadLine").value = "-1.5";
 
       applyLast10Alert();
       setStatus("Filled A "+formA.length+" / B "+formB.length+" games · H2H "+h.length+" · "+BB.lastTrust);
@@ -1439,7 +1419,6 @@
     document.querySelectorAll(".last10-short-field").forEach(function(el){ el.classList.remove("last10-short-field"); });
     document.body.classList.remove("bb-last10-alert");
     const banner = document.getElementById("last10SeriesAlert"); if (banner){ banner.classList.remove("visible"); banner.textContent=""; }
-    const box = document.getElementById("pitcherBox"); if (box){ box.style.display="none"; box.innerHTML=""; }
     const r = document.getElementById("results"); if (r){ r.style.display="none"; r.innerHTML="<tr><th>Market</th><th>Projection</th><th>Edge</th><th>Grade</th><th>Prediction</th></tr>"; }
     document.getElementById("fixtureSelect").innerHTML = '<option value="">- Select match -</option>';
     document.getElementById("leagueSelect").value = "";
