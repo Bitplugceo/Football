@@ -1,3 +1,4 @@
+Z
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,8 +47,11 @@
     html, body { background-color: var(--bg); }
     body {
       margin: 0; padding: 0; background: var(--bg); color: var(--text);
-      font-family: Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      -webkit-text-size-adjust: 100%;
+      min-height: 100vh; min-height: -webkit-fill-available;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
     body.tracker-open { position: fixed; width: 100%; left: 0; right: 0; overflow: hidden; }
     body.bb-last10-alert { background: #4a0d0d !important; }
@@ -112,7 +116,7 @@
     .conf-c { background: #d98a00 !important; color: #fff !important; font-weight: 800 !important; }
     .conf-d { background: #c91920 !important; color: #fff !important; font-weight: 800 !important; }
     .conf-none { background: var(--panel-soft-2) !important; color: var(--muted) !important; font-weight: 700 !important; }
-    .lock { font-size: 11px !important; margin-left: 4px; }
+    .lock { font-size: 4px !important; display: inline-block; vertical-align: middle; transform: translateY(-1px); margin-left: 4px; margin-right: 0; }
     .autofill-indicator { font-size: 10px; color: #2f8f4a; display: none; }
     .last10-short-field { border: 2px solid #d92d2a !important; background: #ffe8e8 !important; }
     #last10SeriesAlert { display: none; margin: 8px 0 0; padding: 10px 12px; border: 2px solid #d92d2a; background: #4a0d0d; color: #fff; font-size: 13px; font-weight: 700; }
@@ -173,6 +177,7 @@
     .tracker-review-text { font-size:12px; font-weight:800; margin:4px 0; }
     .tracker-review-action { font-size:10px; font-weight:700; color:var(--tracker-subtext); }
     .engine-battery-pct { min-width:26px; }
+    #fetchStatus { font-size: 10px; margin-top: 6px; min-height: 16px; font-weight: 700; }
     #fetchStatus.ok { color:#2f8f4a; }
     #fetchStatus.err { color:#d92d2a; }
     #fetchStatus.loading { color:#d98a00; }
@@ -1061,9 +1066,24 @@
 
       applyLast10Alert();
       ["teamASection","teamBSection","h2hSection"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.remove("collapsed"); });
-      const kind = (formA.length>=5 && formB.length>=5) ? "ok" : "err";
-      setStatus("Filled A "+formA.length+" / B "+formB.length+" games · H2H "+h.length+" · "+BB.lastTrust, kind);
-      log(kind==="ok"?"OK":"WARN","FILL","auto-fetch complete", {a:formA.length,b:formB.length,h2h:h.length,aId:aId,bId:bId});
+      const aName = document.getElementById("teamAName").value || "Team A";
+      const bName = document.getElementById("teamBName").value || "Team B";
+      const notes = [];
+      notes.push(aName+": "+formA.length+" games "+(formA.length>=5?"✅":"❌"));
+      notes.push(bName+": "+formB.length+" games "+(formB.length>=5?"✅":"❌"));
+      if (h.length>=2) notes.push("H2H: "+h.length+" games ✅");
+      else if (h.length===1) notes.push("H2H: 1 game found (min 2 to auto-enable)");
+      else notes.push("H2H: no games found");
+      const allGood = formA.length>=5 && formB.length>=5;
+      if (!allGood){
+        notes.push("⚠️ FETCH INCOMPLETE: full model wants 5+ games each. Click Fetch Stats again if data looks wrong.");
+      }
+      const el = document.getElementById("fetchStatus");
+      if (el){
+        el.className = allGood ? "ok" : "err";
+        el.innerHTML = '<div style="font-weight:bold;">'+notes.map(function(n){return esc(n);}).join("<br>")+"</div>";
+      }
+      log(allGood?"OK":"WARN","FILL","auto-fetch complete", {a:formA.length,b:formB.length,h2h:h.length,aId:aId,bId:bId});
     } catch(e){
       setStatus("Fetch failed: "+(e.message||e), "err");
       log("ERROR","FILL", String(e));
@@ -1162,15 +1182,20 @@
     renderRows(rows, proj, data);
     trackRows(rows, proj, data);
     const st = document.getElementById("fixtureContextStatus");
-    if (st){
-      st.textContent = (document.getElementById("teamAName").value||"Home")+" "+proj.home.toFixed(2)+" – "+
-        proj.away.toFixed(2)+" "+(document.getElementById("teamBName").value||"Away")+
-        " · Total "+proj.total.toFixed(2)+" · Park "+proj.park.toFixed(2)+
-        " · "+proj.tier+" sample ("+proj.sample+")";
-    }
+    if (st) st.textContent = "";
+    window.__lastRun = { proj:proj, rows:rows, at:new Date().toISOString() };
     log("OK","ENGINE","run complete", {proj:proj, rows:rows.map(function(r){return r.pick;})});
   }
 
+  function formatProjectionWhole(val){
+    if (!finite(val)) return "NaN";
+    return String(Math.floor(Number(val)));
+  }
+  function formatEdge(edge){
+    if (!finite(edge)) return "NaN";
+    const e = Math.round(edge*10)/10;
+    return (e>0?"+":"")+e.toFixed(1);
+  }
   function renderRows(rows, proj){
     const table = document.getElementById("results");
     table.style.display = "table";
@@ -1180,15 +1205,16 @@
       const tr = document.createElement("tr");
       const c1=document.createElement("td"), c2=document.createElement("td"), c3=document.createElement("td"), c4=document.createElement("td"), c5=document.createElement("td");
       c1.textContent = p.name;
-      if (finite(p.projection) && finite(p.line)){
-        const lt = p.family==="spread" ? displaySigned(p.line) : displayLine(p.line);
-        c2.textContent = (p.family==="spread" ? displaySigned(p.projection) : p.projection.toFixed(2)) + " (line "+lt+")" + (finite(p.prob) ? " · "+(p.prob*100).toFixed(1)+"%" : "");
-      } else c2.textContent = "—";
-      c3.textContent = finite(p.edge) ? ((p.edge>=0?"+":"")+p.edge.toFixed(2)) : "—";
-      c4.textContent = p.grade;
-      c4.className = p.grade==="A"?"conf-a":p.grade==="B"?"conf-b":p.grade==="C"?"conf-c":p.grade==="D"?"conf-d":"conf-none";
-      c5.textContent = p.pick;
+      c2.textContent = formatProjectionWhole(p.projection);
+      c3.textContent = formatEdge(p.edge);
+      c4.textContent = p.pick==="NO PLAY" ? "NaN" : p.grade;
+      c4.className = p.pick==="NO PLAY"?"conf-none":p.grade==="A"?"conf-a":p.grade==="B"?"conf-b":p.grade==="C"?"conf-c":p.grade==="D"?"conf-d":"conf-none";
       c5.className = p.pick==="NO PLAY"?"pred-noplay":(String(p.pick).indexOf("UNDER")>=0?"pred-under":"pred-over");
+      c5.style.whiteSpace = "nowrap";
+      c5.style.fontSize = "11px";
+      const predSpan = document.createElement("span");
+      predSpan.textContent = p.pick;
+      c5.appendChild(predSpan);
       tr.append(c1,c2,c3,c4,c5);
       table.appendChild(tr);
       const rank = {A:4,B:3,C:2,D:1}[p.grade]||0;
@@ -1198,8 +1224,10 @@
     if (best>=0){
       rows[best].isLock = true;
       const cell = table.rows[best+1].cells[4];
+      const lock = document.createElement("span");
+      lock.className = "lock";
+      lock.textContent = "🔒";
       cell.appendChild(document.createTextNode(" "));
-      const lock = document.createElement("span"); lock.className="lock"; lock.textContent="🔒";
       cell.appendChild(lock);
     }
   }
