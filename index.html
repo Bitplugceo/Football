@@ -1,4 +1,3 @@
-A
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -275,7 +274,7 @@ A
     </div>
     <label style="font-size:12px;">Select match</label>
     <select id="fixtureSelect" class="league-box" aria-label="Select match">
-      <option value="">- Select match -</option>
+      <option value="">— Select match —</option>
     </select>
     <input id="fixtureKickoff" type="hidden" value="" />
     <input id="fixtureEventId" type="hidden" value="" />
@@ -466,7 +465,7 @@ A
       const btns =
         '<button type="button" onclick="AFDB.copy(this)" style="background:#111;border:1px solid #333;color:#49d45f;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">📋 Copy Log</button>'+
         '<button type="button" onclick="AFDB.clear()" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🗑️ Clear</button>'+
-        '<button type="button" onclick="AFDB.runTestFetch()" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 0 8px rgba(217,31,38,.4);">🧪 RUN SELF-TEST</button>'+
+        '<button type="button" onclick="AFDB.runTestFetch()" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 0 8px rgba(217,31,38,.4);">🚨 MILITARY RAID</button>'+'<button type="button" onclick="AFDB.fullAudit()" style="background:#0a1f0a;border:1px solid #2f8f4a;color:#49ff7a;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 0 8px rgba(47,143,74,.4);">🩺 Full Audit</button>'+
         '<button type="button" onclick="AFDB.openReport()" style="background:#111;border:1px solid #333;color:#d4af37;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">📊 Tracker Report</button>'+
         '<button type="button" onclick="AFDB.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;">✕ Close</button>';
       panel.innerHTML =
@@ -496,7 +495,8 @@ A
       if (typeof setTrackerModalView==="function") setTrackerModalView("report");
     }
     function runTestFetch(){ if (typeof runSelfTest==="function") runSelfTest(); if(_isOpen) _render(); }
-    return { log:log, open:open, close:close, clear:clear, copy:copy, toggleFilter:toggleFilter, openReport:openReport, runTestFetch:runTestFetch, _render:_render, get isOpen(){ return _isOpen; } };
+    function fullAudit(){ if (typeof runFullAudit==="function") runFullAudit(); if(_isOpen) _render(); }
+    return { log:log, open:open, close:close, clear:clear, copy:copy, toggleFilter:toggleFilter, openReport:openReport, runTestFetch:runTestFetch, fullAudit:fullAudit, _render:_render, get isOpen(){ return _isOpen; } };
   })();
   window.AFDB = AFDB;
   function renderLog(){ if (AFDB && AFDB.isOpen) AFDB._render(); }
@@ -870,7 +870,7 @@ A
   async function loadFixtures(){
     const slug = currentSlug();
     const sel = document.getElementById("fixtureSelect");
-    sel.innerHTML = '<option value="">- Select match -</option>';
+    sel.innerHTML = '<option value="">— Select match —</option>';
     fixtureCache = [];
     if (!slug){ setStatus("Select a league first."); return; }
     const dateKey = localDateKey(fixtureOffset);
@@ -885,8 +885,13 @@ A
       events.forEach(function(fx, i){
         const opt = document.createElement("option");
         opt.value = String(i);
-        const clock = fx.completed ? "Final" : (fx.detail||"Sched");
-        opt.textContent = clock+" · "+fx.awayName+" @ "+fx.homeName;
+        const tipoff = formatFixtureTime(fx.date);
+        opt.textContent = tipoff + " — " + (fx.homeName||"Home") + " vs " + (fx.awayName||"Away");
+        opt.dataset.home = fx.homeName||"";
+        opt.dataset.away = fx.awayName||"";
+        opt.dataset.homeId = fx.homeId||"";
+        opt.dataset.awayId = fx.awayId||"";
+        opt.dataset.eventDate = fx.date||"";
         sel.appendChild(opt);
       });
       setStatus(events.length+" match(es) · "+BB.lastTrust, "ok");
@@ -916,8 +921,8 @@ A
     const rows = [];
     (events||[]).forEach(function(ev){
       const fx = ev._norm || ev;
-      if (!fx.completed) return;
       if (!finite(fx.homeScore) || !finite(fx.awayScore)) return;
+      if (!fx.completed && !(finite(fx.homeScore) && finite(fx.awayScore))) return;
       const inn = fx.period || 9;
       // Drop rain-shortened under 6 innings — not a full-game observation
       if (inn && inn < 6) return;
@@ -931,14 +936,74 @@ A
     return rows.slice(0,10);
   }
 
+  function formatFixtureTime(dateStr){
+    if (!dateStr) return "--:--";
+    try { return new Date(dateStr).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" }); }
+    catch(e){ return "--:--"; }
+  }
+  function normName(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
+  async function resolveTeamId(slug, name){
+    const n = normName(name);
+    if (!n) return "";
+    const data = await fetchJSON(BB.SITE(slug)+"/teams?limit=400", 14000);
+    let teams = [];
+    try {
+      const leagues = ((data.sports||[])[0] && (data.sports||[])[0].leagues) || data.leagues || [];
+      leagues.forEach(function(lg){ (lg.teams||[]).forEach(function(row){ teams.push(row.team||row); }); });
+    } catch(e){}
+    if (!teams.length && Array.isArray(data.sports)) {
+      /* already handled */
+    }
+    let best = "", score = 0;
+    teams.forEach(function(tm){
+      const id = String(tm.id||"");
+      const names = [tm.displayName, tm.name, tm.shortDisplayName, tm.abbreviation, tm.nickname, tm.location].map(normName);
+      names.forEach(function(nm){
+        if (!nm || !id) return;
+        let sc = 0;
+        if (nm === n) sc = 100;
+        else if (nm.indexOf(n)>=0 || n.indexOf(nm)>=0) sc = 80;
+        if (sc > score){ score = sc; best = id; }
+      });
+    });
+    return best;
+  }
   async function fetchTeamSchedule(slug, teamId){
-    const url = BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?limit=200";
-    const data = await fetchJSON(url, 16000);
-    return (data.events||[]).map(function(e){
-      const n = normalizeEvent(e, slug);
-      if (n) n._norm = n;
-      return n;
-    }).filter(Boolean);
+    const year = new Date().getFullYear();
+    const st = LEAGUE_SEASON_TYPE[currentLeagueKey()] || 2;
+    const urls = [
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?season="+year+"&seasontype="+st+"&limit=200",
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?seasontype="+st+"&limit=200",
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?limit=200"
+    ];
+    let events = [];
+    let lastErr = null;
+    for (let i=0;i<urls.length;i++){
+      try {
+        const data = await fetchJSON(urls[i], 16000);
+        events = (data.events||[]).map(function(e){ const n=normalizeEvent(e, slug); if(n) n._norm=n; return n; }).filter(Boolean);
+        if (events.length) break;
+      } catch(e){ lastErr = e; }
+    }
+    if (events.length) return events;
+    // Fallback: walk recent scoreboards so last-10 still fills
+    log("WARN","FETCH","Schedule empty, walking recent scoreboards", {teamId:teamId, error: lastErr && lastErr.message});
+    const seen = {};
+    for (let d=0; d<=21; d++){
+      try {
+        const key = localDateKey(-d);
+        const data = await fetchJSON(BB.SITE(slug)+"/scoreboard?dates="+key+"&limit=200", 12000);
+        (data.events||[]).forEach(function(e){
+          const n = normalizeEvent(e, slug);
+          if (!n || seen[n.id]) return;
+          if (String(n.homeId)!==String(teamId) && String(n.awayId)!==String(teamId)) return;
+          n._norm = n;
+          seen[n.id] = 1;
+          events.push(n);
+        });
+      } catch(e){}
+    }
+    return events;
   }
 
   function fillSeriesInput(id, arr){
@@ -952,11 +1017,16 @@ A
 
   async function autoFetch(){
     const slug = currentSlug();
-    const aId = document.getElementById("teamAId").value;
-    const bId = document.getElementById("teamBId").value;
-    if (!slug || !aId || !bId){ setStatus("Pick a league and a match first."); return; }
-    setStatus("Fetching last-10 + H2H…");
+    if (!slug){ setStatus("Select a league first."); return; }
+    let aId = document.getElementById("teamAId").value.trim();
+    let bId = document.getElementById("teamBId").value.trim();
+    const aName = document.getElementById("teamAName").value.trim();
+    const bName = document.getElementById("teamBName").value.trim();
+    setStatus("Fetching last-10 + H2H…", "loading");
     try {
+      if (!aId && aName){ aId = await resolveTeamId(slug, aName); document.getElementById("teamAId").value = aId; log("INFO","FETCH","Resolved home id", {name:aName,id:aId}); }
+      if (!bId && bName){ bId = await resolveTeamId(slug, bName); document.getElementById("teamBId").value = bId; log("INFO","FETCH","Resolved away id", {name:bName,id:bId}); }
+      if (!aId || !bId){ setStatus("Pick a match, or type both team names.", "err"); return; }
       const pair = await Promise.all([fetchTeamSchedule(slug, aId), fetchTeamSchedule(slug, bId)]);
       const formA = lastCompletedForm(pair[0], aId);
       const formB = lastCompletedForm(pair[1], bId);
@@ -990,10 +1060,12 @@ A
       }
 
       applyLast10Alert();
-      setStatus("Filled A "+formA.length+" / B "+formB.length+" games · H2H "+h.length+" · "+BB.lastTrust);
-      log("OK","FILL","auto-fetch complete", {a:formA.length,b:formB.length,h2h:h.length});
+      ["teamASection","teamBSection","h2hSection"].forEach(function(id){ const el=document.getElementById(id); if(el) el.classList.remove("collapsed"); });
+      const kind = (formA.length>=5 && formB.length>=5) ? "ok" : "err";
+      setStatus("Filled A "+formA.length+" / B "+formB.length+" games · H2H "+h.length+" · "+BB.lastTrust, kind);
+      log(kind==="ok"?"OK":"WARN","FILL","auto-fetch complete", {a:formA.length,b:formB.length,h2h:h.length,aId:aId,bId:bId});
     } catch(e){
-      setStatus("Fetch failed: "+(e.message||e));
+      setStatus("Fetch failed: "+(e.message||e), "err");
       log("ERROR","FILL", String(e));
     }
   }
@@ -1288,23 +1360,74 @@ A
   }
   window.setTrackerModalView = setTrackerModalView;
   function runSelfTest(){
-    let issues=0;
-    ["aFTScored","bFTScored","aFTAllowed","bFTAllowed","ftMarket"].forEach(function(id){
+    if (window.AFDB) AFDB.open();
+    let suspects=0;
+    BB.requestCache.clear();
+    ["aFTScored","bFTScored","aFTAllowed","bFTAllowed","ftMarket","aTeamTotal","bTeamTotal","spreadLine"].forEach(function(id){
       const el=document.getElementById(id); const val=el?el.value.trim():"";
-      if (val && /[^0-9,.\s-]/.test(val)){ issues++; log("ERROR","UI INPUT","Invalid characters in "+id, {val:val}); }
+      if (val && /[^0-9,.\s+-]/.test(val)){ suspects++; log("ERROR","UI INPUT","Invalid characters in "+id, {val:val}); }
     });
-    if (typeof window.runEngine!=="function"){ issues++; log("ERROR","EXPORTS","runEngine missing"); }
-    if (typeof window.settleMath!=="function"){ issues++; log("ERROR","EXPORTS","settleMath missing"); }
+    const active = (g_trackerState && g_trackerState.activePicks) || [];
+    if (active.length > 490){ suspects++; log("ERROR","STORAGE","Active picks array is critically full (Limit: 500)."); }
+    if (typeof window.runEngine!=="function"){ suspects++; log("ERROR","EXPORTS","runEngine missing"); }
+    if (typeof window.settleMath!=="function"){ suspects++; log("ERROR","EXPORTS","settleMath missing"); }
     const s=g_trackerState.stats||{};
     if ((s.settled||0)>=20){
       const wr=((s.wins||0)/s.settled)*100;
-      if (wr<45) { issues++; log("ERROR","MODEL BIAS","Win rate below 45% ("+wr.toFixed(1)+"%)"); }
+      if (wr<45) { suspects++; log("ERROR","MODEL BIAS","Win rate below 45% ("+wr.toFixed(1)+"%)"); }
       else log("OK","MODEL BIAS","Win rate OK at "+wr.toFixed(1)+"%");
     } else log("INFO","MODEL BIAS","Need 20+ settled (have "+(s.settled||0)+")");
-    log(issues?"ERROR":"OK","SELF_TEST", issues?("Found "+issues+" issue(s)"):"Self-test complete. Engine integrity clean.");
-    if (window.AFDB) AFDB.open();
+    log("INFO","RAID","Hitting ESPN MLB scoreboard + schedule…");
+    (async function(){
+      try {
+        const board = await fetchJSON(BB.SITE("mlb")+"/scoreboard?limit=50", 12000);
+        const n = (board.events||[]).length;
+        log(n?"OK":"WARN","RAID","Scoreboard reachable", {events:n, trust:BB.lastTrust});
+        const ev = (board.events||[])[0];
+        const fx = ev ? normalizeEvent(ev, "mlb") : null;
+        if (fx && fx.homeId){
+          const sched = await fetchTeamSchedule("mlb", fx.homeId);
+          const form = lastCompletedForm(sched, fx.homeId);
+          log(form.length?"OK":"ERROR","RAID","Schedule last-10 probe", {team:fx.homeName, id:fx.homeId, games:form.length, raw:sched.length});
+          if (!form.length) suspects++;
+        }
+      } catch(e){
+        suspects++;
+        log("ERROR","RAID","Live ESPN probe failed", {error:String(e&&e.message||e)});
+      }
+      log(suspects?"ERROR":"OK","SELF_TEST", suspects?("Military raid finished. "+suspects+" suspect(s) arrested."):"Military raid complete. No suspects arrested. The code is clean.");
+    })();
   }
   window.runSelfTest = runSelfTest;
+  function runFullAudit(){
+    if (window.AFDB) AFDB.open();
+    let issues=0;
+    const need = ["runEngine","settleMath","autoFetch","loadFixtures","projectMatchup"];
+    need.forEach(function(fn){
+      if (typeof window[fn] !== "function" && typeof eval("typeof "+fn) !== "function") {
+        /* local functions are closure-scoped — check via known exports */
+      }
+    });
+    if (typeof runEngine !== "function"){ issues++; log("ERROR","AUDIT","runEngine missing"); }
+    if (typeof settleMath !== "function"){ issues++; log("ERROR","AUDIT","settleMath missing"); }
+    if (typeof autoFetch !== "function"){ issues++; log("ERROR","AUDIT","autoFetch missing"); }
+    if (typeof loadFixtures !== "function"){ issues++; log("ERROR","AUDIT","loadFixtures missing"); }
+    if (typeof projectMatchup !== "function"){ issues++; log("ERROR","AUDIT","projectMatchup missing"); }
+    const mu = (typeof projectMatchup==="function") ? projectMatchup({
+      aScored:[5,4,6,3,7,2,5,4,6,3], aAllowed:[3,4,5,2,4,3,5,4,3,4],
+      bScored:[4,3,5,4,6,3,4,5,3,4], bAllowed:[5,4,6,3,5,4,6,5,4,5],
+      aH2H:[], bH2H:[], useH2H:false, park:1, weather:1, aEra:NaN, bEra:NaN
+    }) : null;
+    if (!mu || !isFinite(mu.expA) || !isFinite(mu.expB) || !isFinite(mu.expTot)){
+      issues++; log("ERROR","AUDIT","Projection produced non-finite totals", mu);
+    } else if (mu.expTot < 5 || mu.expTot > 14){
+      issues++; log("ERROR","AUDIT","Toy last-10 projection outside MLB band", mu);
+    } else {
+      log("OK","AUDIT","Projection sanity OK", mu);
+    }
+    log(issues?"ERROR":"OK","AUDIT", issues?("Full audit found "+issues+" issue(s)."):"Full audit clean. Engine exports + projection path OK.");
+  }
+  window.runFullAudit = runFullAudit;
 
     function renderTracked(){
     const body = document.getElementById("trackedPicksBody");
@@ -1420,7 +1543,7 @@ A
     document.body.classList.remove("bb-last10-alert");
     const banner = document.getElementById("last10SeriesAlert"); if (banner){ banner.classList.remove("visible"); banner.textContent=""; }
     const r = document.getElementById("results"); if (r){ r.style.display="none"; r.innerHTML="<tr><th>Market</th><th>Projection</th><th>Edge</th><th>Grade</th><th>Prediction</th></tr>"; }
-    document.getElementById("fixtureSelect").innerHTML = '<option value="">- Select match -</option>';
+    document.getElementById("fixtureSelect").innerHTML = '<option value="">— Select match —</option>';
     document.getElementById("leagueSelect").value = "";
     document.querySelectorAll(".section").forEach(function(s){ s.classList.add("collapsed"); s.classList.remove("locked"); });
     const lg = document.getElementById("leagueSection"); if (lg) lg.classList.remove("collapsed");
