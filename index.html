@@ -145,8 +145,6 @@
     .why-pick-body { margin-top: 4px; padding: 6px 8px; background: var(--panel-soft); border: 1px solid var(--table-border); text-align: left; font-size: 10px; }
     .why-pick-list { margin: 0; padding-left: 14px; }
 
-    .section { padding: 12px 10px 10px; }
-    .section h3 { margin-bottom: 8px; }
     .header-error-btn { background:none!important;border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;font-size:18px!important;line-height:1!important;cursor:pointer!important;opacity:0;pointer-events:none; }
     .header-error-btn.active { opacity:1; pointer-events:auto; }
     .tracker-head { position:relative; }
@@ -323,11 +321,11 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
       <div>
         <label>Runs Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-        <input id="aFTScored" placeholder="5,3,7,2,4,6,1,8,3,5" aria-label="Team A runs scored last 10" />
+        <input id="aFTScored" placeholder="e.g. 5,3,7,2,4" aria-label="Team A runs scored last 10" />
       </div>
       <div>
         <label>Runs Allowed</label>
-        <input id="aFTAllowed" placeholder="2,4,1,6,3,5,2,4,7,3" aria-label="Team A runs allowed last 10" />
+        <input id="aFTAllowed" placeholder="e.g. 2,4,1,6,3" aria-label="Team A runs allowed last 10" />
       </div>
     </div>
   </div>
@@ -337,11 +335,11 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
       <div>
         <label>Runs Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
-        <input id="bFTScored" placeholder="4,1,6,3,2,5,7,2,4,3" aria-label="Team B runs scored last 10" />
+        <input id="bFTScored" placeholder="e.g. 4,1,6,3,2" aria-label="Team B runs scored last 10" />
       </div>
       <div>
         <label>Runs Allowed</label>
-        <input id="bFTAllowed" placeholder="5,3,2,7,4,1,6,3,5,2" aria-label="Team B runs allowed last 10" />
+        <input id="bFTAllowed" placeholder="e.g. 5,3,2,7,4" aria-label="Team B runs allowed last 10" />
       </div>
     </div>
   </div>
@@ -373,9 +371,8 @@
   <div class="tracker-panel">
     <div class="tracker-head">
       <span id="trackerHeadTitle" style="cursor:pointer;" title="Tap to switch Tracked Picks / Engine Report">Tracked Picks</span>
-      <span id="trackerStatusLabel" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;pointer-events:none;white-space:nowrap;"></span>
       <div class="tracker-head-actions">
-        <button type="button" id="trackerSelfTestBtn" class="tracker-insights-btn" title="Run self-test">🧪</button>
+        <button type="button" id="trackerCopyDataBtn" class="tracker-insights-btn" title="Copy tracker data">📑</button>
         <span class="engine-battery" title="Rolling engine performance">
           <span class="engine-battery-shell"><span class="engine-battery-fill" id="enginePerfFill" style="width:0%"></span></span>
           <span class="engine-battery-pct" id="enginePerfPct">—</span>
@@ -400,206 +397,6 @@
 
 <div id="afdbOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.96);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
   <div id="afdbPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
-</div>
-
-<script>
-(function(){
-  var ENGINE_LOCK_PIN = "349137";
-  var overlay = document.getElementById('engineLockOverlay');
-  if (localStorage.getItem('engineUnlocked') === 'yes') overlay.classList.add('hidden');
-  var FAIL_LIMIT = 5, LOCKOUT_MS = 30000, failCount = 0, lockoutUntil = 0, lockoutTimer = null;
-  var inputEl = document.getElementById('engineLockInput');
-  var btnEl = document.getElementById('engineLockBtn');
-  var errEl = document.getElementById('engineLockError');
-  function remaining(){ return Math.max(0, Math.ceil((lockoutUntil - Date.now())/1000)); }
-  function setLocked(v){ inputEl.disabled = v; btnEl.disabled = v; }
-  function tick(){
-    var s = remaining();
-    if (s <= 0){ clearInterval(lockoutTimer); lockoutTimer=null; failCount=0; setLocked(false); errEl.textContent=''; inputEl.focus(); return; }
-    errEl.textContent = 'Too many attempts — try again in ' + s + 's';
-  }
-  function startLockout(){ lockoutUntil = Date.now()+LOCKOUT_MS; setLocked(true); tick(); if(lockoutTimer) clearInterval(lockoutTimer); lockoutTimer=setInterval(tick,500); }
-  function tryUnlock(){
-    if (Date.now() < lockoutUntil){ tick(); return; }
-    if (inputEl.value === ENGINE_LOCK_PIN){
-      localStorage.setItem('engineUnlocked','yes'); overlay.classList.add('hidden'); errEl.textContent=''; failCount=0;
-    } else {
-      failCount++; inputEl.value='';
-      if (failCount >= FAIL_LIMIT) startLockout();
-      else errEl.textContent = 'Wrong PIN (' + (FAIL_LIMIT-failCount) + ' attempt(s) left)';
-    }
-  }
-  btnEl.addEventListener('click', tryUnlock);
-  inputEl.addEventListener('keydown', function(e){ if(e.key==='Enter') tryUnlock(); });
-})();
-</script>
-<header class="app-header">
-  <span class="brand-name">TheBetCeo ⚡️</span>
-  <span class="header-center">
-    <button class="header-error-btn" type="button" id="headerErrorBtn" title="Show fetch/input issues">⚠️</button>
-  </span>
-  <span class="brand-right">
-    <button class="theme-toggle" type="button" id="trackerToggleBtn" title="Open tracked picks">📊</button>
-    <button class="theme-toggle" type="button" id="bbdbBtn" title="Auto-Fetch Debugger" onclick="if(typeof AFDB!=='undefined'&&AFDB.open)AFDB.open()">🔬</button>
-    <button class="theme-toggle" type="button" id="engineRelockBtn" title="Lock the engine" onclick="localStorage.removeItem('engineUnlocked'); location.reload();">PREDICTIONS</button>
-  </span>
-</header>
-<div class="wrapper">
-  <div class="section" id="leagueSection">
-    <button type="button" class="section-toggle"><span class="toggle-title">League</span><span class="toggle-icon">▾</span></button>
-    <div class="section-body">
-      <label>Select League</label>
-      <select id="leagueSelect" class="league-box" aria-label="Select League">
-        <option value="">— Select League —</option>
-        <optgroup label="── MLB ──────────────────">
-          <option value="mlb">USA - MLB, Regular Season</option>
-          <option value="mlb_pre">USA - MLB, Spring Training</option>
-          <option value="mlb_post">USA - MLB, Postseason</option>
-        </optgroup>
-        <optgroup label="── COLLEGE / INTL ──────">
-          <option value="college-baseball">USA - NCAA Baseball</option>
-          <option value="world-baseball-classic">World Baseball Classic</option>
-          <option value="olympics-baseball">Olympics Baseball</option>
-        </optgroup>
-        <optgroup label="── WINTER ──────────────">
-          <option value="caribbean-series">Caribbean Series</option>
-          <option value="dominican-winter-league">Dominican Winter League</option>
-          <option value="mexican-winter-league">Mexican League / LMB</option>
-          <option value="puerto-rican-winter-league">Puerto Rican Winter League</option>
-          <option value="venezuelan-winter-league">Venezuelan Winter League</option>
-        </optgroup>
-      </select>
-    </div>
-  </div>
-
-  <div class="section collapsed" id="espnAutoSection">
-    <button type="button" class="section-toggle"><span class="toggle-title">⚡ ESPN Auto-Fetch</span><span class="toggle-icon">▾</span></button>
-    <div class="section-body">
-      <div class="fixture-toolbar">
-        <button type="button" class="fixture-day active" id="dayToday">Today</button>
-        <button type="button" class="fixture-day" id="dayTomorrow">Tomorrow</button>
-      </div>
-      <label>Select match</label>
-      <select id="fixtureSelect" class="league-box" aria-label="Select match">
-        <option value="">- Select match -</option>
-      </select>
-      <input id="fixtureKickoff" type="hidden" value="" />
-      <input id="fixtureEventId" type="hidden" value="" />
-      <input id="fixtureVenue" type="hidden" value="" />
-      <label>Team A Name (Home)</label>
-      <input id="teamAName" placeholder="e.g. New York Yankees" autocomplete="off" />
-      <input id="teamAId" type="hidden" value="" />
-      <label>Team B Name (Away)</label>
-      <input id="teamBName" placeholder="e.g. Boston Red Sox" autocomplete="off" />
-      <input id="teamBId" type="hidden" value="" />
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 4px;">
-        <button type="button" class="fetch-btn" id="autoFetchBtn">📡 Fetch Stats</button>
-      </div>
-      <div id="fetchStatus" class="muted" style="min-height:16px;"></div>
-      <div id="last10SeriesAlert" role="alert"></div>
-      <div class="pitcher-box" id="pitcherBox"></div>
-    </div>
-  </div>
-
-  <div class="section collapsed" id="marketSection">
-    <button type="button" class="section-toggle"><span class="toggle-title">Market Lines · full game (all innings)</span><span class="toggle-icon">▾</span></button>
-    <div class="section-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div><label>Game Total (Runs)</label><input id="ftMarket" placeholder="e.g. 8.5" /></div>
-        <div><label>Handicap (Home run line)</label><input id="spreadLine" placeholder="e.g. -1.5" /></div>
-        <div><label>Team A Total (Home runs)</label><input id="aTeamTotal" placeholder="e.g. 4.5" /></div>
-        <div><label>Team B Total (Away runs)</label><input id="bTeamTotal" placeholder="e.g. 3.5" /></div>
-      </div>
-      <div class="muted">Markets settle on full-game runs (regulation + extras). Handicap is the home run line.</div>
-    </div>
-  </div>
-
-  <div class="section collapsed" id="teamASection">
-    <button type="button" class="section-toggle"><span class="toggle-title">Team A · Last 10 (Runs) <span class="autofill-indicator" id="aAutoTag">✅ Auto-filled</span></span><span class="toggle-icon">▾</span></button>
-    <div class="section-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-        <div>
-          <label>Runs Scored <span class="muted">(recent → oldest)</span></label>
-          <input id="aFTScored" placeholder="e.g. 5,3,7,2,4" />
-        </div>
-        <div>
-          <label>Runs Allowed</label>
-          <input id="aFTAllowed" placeholder="e.g. 2,4,1,6,3" />
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section collapsed" id="teamBSection">
-    <button type="button" class="section-toggle"><span class="toggle-title">Team B · Last 10 (Runs) <span class="autofill-indicator" id="bAutoTag">✅ Auto-filled</span></span><span class="toggle-icon">▾</span></button>
-    <div class="section-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-        <div>
-          <label>Runs Scored <span class="muted">(recent → oldest)</span></label>
-          <input id="bFTScored" placeholder="e.g. 4,1,6,3,2" />
-        </div>
-        <div>
-          <label>Runs Allowed</label>
-          <input id="bFTAllowed" placeholder="e.g. 5,3,2,7,4" />
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section collapsed" id="h2hSection">
-    <button type="button" class="section-toggle"><span class="toggle-title">H2H (Last 5) <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled</span></span><span class="toggle-icon">▾</span></button>
-    <div class="section-body">
-      <label><input type="checkbox" id="useFTH2H" /> Use Game H2H (min 2 games)</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-        <input id="aFTH2H" placeholder="Team A runs vs B" />
-        <input id="bFTH2H" placeholder="Team B runs vs A" />
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="actions">
-  <button id="runBtn" type="button">Run</button>
-  <button id="clearBtn" type="button">Clear</button>
-  <button id="auditCopyBtn" type="button" title="Copy Audit" style="background:#d4af37!important;color:#111!important;padding:5px 14px!important;font-size:12px!important;font-weight:700!important;">📋</button>
-  <button id="inputsCopyBtn" type="button" title="Copy Inputs" style="background:#d4af37!important;color:#111!important;padding:5px 14px!important;font-size:12px!important;font-weight:700!important;">🗒️</button>
-</div>
-<div class="context-line" id="fixtureContextStatus" style="text-align:center;"></div>
-<div class="table-wrap">
-  <table id="results" style="display:none;">
-    <tr><th>Market</th><th>Projection</th><th>Edge</th><th>Grade</th><th>Prediction</th></tr>
-  </table>
-</div>
-
-<div id="trackerModal" class="tracker-modal" aria-hidden="true">
-  <div class="tracker-panel">
-    <div class="tracker-head">
-      <span>Tracked Picks</span>
-      <button type="button" id="trackerCloseBtn" class="tracker-close" aria-label="Close">✕</button>
-    </div>
-    <div class="tracker-summary" id="trackerSummary">0 live/recent • 0 pending • 0 wins • 0 losses</div>
-    <div class="tracker-body-scroll">
-      <div id="trackerEmpty" class="tracker-empty">No live/recent picks.</div>
-      <div class="table-wrap tracker-table-wrap">
-        <table id="trackedPicksTable">
-          <thead><tr><th>Date</th><th>League</th><th>Match</th><th>Market</th><th>Line</th><th>Pick</th><th>Grade</th><th>Status</th></tr></thead>
-          <tbody id="trackedPicksBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="bbdbOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.96);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);">
-  <div style="padding:12px;display:flex;justify-content:space-between;align-items:center;color:#d4af37;font-weight:900;">
-    <span>🔬 BASEBALL DEBUG</span>
-    <span>
-      <button type="button" id="bbdbCopy" style="background:#111;border:1px solid #333;color:#49d45f;padding:6px 10px;font-weight:700;">Copy</button>
-      <button type="button" id="bbdbClear" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 10px;font-weight:700;">Clear</button>
-      <button type="button" id="bbdbClose" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 10px;font-weight:900;">Close</button>
-    </span>
-  </div>
-  <div id="bbdbLog" style="flex:1;overflow:auto;padding:10px;color:#ccc;font-size:11px;"></div>
 </div>
 
 <script>
@@ -633,55 +430,80 @@
     const row = { ts: new Date().toLocaleTimeString([], {hour12:false}), level: level, section: section, msg: String(msg||""), data: data||null };
     LOG.unshift(row);
     if (LOG.length > 400) LOG.pop();
-    const box = document.getElementById("bbdbLog");
-    if (box && document.getElementById("bbdbOverlay").style.display === "flex") renderLog();
+    if (window.AFDB && AFDB.isOpen && typeof AFDB._render === "function") AFDB._render();
   }
   window.__bbLog = function(ctx, err){ try { log("WARN", ctx, err && err.message ? err.message : String(err)); } catch(e){} };
-  function renderLog(){
-    const panel = document.getElementById("afdbPanel") || document.getElementById("bbdbLog");
-    if (!panel) return;
-    const col = function(lv){ return lv==="ERROR"?"#ff5c61":lv==="WARN"?"#ffcf73":(lv==="OK"||lv==="SUCCESS")?"#49d45f":lv==="FETCH"?"#4ea9ff":"#aaa"; };
-    const rows = LOG.map(function(e){
-      let extra = "";
-      if (e.data){ try { extra = "<pre style='color:#777;white-space:pre-wrap;font-size:9px;margin:4px 0 0;padding:6px;background:#070707;border-left:2px solid #222'>"+esc(JSON.stringify(e.data,null,2)).slice(0,1200)+"</pre>"; } catch(x){} }
-      return "<div style='padding:8px;border-bottom:1px solid #151515'><div style='display:flex;gap:8px;flex-wrap:wrap'><span style='color:#555;font-size:9px;min-width:65px'>"+esc(e.ts)+"</span><span style='color:"+col(e.level)+";font-size:10px;font-weight:900;min-width:70px'>"+esc(e.level)+"</span><span style='color:#777;font-size:9px'>["+esc(e.section)+"]</span><span style='color:"+col(e.level)+";font-size:11px;font-weight:700;flex:1;white-space:pre-wrap'>"+esc(e.msg)+"</span></div>"+extra+"</div>";
-    }).join("") || "<div style='color:#555;font-size:12px;text-align:center;padding:30px;font-weight:bold'>No log entries yet. Run a fetch or prediction.</div>";
-    panel.innerHTML =
-      '<div style="background:#080808;border-bottom:1px solid #222;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;flex-shrink:0">'+
-      '<div style="color:#d4af37;font-size:14px;font-weight:900;letter-spacing:1px">🔬 AUTO-FETCH DEBUG BRAIN (BASEBALL)</div>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-      '<button type="button" id="bbdbCopy" style="background:#111;border:1px solid #333;color:#49d45f;padding:6px 12px;font-size:11px;font-weight:700">📋 Copy Log</button>'+
-      '<button type="button" id="bbdbClear" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 12px;font-size:11px;font-weight:700">🗑️ Clear</button>'+
-      '<button type="button" id="bbdbSelf" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900">🧪 RUN SELF-TEST</button>'+
-      '<button type="button" id="bbdbReport" style="background:#111;border:1px solid #333;color:#d4af37;padding:6px 12px;font-size:11px;font-weight:700">📊 Tracker Report</button>'+
-      '<button type="button" id="bbdbClose" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 12px;font-size:11px;font-weight:900">✕ Close</button>'+
-      '</div></div>'+
-      '<div style="flex:1;overflow:auto;background:#0a0a0a">'+
-      '<div style="padding:10px 12px;background:#111;color:#d4af37;font-size:11px;font-weight:900;position:sticky;top:0;border-bottom:1px solid #222">📡 FETCH & ENGINE LOGS</div>'+
-      rows+'</div>';
-    function bind(id, fn){ const el=document.getElementById(id); if(el) el.onclick=fn; }
-    bind("bbdbCopy", function(){
-      const text = LOG.slice().reverse().map(function(e){ return "["+e.ts+"] ["+e.level+"] ["+e.section+"] "+e.msg; }).join("\n");
-      if (navigator.clipboard) navigator.clipboard.writeText(text);
-    });
-    bind("bbdbClear", function(){ LOG.length=0; renderLog(); });
-    bind("bbdbClose", function(){ const ov=document.getElementById("afdbOverlay"); if(ov) ov.style.display="none"; });
-    bind("bbdbReport", function(){
-      const ov=document.getElementById("afdbOverlay"); if(ov) ov.style.display="none";
-      const m=document.getElementById("trackerModal"); if(m){ m.classList.add("open"); document.body.classList.add("tracker-open"); }
-      if (typeof setTrackerModalView==="function") setTrackerModalView("report");
-    });
-    bind("bbdbSelf", function(){ if (typeof runSelfTest==="function") runSelfTest(); });
-  }
-  const AFDB = {
-    log: log,
-    open: function(){ const ov=document.getElementById("afdbOverlay"); if(ov){ ov.style.display="flex"; renderLog(); } },
-    close: function(){ const ov=document.getElementById("afdbOverlay"); if(ov) ov.style.display="none"; }
-  };
-  window.AFDB = AFDB;
-  function esc(s){ return String(s||"").replace(/[&<>"]/g, function(m){ return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[m]; }); }
 
-  /* ===================== MATH ===================== */
+  const AFDB = (function(){
+    let _isOpen = false;
+    let _level = "ALL";
+    const LEVELS = { BOOT:"#7aa6ff", NET:"#4ea9ff", FETCH:"#49d45f", FILL:"#2aff9e", OK:"#49d45f", SUCCESS:"#49d45f", WARN:"#ffcf73", ERROR:"#ff5c61", INFO:"#aaa", ENGINE:"#d4af37", TRACKER:"#4ea9ff", SELF_TEST:"#49d45f" };
+    function visible(){
+      if (_level === "ALL") return LOG.slice();
+      if (_level === "ERROR") return LOG.filter(function(e){ return e.level==="ERROR"; });
+      if (_level === "WARN") return LOG.filter(function(e){ return e.level==="ERROR" || e.level==="WARN"; });
+      return LOG.slice();
+    }
+    function _render(){
+      const panel = document.getElementById("afdbPanel");
+      if (!panel) return;
+      const rows = visible().map(function(e){
+        const col = LEVELS[e.level] || "#aaa";
+        let extra = "";
+        if (e.data != null){
+          try { extra = '<pre style="color:#888;font-size:9px;margin:4px 0 0;padding:6px;background:#070707;border-left:2px solid #222;white-space:pre-wrap;word-break:break-all;">'+esc(typeof e.data==="object"?JSON.stringify(e.data,null,2):String(e.data)).slice(0,1600)+"</pre>"; } catch(x){}
+        }
+        return '<div style="padding:8px;border-bottom:1px solid #151515;"><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;"><span style="color:#555;font-size:9px;min-width:65px;flex-shrink:0;">'+esc(e.ts)+'</span><span style="color:'+col+';font-size:10px;font-weight:900;min-width:75px;flex-shrink:0;">'+esc(e.level)+'</span><span style="color:#777;font-size:9px;min-width:80px;flex-shrink:0;">['+esc(e.section)+']</span><span style="color:'+col+';font-size:11px;font-weight:700;flex:1;white-space:pre-wrap;">'+esc(e.msg)+"</span></div>"+extra+"</div>";
+      }).join("");
+      const empty = _level==="ERROR" ? "No issues found. The code is clean." : "No log entries yet. Run a fetch or prediction.";
+      const driftN = (window.g_driftErrors && window.g_driftErrors.length) || 0;
+      let rme = "—", rmeCol = "#555";
+      if (driftN){
+        const last = window.g_driftErrors.slice(-20);
+        const m = last.reduce(function(a,b){return a+b;},0)/last.length;
+        rme = m.toFixed(2)+" runs";
+        rmeCol = m>2.2?"#ff5c61":m>1.4?"#ffcf73":"#49d45f";
+      }
+      const btns =
+        '<button type="button" onclick="AFDB.copy(this)" style="background:#111;border:1px solid #333;color:#49d45f;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">📋 Copy Log</button>'+
+        '<button type="button" onclick="AFDB.clear()" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🗑️ Clear</button>'+
+        '<button type="button" onclick="AFDB.runTestFetch()" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 0 8px rgba(217,31,38,.4);">🧪 RUN SELF-TEST</button>'+
+        '<button type="button" onclick="AFDB.openReport()" style="background:#111;border:1px solid #333;color:#d4af37;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">📊 Tracker Report</button>'+
+        '<button type="button" onclick="AFDB.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;">✕ Close</button>';
+      panel.innerHTML =
+        '<div style="background:#080808;border-bottom:1px solid #222;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;flex-shrink:0;"><div style="color:#d4af37;font-size:14px;font-weight:900;letter-spacing:1px;">🔬 AUTO-FETCH DEBUG BRAIN (BB)</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+btns+"</div></div>"+
+        '<div style="padding:6px 12px;background:#0d0d0d;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0;"><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">📐 DRIFT TRACKER</span><span style="color:'+rmeCol+';font-size:12px;font-weight:900;">Rolling Mean Error (last 20): '+rme+'</span><span style="color:#555;font-size:10px;">'+driftN+' samples logged</span></div>'+
+        '<div style="display:flex;flex-direction:column;flex:1;overflow-y:auto;background:#0a0a0a;"><div style="padding:10px 12px;background:#111;color:#d4af37;font-size:11px;font-weight:900;text-transform:uppercase;position:sticky;top:0;z-index:10;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center;"><span>📡 FETCH & ENGINE LOGS</span><button type="button" onclick="AFDB.toggleFilter()" style="background:none;border:none;color:#4ea9ff;font-size:14px;font-weight:bold;cursor:pointer;">🎯 LEVEL: '+_level+"</button></div><div style='padding-bottom:15px;'>"+
+        (rows || ('<div style="color:#555;font-size:12px;text-align:center;padding:30px;font-weight:bold;">'+empty+"</div>"))+
+        "</div></div>";
+    }
+    function open(){ _isOpen = true; const ov=document.getElementById("afdbOverlay"); if(ov){ ov.style.display="flex"; _render(); } }
+    function close(){ _isOpen = false; const ov=document.getElementById("afdbOverlay"); if(ov) ov.style.display="none"; }
+    function clear(){ LOG.length=0; if(_isOpen) _render(); }
+    function copy(btn){
+      const text = visible().slice().reverse().map(function(e){ let line="["+e.ts+"] ["+e.level+"] ["+e.section+"] "+e.msg; if(e.data!=null){ try{ line+=" | "+JSON.stringify(e.data);}catch(x){} } return line; }).join("\n");
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ if(btn){ const o=btn.textContent; btn.textContent="✅ COPIED!"; setTimeout(function(){ btn.textContent=o; },1500);} });
+    }
+    function toggleFilter(){
+      const order=["ALL","ERROR","WARN"];
+      _level = order[(order.indexOf(_level)+1)%order.length];
+      if (_isOpen) _render();
+    }
+    function openReport(){
+      close();
+      const m=document.getElementById("trackerModal");
+      if(m){ m.classList.add("open"); document.body.classList.add("tracker-open"); }
+      if (typeof renderTracked==="function") renderTracked();
+      if (typeof setTrackerModalView==="function") setTrackerModalView("report");
+    }
+    function runTestFetch(){ if (typeof runSelfTest==="function") runSelfTest(); if(_isOpen) _render(); }
+    return { log:log, open:open, close:close, clear:clear, copy:copy, toggleFilter:toggleFilter, openReport:openReport, runTestFetch:runTestFetch, _render:_render, get isOpen(){ return _isOpen; } };
+  })();
+  window.AFDB = AFDB;
+  function renderLog(){ if (AFDB && AFDB.isOpen) AFDB._render(); }
+
+  window.g_driftErrors = window.g_driftErrors || [];
+
   function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
   function finite(x){ return Number.isFinite(Number(x)); }
   function avg(arr){
@@ -1581,10 +1403,34 @@
   }
 
   /* ===================== UI ===================== */
-  function makeCollapsible(){
-    document.querySelectorAll(".section-toggle").forEach(function(btn){
-      btn.addEventListener("click", function(){ btn.parentElement.classList.toggle("collapsed"); });
+  function makeSectionsCollapsible(){
+    document.querySelectorAll(".section").forEach(function(section){
+      if (section.querySelector(".section-toggle")) return;
+      const heading = section.querySelector("h3");
+      if (!heading) return;
+      const body = document.createElement("div");
+      body.className = "section-body";
+      const nodes = Array.prototype.slice.call(section.childNodes);
+      nodes.forEach(function(node){ if (node !== heading) body.appendChild(node); });
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "section-toggle";
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "toggle-title";
+      titleSpan.innerHTML = heading.innerHTML;
+      const iconSpan = document.createElement("span");
+      iconSpan.className = "toggle-icon";
+      iconSpan.innerHTML = "▾";
+      btn.appendChild(titleSpan);
+      btn.appendChild(iconSpan);
+      btn.addEventListener("click", function(){ section.classList.toggle("collapsed"); });
+      section.innerHTML = "";
+      section.appendChild(btn);
+      section.appendChild(body);
+      section.classList.add("collapsed");
     });
+    const league = document.getElementById("leagueSection");
+    if (league) league.classList.remove("collapsed");
   }
   function clearAll(){
     ["teamAName","teamAId","teamBName","teamBId","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","fixtureKickoff","fixtureEventId","fixtureVenue"].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=""; });
@@ -1597,17 +1443,19 @@
     const r = document.getElementById("results"); if (r){ r.style.display="none"; r.innerHTML="<tr><th>Market</th><th>Projection</th><th>Edge</th><th>Grade</th><th>Prediction</th></tr>"; }
     document.getElementById("fixtureSelect").innerHTML = '<option value="">- Select match -</option>';
     document.getElementById("leagueSelect").value = "";
+    document.querySelectorAll(".section").forEach(function(s){ s.classList.add("collapsed"); s.classList.remove("locked"); });
+    const lg = document.getElementById("leagueSection"); if (lg) lg.classList.remove("collapsed");
     window.__bbAuto = { A:{}, B:{}, weather:null, venue:"", pitchers:{}, odds:{} };
     setStatus("");
     document.getElementById("fixtureContextStatus").textContent = "";
   }
 
   document.addEventListener("DOMContentLoaded", function(){
-    // Basketball-style boot: main sections stay open. League Tier is the first card.
+        makeSectionsCollapsible();
 
     document.getElementById("leagueSelect").addEventListener("change", function(){
       const espn = document.getElementById("espnAutoSection");
-      espn.classList.remove("collapsed");
+      if (espn) espn.classList.remove("collapsed");
       loadFixtures();
     });
     document.getElementById("dayToday").addEventListener("click", function(){
@@ -1620,6 +1468,9 @@
       const fx = fixtureCache[Number(this.value)];
       if (!fx) return;
       applyFixture(fx);
+      ["marketSection","teamASection","teamBSection","h2hSection"].forEach(function(id){
+        const el=document.getElementById(id); if(el) el.classList.remove("collapsed");
+      });
       autoFetch();
     });
     document.getElementById("autoFetchBtn").addEventListener("click", autoFetch);
@@ -1650,8 +1501,11 @@
     if (headTitle) headTitle.addEventListener("click", function(){
       setTrackerModalView(__trackerView==="report" ? "picks" : "report");
     });
-    const selfBtn = document.getElementById("trackerSelfTestBtn");
-    if (selfBtn) selfBtn.addEventListener("click", runSelfTest);
+    const copyBtn = document.getElementById("trackerCopyDataBtn");
+    if (copyBtn) copyBtn.addEventListener("click", function(){
+      const text = JSON.stringify({ exportedAt:new Date().toISOString(), state:g_trackerState }, null, 2);
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ copyBtn.textContent="✅"; setTimeout(function(){ copyBtn.textContent="📑"; },1200); });
+    });
     const afdbBtn = document.getElementById("bbdbBtn");
     if (afdbBtn) afdbBtn.addEventListener("click", function(){ if (window.AFDB) AFDB.open(); });
     const errBtn = document.getElementById("headerErrorBtn");
