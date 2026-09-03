@@ -1,3 +1,4 @@
+H
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -373,6 +374,7 @@
   <div class="tracker-panel">
     <div class="tracker-head">
       <span id="trackerHeadTitle" style="cursor:pointer;" title="Tap to switch Tracked Picks / Engine Report">Tracked Picks</span>
+      <span id="trackerStatusLabel" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;pointer-events:none;white-space:nowrap;"></span>
       <div class="tracker-head-actions">
         <button type="button" id="trackerMilitaryRaidBtn" class="tracker-insights-btn" title="Military Raid">🚨</button>
         <button type="button" id="trackerCloseBtn" class="tracker-close" aria-label="Close">✕</button>
@@ -502,7 +504,7 @@
       if (typeof renderTracked==="function") renderTracked();
       if (typeof setTrackerModalView==="function") setTrackerModalView("report");
     }
-    function runTestFetch(){ if (typeof runSelfTest==="function") runSelfTest(); if(_isOpen) _render(); }
+    function runTestFetch(){ if (typeof runSelfTest==="function") runSelfTest({ openDebug:false }); if(_isOpen) _render(); }
     function fullAudit(){ if (typeof runFullAudit==="function") runFullAudit(); if(_isOpen) _render(); }
     return { log:log, open:open, close:close, clear:clear, copy:copy, toggleFilter:toggleFilter, openReport:openReport, runTestFetch:runTestFetch, fullAudit:fullAudit, _render:_render, get isOpen(){ return _isOpen; } };
   })();
@@ -512,7 +514,7 @@
   window.g_driftErrors = window.g_driftErrors || [];
 
   function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
-  function finite(x){ return Number.isFinite(Number(x)); }
+  function finite(x){ if (x===null || x===undefined || x==="") return false; return Number.isFinite(Number(x)); }
   function avg(arr){
     const x = (arr||[]).map(Number).filter(finite);
     return x.length ? x.reduce(function(a,b){return a+b;},0)/x.length : NaN;
@@ -1151,7 +1153,10 @@
 
     const rows = [];
     function add(key, name, mu, line, variance, family){
-      if (!finite(line)) return;
+      if (!finite(line)){
+        rows.push({ marketKey:key, name:name, projection:mu, line:null, edge:null, prob:null, pick:"NO PLAY", side:"", grade:"NaN", family:family, noLine:true });
+        return;
+      }
       const edge = family==="spread" ? (mu + line) : (mu - line);
       // spread: mu is home margin, line is home handicap (neg = home favored)
       // cover edge for picked side decided below
@@ -1207,9 +1212,10 @@
       const tr = document.createElement("tr");
       const c1=document.createElement("td"), c2=document.createElement("td"), c3=document.createElement("td"), c4=document.createElement("td"), c5=document.createElement("td");
       c1.textContent = p.name;
-      c2.textContent = formatProjectionWhole(p.projection);
-      c3.textContent = formatEdge(p.edge);
-      c4.textContent = p.pick==="NO PLAY" ? "NaN" : p.grade;
+      const dead = p.pick==="NO PLAY" || p.noLine || !finite(p.line);
+      c2.textContent = dead ? "NaN" : formatProjectionWhole(p.projection);
+      c3.textContent = dead ? "NaN" : formatEdge(p.edge);
+      c4.textContent = dead ? "NaN" : p.grade;
       c4.className = p.pick==="NO PLAY"?"conf-none":p.grade==="A"?"conf-a":p.grade==="B"?"conf-b":p.grade==="C"?"conf-c":p.grade==="D"?"conf-d":"conf-none";
       c5.className = p.pick==="NO PLAY"?"pred-noplay":(String(p.pick).indexOf("UNDER")>=0?"pred-under":"pred-over");
       c5.style.whiteSpace = "nowrap";
@@ -1232,6 +1238,12 @@
       cell.appendChild(document.createTextNode(" "));
       cell.appendChild(lock);
     }
+    setTimeout(function(){
+      const wrap = table.closest(".table-wrap") || table;
+      const rect = wrap.getBoundingClientRect();
+      const vis = rect.top >= 0 && rect.bottom <= (window.innerHeight||800);
+      if (!vis) wrap.scrollIntoView({ behavior:"smooth", block:"start" });
+    }, 300);
   }
 
   /* ===================== TRACKER ===================== */
@@ -1389,8 +1401,9 @@
     }
   }
   window.setTrackerModalView = setTrackerModalView;
-  function runSelfTest(){
-    if (window.AFDB) AFDB.open();
+  function runSelfTest(opts){
+    opts = opts || {};
+    if (opts.openDebug && window.AFDB) AFDB.open();
     let suspects=0;
     BB.requestCache.clear();
     ["aFTScored","bFTScored","aFTAllowed","bFTAllowed","ftMarket","aTeamTotal","bTeamTotal","spreadLine"].forEach(function(id){
@@ -1432,28 +1445,37 @@
   function runFullAudit(){
     if (window.AFDB) AFDB.open();
     let issues=0;
-    const need = ["runEngine","settleMath","autoFetch","loadFixtures","projectMatchup"];
-    need.forEach(function(fn){
-      if (typeof window[fn] !== "function" && typeof eval("typeof "+fn) !== "function") {
-        /* local functions are closure-scoped — check via known exports */
+    try {
+      if (typeof runEngine !== "function"){ issues++; log("ERROR","AUDIT","runEngine missing"); }
+      if (typeof settleMath !== "function"){ issues++; log("ERROR","AUDIT","settleMath missing"); }
+      if (typeof autoFetch !== "function"){ issues++; log("ERROR","AUDIT","autoFetch missing"); }
+      if (typeof loadFixtures !== "function"){ issues++; log("ERROR","AUDIT","loadFixtures missing"); }
+      if (typeof projectMatchup !== "function"){ issues++; log("ERROR","AUDIT","projectMatchup missing"); }
+      const mu = projectMatchup({
+        leagueKey:"mlb",
+        aScored:[5,4,6,3,7,2,5,4,6,3], aAllowed:[3,4,5,2,4,3,5,4,3,4],
+        bScored:[4,3,5,4,6,3,4,5,3,4], bAllowed:[5,4,6,3,5,4,6,5,4,5],
+        aH2H:[], bH2H:[], useH2H:false, venue:"", weather:null, aEra:NaN, bEra:NaN, neutral:false
+      });
+      if (!mu || !finite(mu.home) || !finite(mu.away) || !finite(mu.total)){
+        issues++; log("ERROR","AUDIT","Projection produced non-finite totals", mu);
+      } else if (mu.total < 5 || mu.total > 14){
+        issues++; log("ERROR","AUDIT","Toy last-10 projection outside MLB band", mu);
+      } else {
+        log("OK","AUDIT","Projection sanity OK", {home:+mu.home.toFixed(2), away:+mu.away.toFixed(2), total:+mu.total.toFixed(2)});
       }
-    });
-    if (typeof runEngine !== "function"){ issues++; log("ERROR","AUDIT","runEngine missing"); }
-    if (typeof settleMath !== "function"){ issues++; log("ERROR","AUDIT","settleMath missing"); }
-    if (typeof autoFetch !== "function"){ issues++; log("ERROR","AUDIT","autoFetch missing"); }
-    if (typeof loadFixtures !== "function"){ issues++; log("ERROR","AUDIT","loadFixtures missing"); }
-    if (typeof projectMatchup !== "function"){ issues++; log("ERROR","AUDIT","projectMatchup missing"); }
-    const mu = (typeof projectMatchup==="function") ? projectMatchup({
-      aScored:[5,4,6,3,7,2,5,4,6,3], aAllowed:[3,4,5,2,4,3,5,4,3,4],
-      bScored:[4,3,5,4,6,3,4,5,3,4], bAllowed:[5,4,6,3,5,4,6,5,4,5],
-      aH2H:[], bH2H:[], useH2H:false, park:1, weather:1, aEra:NaN, bEra:NaN
-    }) : null;
-    if (!mu || !isFinite(mu.expA) || !isFinite(mu.expB) || !isFinite(mu.expTot)){
-      issues++; log("ERROR","AUDIT","Projection produced non-finite totals", mu);
-    } else if (mu.expTot < 5 || mu.expTot > 14){
-      issues++; log("ERROR","AUDIT","Toy last-10 projection outside MLB band", mu);
-    } else {
-      log("OK","AUDIT","Projection sanity OK", mu);
+      const emptyLine = parseLine("");
+      if (emptyLine !== null){ issues++; log("ERROR","AUDIT","Empty line must parse to null, got "+emptyLine); }
+      else log("OK","AUDIT","Empty line parses to null / NO PLAY");
+      const range = parseLine("7.5 - 9.5");
+      if (range !== 8.5){ issues++; log("ERROR","AUDIT","Range 7.5-9.5 should mid to 8.5, got "+range); }
+      else log("OK","AUDIT","Range line midpoint OK (8.5)");
+      const single = parseLine("-1.5");
+      if (single !== -1.5){ issues++; log("ERROR","AUDIT","Signed handicap parse failed", {got:single}); }
+      else log("OK","AUDIT","Signed handicap parse OK");
+    } catch(e){
+      issues++;
+      log("ERROR","AUDIT","Full audit threw", {error:String(e&&e.message||e)});
     }
     log(issues?"ERROR":"OK","AUDIT", issues?("Full audit found "+issues+" issue(s)."):"Full audit clean. Engine exports + projection path OK.");
   }
@@ -1631,7 +1653,16 @@
       setTrackerModalView(__trackerView==="report" ? "picks" : "report");
     });
     const raidBtn = document.getElementById("trackerMilitaryRaidBtn");
-    if (raidBtn) raidBtn.addEventListener("click", function(){ if (typeof runSelfTest==="function") runSelfTest(); });
+    if (raidBtn) raidBtn.addEventListener("click", function(){
+      const statusEl = document.getElementById("trackerStatusLabel");
+      if (statusEl){
+        statusEl.textContent = "Triggered ⚡️";
+        statusEl.style.color = "#ff6b6b";
+        setTimeout(function(){ statusEl.textContent = "Completed ⚡️"; statusEl.style.color = "#4ade80"; }, 500);
+        setTimeout(function(){ statusEl.textContent = ""; statusEl.style.color = ""; }, 1400);
+      }
+      if (typeof runSelfTest==="function") runSelfTest({ openDebug:false });
+    });
     const afdbBtn = document.getElementById("bbdbBtn");
     if (afdbBtn) afdbBtn.addEventListener("click", function(){ if (window.AFDB) AFDB.open(); });
     const errBtn = document.getElementById("headerErrorBtn");
