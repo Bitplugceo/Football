@@ -2396,6 +2396,10 @@
     const banner = document.getElementById("last10SeriesAlert"); if (banner){ banner.classList.remove("visible"); banner.textContent=""; }
     const r = document.getElementById("results"); if (r){ r.style.display="none"; r.innerHTML="<tr><th>Market</th><th>Projection</th><th>Edge</th><th>Grade</th><th>Prediction</th></tr>"; }
     document.getElementById("fixtureSelect").innerHTML = '<option value="">— Select match —</option>';
+    fixtureCache = [];
+    fixtureOffset = 0;
+    const dToday = document.getElementById("dayToday"); if (dToday) dToday.classList.add("active");
+    const dTom = document.getElementById("dayTomorrow"); if (dTom) dTom.classList.remove("active");
     if (!preserveLeague) document.getElementById("leagueSelect").value = "";
     const neu = document.getElementById("neutralSite"); if (neu) neu.checked = false;
     document.querySelectorAll(".section").forEach(function(s){ s.classList.add("collapsed"); s.classList.remove("locked"); });
