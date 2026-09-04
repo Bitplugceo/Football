@@ -1,3 +1,4 @@
+K
 
 <!DOCTYPE html>
 <html lang="en">
@@ -347,10 +348,6 @@
         <input id="bTeamTotal" placeholder="3.5 - 5.5" aria-label="Away team total runs" />
       </div>
     </div>
-    <div style="margin-top:6px;">
-      <label>F5 Total (first 5 innings)</label>
-      <input id="f5Market" placeholder="4.5 - 5.5" aria-label="First five innings total" />
-    </div>
   </div>
 
   <div class="section" id="teamASection">
@@ -448,14 +445,14 @@
 <script>
 (function(){
   'use strict';
-  const APP_BUILD = "bb_engine_v4_mlb_ui_20260904_deskfix2";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260904_deskfix4";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
      but they now live in one place so thresholds cannot drift independently. */
   const ENGINE_CONFIG = {
     version: "baseball_v4.1_auditfix",
-    thresholds: { ft: 0.42, team: 0.32, spread: 0.36, f5: 0.28, pWin: 0.538 },
+    thresholds: { ft: 0.42, team: 0.32, spread: 0.36, pWin: 0.538 },
     grades: { A: 0.585, B: 0.555, C: 0.538 },
     recencyWeights: [1.40, 1.22, 1.06, 0.92, 0.80, 0.68, 0.56, 0.46, 0.36, 0.28],
     extras: {
@@ -476,7 +473,7 @@
     },
     variance: { floorShare: 0.55, meanCoef: 1.28, meanAdd: 0.20, obsShrinkMax: 0.72, obsShrinkMin: 0.15, missingPitcherInflate: 1.15 },
     clampExp: { lo: 1.55, hi: 8.40 },
-    pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45, ipMin: 3.5, ipMax: 7.2, f5Share: 0.58, vsLhpMult: 0.96 },
+    pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45, ipMin: 3.5, ipMax: 7.2, vsLhpMult: 0.96 },
     h2h: { minGames: 2, wDenom: 16, wMin: 0.05, wMax: 0.12 },
     softClamp: { nTinyCap: 6, madMultiplier: 3.5 }
   };
@@ -629,16 +626,26 @@
     return String(val||"").split(/[,\s]+/).map(function(t){ return parseFloat(t); }).filter(finite).slice(0,10);
   }
   function half(n){ return Math.round(Number(n)*2)/2; }
+  function snapRunTotal(n){
+    const x = Number(n);
+    if (!finite(x)) return NaN;
+    if (x <= 2.25) return half(x);
+    const whole = Math.round(x);
+    if (Math.abs(x - whole) < 0.20) return whole + 0.5;
+    const down = Math.floor(x) + 0.5;
+    const up = Math.floor(x) + 1.5;
+    return (Math.abs(x - down) <= Math.abs(x - up)) ? down : up;
+  }
   function parseBand(val){
     if (!val || !String(val).trim()) return null;
     const raw = String(val).trim();
     const m = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*-\s*([+-]?\d+(?:\.\d+)?)$/);
     if (m){
-      const a=half(m[1]), b=half(m[2]);
+      const a=snapRunTotal(m[1]), b=snapRunTotal(m[2]);
       if (!finite(a)||!finite(b)) return null;
-      return { lo: Math.min(a,b), hi: Math.max(a,b), mid: half((a+b)/2), isRange: Math.abs(a-b)>0.01, raw:raw };
+      return { lo: Math.min(a,b), hi: Math.max(a,b), mid: snapRunTotal((a+b)/2), isRange: Math.abs(a-b)>0.01, raw:raw };
     }
-    const n = half(raw);
+    const n = snapRunTotal(raw);
     if (!finite(n)) return null;
     return { lo:n, hi:n, mid:n, isRange:false, raw:raw };
   }
@@ -646,7 +653,7 @@
     const b = parseBand(val);
     return b ? b.mid : null;
   }
-  function displayLine(v){ if (!finite(v)) return "—"; return String(Math.round(Number(v)*2)/2); }
+  function displayLine(v){ if (!finite(v)) return "—"; return String(snapRunTotal(v)); }
   function displaySigned(v){ if (!finite(v)) return "—"; const x=Math.round(Number(v)*2)/2; return x>0?"+"+x:String(x); }
   function weightedRecent(arr){
     const w = (ENGINE_CONFIG && ENGINE_CONFIG.recencyWeights) || [1.40,1.22,1.06,0.92,0.80,0.68,0.56,0.46,0.36,0.28];
@@ -879,9 +886,6 @@
     const vsL = ENGINE_CONFIG.pitching.vsLhpMult || 0.96;
     if (String(input.bHand||"").toUpperCase()==="L") expA *= vsL;
     if (String(input.aHand||"").toUpperCase()==="L") expB *= vsL;
-    const f5Share = ENGINE_CONFIG.pitching.f5Share || 0.58;
-    const f5Home = expA * f5Share;
-    const f5Away = expB * f5Share;
 
     const pf = parkFactor(input.venue);
     // Today's park is applied only when last-10 is already de-parked.
@@ -966,7 +970,6 @@
 
     return {
       home: expA, away: expB, total: expA+expB,
-      f5Home: f5Home, f5Away: f5Away, f5Total: f5Home+f5Away,
       varHome: varA, varAway: varB, varTotal: varA+varB,
       pHome: pHome, pAway: pAway, pTie: pTie,
       park: dirty ? 1 : pf, weather: wx, sample: n, tier: sampleTier(n),
@@ -1602,7 +1605,6 @@
     const aBand = parseBand(document.getElementById("aTeamTotal").value);
     const bBand = parseBand(document.getElementById("bTeamTotal").value);
     const sprBand = parseBand(document.getElementById("spreadLine").value);
-    const f5Band = parseBand((document.getElementById("f5Market")||{}).value || "");
 
     const rows = [];
     function addTotal(key, name, mu, band, family){
@@ -1610,17 +1612,10 @@
         rows.push({ marketKey:key, name:name, projection:mu, line:null, edge:null, prob:null, pick:"NO PLAY", side:"", grade:"NaN", family:family, noLine:true });
         return;
       }
-      const thresh = family==="team" ? th.team : family==="f5" ? (th.f5||0.28) : th.ft;
+      const thresh = family==="team" ? th.team : th.ft;
       // Basketball-style: decide vs mid (single line OR band mid). If the box
       // is a range, smart-line then stresses the unfavourable end.
-      const massMid = family==="f5"
-        ? (function(){
-            const sd = Math.max(0.85, Math.sqrt(Math.max(0.4, proj.varTotal||4))*0.55);
-            const z = (band.mid - mu) / sd;
-            const pUnder = 1 / (1 + Math.exp(-1.7*z));
-            return { over: 1-pUnder, under: pUnder };
-          })()
-        : family==="team"
+      const massMid = family==="team"
         ? massOverUnder(key==="tt_away" ? proj.pAway : proj.pHome, band.mid)
         : probOverJoint(proj, band.mid);
       const overEdge = mu - band.mid;
@@ -1654,6 +1649,11 @@
             pick = (side==="over"?"OVER ":"UNDER ") + displayLine(cons);
           }
         }
+      }
+      if (pick!=="NO PLAY"){
+        used = snapRunTotal(used);
+        showEdge = mu - used;
+        pick = (side==="over"?"OVER ":"UNDER ") + displayLine(used);
       }
       const g = pick==="NO PLAY" ? "NaN" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
       rows.push({ marketKey:key, name:name, projection:mu, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:family, noLine:false });
@@ -1692,14 +1692,13 @@
     }
 
     addTotal("ft_total", "Game Total", proj.total, ftBand, "ft");
-    addTotal("f5_total", "F5 Total", proj.f5Total, f5Band, "f5");
     addTotal("tt_home", "Team A Total", proj.home, aBand, "team");
     addTotal("tt_away", "Team B Total", proj.away, bBand, "team");
     addSpread("rl_home", "Handicap", proj.home-proj.away, sprBand);
 
     if (!proj.hasPitcher){
       rows.forEach(function(r){
-        if (r.family==="ft" || r.family==="spread" || r.family==="f5"){
+        if (r.family==="ft" || r.family==="spread"){
           r.pick = "NO PLAY";
           r.side = "";
           r.grade = "NaN";
@@ -1724,12 +1723,11 @@
     rows.forEach(function(r){ r.track = false; });
     const live = rows.filter(function(r){ return r.pick && r.pick!=="NO PLAY"; });
     const ftLive = live.find(function(r){ return r.family==="ft"; });
-    const f5Live = live.find(function(r){ return r.family==="f5"; });
     const teamLive = live.filter(function(r){ return r.family==="team"; }).sort(function(a,b){
       return Math.abs(b.edge||0) - Math.abs(a.edge||0);
     });
     const rlLive = live.find(function(r){ return r.family==="spread" && !r.plusDog && !r.review; });
-    const chosen = ftLive || f5Live || teamLive[0] || rlLive || null;
+    const chosen = ftLive || teamLive[0] || rlLive || null;
     if (chosen) chosen.track = true;
 
     renderRows(rows, proj, data);
@@ -1916,14 +1914,7 @@
     extra = extra || {};
     if (!pick) return "pending";
     const line = Number(pick.line);
-    const fam = pick.family || (String(pick.marketKey).indexOf("rl")===0 || String(pick.marketKey).indexOf("spread")>=0 ? "spread" : String(pick.marketKey).indexOf("f5")===0 ? "f5" : String(pick.marketKey).indexOf("tt")===0 ? "team" : "ft");
-    if (fam==="f5"){
-      const tot = finite(extra.f5Total) ? extra.f5Total : (finite(pick.actualF5) ? Number(pick.actualF5) : NaN);
-      if (!finite(tot) || !finite(line)) return "pending";
-      if (Math.abs(tot-line)<1e-9) return "push";
-      const over = tot>line;
-      return (pick.side==="under") ? (over?"loss":"win") : (over?"win":"loss");
-    }
+    const fam = pick.family || (String(pick.marketKey).indexOf("rl")===0 || String(pick.marketKey).indexOf("spread")>=0 ? "spread" : String(pick.marketKey).indexOf("tt")===0 ? "team" : "ft");
     if (!finite(home) || !finite(away)) return "pending";
     if (fam==="ft"){
       const tot = home+away;
@@ -2509,19 +2500,6 @@
         const home = cs.find(function(x){return x.homeAway==="home";}) || cs[0];
         const away = cs.find(function(x){return x.homeAway==="away";}) || cs[1];
         const hs = scoreVal(home && home.score), as = scoreVal(away && away.score);
-        function sumFirstN(comp, n){
-          const ls = (comp && comp.linescores) || [];
-          if (ls.length < n) return NaN;
-          let s = 0;
-          for (let i=0;i<n;i++){
-            const v = scoreVal(ls[i] && (ls[i].value!=null ? ls[i].value : ls[i]));
-            if (!finite(v)) return NaN;
-            s += v;
-          }
-          return s;
-        }
-        const f5h = sumFirstN(home, 5), f5a = sumFirstN(away, 5);
-        const f5Total = finite(f5h) && finite(f5a) ? f5h+f5a : NaN;
         const closeOdds = extractOdds(c);
         byEvent[eid].forEach(function(p){
           if (p.family==="spread" || String(p.marketKey).indexOf("rl")===0){
@@ -2536,8 +2514,7 @@
             else if (p.side==="away") p.clv = p.closeLine - p.line;
             if (finite(p.clv)) window.g_driftErrors.push(Math.abs(p.clv));
           }
-          if (finite(f5Total)) p.actualF5 = f5Total;
-          const st = settleMath(p, hs, as, { f5Total:f5Total });
+          const st = settleMath(p, hs, as);
           if (st && st!=="pending"){
             p.resultStatus = st;
             p.actualHomePoints = hs; p.actualAwayPoints = as;
@@ -2581,7 +2558,7 @@
     if (league) league.classList.remove("collapsed");
   }
   function clearAll(preserveLeague){
-    ["teamAName","teamAId","teamBName","teamBId","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","f5Market","fixtureKickoff","fixtureEventId","fixtureVenue"].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=""; });
+    ["teamAName","teamAId","teamBName","teamBId","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","fixtureKickoff","fixtureEventId","fixtureVenue"].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=""; });
     const u = document.getElementById("useFTH2H"); if (u) u.checked=false;
     document.querySelectorAll(".autofill-indicator").forEach(function(el){ el.style.display="none"; });
     document.querySelectorAll(".last10-short-field").forEach(function(el){ el.classList.remove("last10-short-field"); });
@@ -2680,7 +2657,7 @@
       if (navigator.clipboard) navigator.clipboard.writeText(text).then(()=>{ this.textContent="✅"; const b=this; setTimeout(function(){ b.textContent="📋"; },1200); });
     });
     document.getElementById("inputsCopyBtn").addEventListener("click", function(){
-      const ids=["teamAName","teamBName","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","f5Market"];
+      const ids=["teamAName","teamBName","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal"];
       const data={}; ids.forEach(function(id){ const e=document.getElementById(id); if(e&&e.value) data[id]=e.value; });
       if (navigator.clipboard) navigator.clipboard.writeText(JSON.stringify(data,null,2));
     });
