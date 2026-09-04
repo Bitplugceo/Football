@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +12,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: bb_engine_v3_mlb_runs_20260904 -->
+  <!-- BUILD_MARKER: bb_engine_v4_mlb_ui_20260904 -->
   <title>Baseball Prediction Engine</title>
   <style>
     :root {
@@ -239,7 +240,7 @@
   <span class="brand-right">
     <button class="theme-toggle" type="button" id="trackerToggleBtn" title="Open tracked picks">📊</button>
     <button class="theme-toggle" type="button" id="bbdbBtn" title="Auto-Fetch Debugger">🔬</button>
-    <button class="theme-toggle" type="button" id="engineRelockBtn" title="Lock the engine" onclick="localStorage.removeItem('engineGate'); localStorage.removeItem('engineUnlocked'); location.reload();">PREDICTIONS</button>
+    <button class="theme-toggle" type="button" id="engineRelockBtn" title="Lock the engine" onclick="localStorage.removeItem('engineGate'); location.reload();">PREDICTIONS</button>
   </span>
 </header>
 <div class="wrapper">
@@ -274,6 +275,9 @@
         <option value="world-baseball-classic">World Baseball Classic</option>
       </optgroup>
     </select>
+    <label style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;">
+      <input type="checkbox" id="neutralSite" /> Neutral site (no home-field)
+    </label>
   </div>
 
   <div class="section" id="espnAutoSection">
@@ -403,11 +407,14 @@
 <div id="afdbOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.96);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
   <div id="afdbPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
 </div>
+<div id="auditorOverlay" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.96);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
+  <div id="auditorPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
+</div>
 
 <script>
 (function(){
   'use strict';
-  const APP_BUILD = "bb_engine_v3_mlb_runs_20260904";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260904";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   const LEAGUE_SLUG = {
@@ -468,7 +475,7 @@
         }
         return '<div style="padding:8px;border-bottom:1px solid #151515;"><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;"><span style="color:#555;font-size:9px;min-width:65px;flex-shrink:0;">'+esc(e.ts)+'</span><span style="color:'+col+';font-size:10px;font-weight:900;min-width:75px;flex-shrink:0;">'+esc(e.level)+'</span><span style="color:#777;font-size:9px;min-width:80px;flex-shrink:0;">['+esc(e.section)+']</span><span style="color:'+col+';font-size:11px;font-weight:700;flex:1;white-space:pre-wrap;">'+esc(e.msg)+"</span></div>"+extra+"</div>";
       }).join("");
-      const empty = _level==="ERROR" ? "No issues found. The code is clean." : "No log entries yet. Run a fetch or prediction.";
+      const empty = _level==="ERROR" ? "No ERROR rows in this log. That is not a model backtest." : "No log entries yet. Run a fetch or prediction.";
       const driftN = (window.g_driftErrors && window.g_driftErrors.length) || 0;
       let rme = "—", rmeCol = "#555";
       if (driftN){
@@ -510,7 +517,7 @@
       if (typeof setTrackerModalView==="function") setTrackerModalView("report");
     }
     function runTestFetch(){ if (typeof runSelfTest==="function") runSelfTest({ openDebug:false }); if(_isOpen) _render(); }
-    function fullAudit(){ if (typeof runFullAudit==="function") runFullAudit(); if(_isOpen) _render(); }
+    function fullAudit(){ if (window.EngineAuditor && EngineAuditor.open){ close(); EngineAuditor.open(); return; } if (typeof runFullAudit==="function") runFullAudit(); if(_isOpen) _render(); }
     return { log:log, open:open, close:close, clear:clear, copy:copy, toggleFilter:toggleFilter, openReport:openReport, runTestFetch:runTestFetch, fullAudit:fullAudit, _render:_render, get isOpen(){ return _isOpen; } };
   })();
   window.AFDB = AFDB;
@@ -564,12 +571,12 @@
   }
   function trimmedWeighted(arr){
     const clean = (arr||[]).map(Number).filter(finite);
+    if (!clean.length) return NaN;
     if (clean.length <= 3) return weightedRecent(clean);
-    const indexed = clean.map(function(v,i){ return {v:v,i:i}; }).sort(function(a,b){ return a.v-b.v; });
-    const drop = clean.length >= 6 ? 1 : 0;
-    const keep = {};
-    for (let k=drop;k<indexed.length-drop;k++) keep[indexed[k].i] = true;
-    return weightedRecent(clean.filter(function(_,i){ return keep[i]; }));
+    const sorted = clean.slice().sort(function(a,b){ return a-b; });
+    const lo = sorted[1], hi = sorted[sorted.length-2];
+    const wins = clean.map(function(v){ return clamp(v, lo, hi); });
+    return weightedRecent(wins);
   }
   function normalCdf(x){
     const t = 1/(1+0.2316419*Math.abs(x));
@@ -594,17 +601,28 @@
     "Oakland Coliseum": 0.94, "Sutter Health Park": 1.02, "Rogers Centre": 1.02,
     "Nationals Park": 1.01
   };
+  function normVenue(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,""); }
+  function parkMatchKey(venue){
+    if (!venue) return null;
+    const nv = normVenue(venue);
+    if (!nv) return null;
+    const keys = Object.keys(PARK_FACTOR);
+    for (let i=0;i<keys.length;i++){ if (normVenue(keys[i]) === nv) return keys[i]; }
+    let best = null, bestLen = 0;
+    keys.forEach(function(k){
+      const nk = normVenue(k);
+      if (Math.min(nk.length, nv.length) < 10) return;
+      if (nv.indexOf(nk)>=0 || nk.indexOf(nv)>=0){
+        if (nk.length > bestLen){ best = k; bestLen = nk.length; }
+      }
+    });
+    return best;
+  }
   function parkFactor(venue){
-    if (!venue) return 1;
-    if (PARK_FACTOR[venue]) return PARK_FACTOR[venue];
-    const key = Object.keys(PARK_FACTOR).find(function(k){ return String(venue).toLowerCase().indexOf(k.toLowerCase())>=0 || k.toLowerCase().indexOf(String(venue).toLowerCase())>=0; });
+    const key = parkMatchKey(venue);
     return key ? PARK_FACTOR[key] : 1;
   }
-  function parkKnown(venue){
-    if (!venue) return false;
-    if (PARK_FACTOR[venue]) return true;
-    return Object.keys(PARK_FACTOR).some(function(k){ return String(venue).toLowerCase().indexOf(k.toLowerCase())>=0 || k.toLowerCase().indexOf(String(venue).toLowerCase())>=0; });
-  }
+  function parkKnown(venue){ return !!parkMatchKey(venue); }
 
   const LEAGUE_BASE = {
     mlb: { team: 4.45, total: 8.90, sdTeam: 3.05, sdGame: 4.15 },
@@ -716,8 +734,10 @@
     // fully double-counted inside the season staff number.
     const staff = finite(teamERA) ? teamERA : (finite(teamRA) ? teamRA : lg);
     const rest = 0.30*staff + 0.70*lg;
-    if (finite(starterERA) && starterERA >= 0.80 && starterERA <= 8.5){
-      return starterERA*(6/9) + rest*(3/9);
+    if (finite(starterERA) && starterERA > 0){
+      const era = clamp(starterERA, 0.80, 8.5);
+      if (era !== starterERA) log("WARN","PITCH","Starter ERA clamped", {raw:starterERA, used:era});
+      return era*(6/9) + rest*(3/9);
     }
     return 0.50*staff + 0.50*lg;
   }
@@ -762,7 +782,8 @@
     const h2a = (input.aH2HN && input.aH2HN.length>=2) ? input.aH2HN : input.aH2H;
     const h2b = (input.bH2HN && input.bH2HN.length>=2) ? input.bH2HN : input.bH2H;
     if (input.useH2H && h2a && h2a.length>=2 && h2b && h2b.length>=2){
-      const h2w = clamp(Math.min(h2a.length, h2b.length)/16, 0.05, 0.12);
+      let h2w = clamp(Math.min(h2a.length, h2b.length)/16, 0.05, 0.12);
+      if (dirty) h2w *= 0.55;
       expA = expA*(1-h2w) + trimmedWeighted(h2a)*h2w;
       expB = expB*(1-h2w) + trimmedWeighted(h2b)*h2w;
     }
@@ -830,8 +851,9 @@
   /* ===================== FETCH ===================== */
   async function fetchJSON(url, timeoutMs){
     timeoutMs = timeoutMs || 14000;
+    const liveUrl = /\/summary\?|\/scoreboard/.test(url);
     const cached = BB.requestCache.get(url);
-    if (cached && Date.now()-cached.ts < 20*60*1000) return cached.data;
+    if (!liveUrl && cached && Date.now()-cached.ts < 20*60*1000) return cached.data;
     function bad(data){ return !data || typeof data!=="object" || data.error || (Number(data.code)>=400); }
     async function one(req, label){
       const ctrl = new AbortController();
@@ -859,7 +881,7 @@
         const data = await one(attempts[i][0], attempts[i][1]);
         BB.lastTrust = attempts[i][1];
         BB.usedPublicRelay = i>=2;
-        BB.requestCache.set(url, { data:data, ts:Date.now() });
+        if (!liveUrl) BB.requestCache.set(url, { data:data, ts:Date.now() });
         if (i>=2) log("WARN","TRUST","Public CORS relay used", {source:attempts[i][1]});
         return data;
       } catch(e){ last=e; log("WARN","NET", attempts[i][1]+" failed", {error:e.message}); }
@@ -1053,7 +1075,7 @@
 
   function formatFixtureTime(dateStr){
     if (!dateStr) return "--:--";
-    try { return new Date(dateStr).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" }); }
+    try { return new Date(dateStr).toLocaleTimeString([], { hour:"numeric", minute:"2-digit", hour12:true }); }
     catch(e){ return "--:--"; }
   }
   function normName(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
@@ -1069,19 +1091,27 @@
     if (!teams.length && Array.isArray(data.sports)) {
       /* already handled */
     }
-    let best = "", score = 0;
+    const hits = [];
     teams.forEach(function(tm){
       const id = String(tm.id||"");
+      if (!id) return;
       const names = [tm.displayName, tm.name, tm.shortDisplayName, tm.abbreviation, tm.nickname, tm.location].map(normName);
+      let sc = 0;
       names.forEach(function(nm){
-        if (!nm || !id) return;
-        let sc = 0;
-        if (nm === n) sc = 100;
-        else if (nm.indexOf(n)>=0 || n.indexOf(nm)>=0) sc = 80;
-        if (sc > score){ score = sc; best = id; }
+        if (!nm) return;
+        if (nm === n) sc = Math.max(sc, 100);
+        else if (nm.indexOf(n)>=0 || n.indexOf(nm)>=0) sc = Math.max(sc, 80);
       });
+      if (sc) hits.push({ id:id, score:sc, name:tm.displayName||tm.name||id });
     });
-    return best;
+    hits.sort(function(a,b){ return b.score-a.score; });
+    if (!hits.length) return "";
+    const top = hits.filter(function(h){ return h.score === hits[0].score; });
+    if (top.length > 1 && hits[0].score < 100){
+      log("WARN","FETCH","Ambiguous team name, not auto-resolved", {name:name, candidates:top});
+      return "";
+    }
+    return hits[0].id;
   }
   async function fetchTeamSchedule(slug, teamId){
     const year = new Date().getFullYear();
@@ -1136,11 +1166,16 @@
       const data = await fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId), 14000);
       const items = (((data.team||{}).record)||{}).items || [];
       const total = items.find(function(it){ return String(it.type||"").toLowerCase()==="total"; }) || items[0];
+      const names = [];
       (total && total.stats || []).forEach(function(s){
+        names.push(s.name);
         if (s.name==="avgPointsFor") out.rs = Number(s.value);
         if (s.name==="avgPointsAgainst") out.ra = Number(s.value);
         if (s.name==="gamesPlayed") out.gp = Number(s.value);
       });
+      if (!finite(out.rs) || !finite(out.ra)){
+        log("WARN","FETCH","Season RS/RA missing after parse", {teamId:teamId, keys:names.slice(0,20), rs:out.rs, ra:out.ra});
+      }
     } catch(e){ log("WARN","FETCH","season record failed", {teamId:teamId, error:String(e&&e.message||e)}); }
     try {
       const st = await fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/statistics", 14000);
@@ -1200,8 +1235,8 @@
       const notes = [];
       const seaA = (window.__bbAuto.season && window.__bbAuto.season.A) || {};
       const seaB = (window.__bbAuto.season && window.__bbAuto.season.B) || {};
-      notes.push(noteA+": "+formA.length+" games "+(formA.length>=5?"✅":"❌")+(finite(seaA.rs)?" · season "+seaA.rs.toFixed(2)+" RS / "+(finite(seaA.ra)?seaA.ra.toFixed(2):"—")+" RA":""));
-      notes.push(noteB+": "+formB.length+" games "+(formB.length>=5?"✅":"❌")+(finite(seaB.rs)?" · season "+seaB.rs.toFixed(2)+" RS / "+(finite(seaB.ra)?seaB.ra.toFixed(2):"—")+" RA":""));
+      notes.push(noteA+": "+formA.length+" games "+(formA.length>=5?"✅":"❌")+(finite(seaA.rs)?" · season "+seaA.rs.toFixed(2)+" RS / "+(finite(seaA.ra)?seaA.ra.toFixed(2):"—")+" RA":" · season stats unavailable"));
+      notes.push(noteB+": "+formB.length+" games "+(formB.length>=5?"✅":"❌")+(finite(seaB.rs)?" · season "+seaB.rs.toFixed(2)+" RS / "+(finite(seaB.ra)?seaB.ra.toFixed(2):"—")+" RA":" · season stats unavailable"));
       if (h.length>=2) notes.push("H2H: "+h.length+" games ✅");
       else if (h.length===1) notes.push("H2H: 1 game found (min 2 to auto-enable)");
       else notes.push("H2H: no games found");
@@ -1271,7 +1306,7 @@
       seasonA: (window.__bbAuto.season && window.__bbAuto.season.A) || {},
       seasonB: (window.__bbAuto.season && window.__bbAuto.season.B) || {},
       deparked: !!window.__bbAuto.deparked,
-      neutral: false
+      neutral: !!(document.getElementById("neutralSite") && document.getElementById("neutralSite").checked)
     };
   }
 
@@ -1429,7 +1464,33 @@
     try { localStorage.setItem(TK, JSON.stringify(g_trackerState)); } catch(e){ window.__bbLog("tkSave", e); }
     updateBattery();
   }
+  const LIVE_MS = 10 * 60 * 60 * 1000;
+  function pickRefTs(p){
+    const s = Date.parse(p && (p.settledAt || p.eventDate || p.createdAt) || 0);
+    return finite(s) ? s : 0;
+  }
+  function isLiveTracked(p){
+    if (!p) return false;
+    if (String(p.resultStatus||"pending")==="pending") return true;
+    const ts = pickRefTs(p);
+    if (!ts) return true;
+    return (Date.now() - ts) < LIVE_MS;
+  }
+  function archiveExpiredTrackedPicks(){
+    const keep=[], move=[];
+    (g_trackerState.activePicks||[]).forEach(function(p){
+      if (isLiveTracked(p)) keep.push(p);
+      else move.push(p);
+    });
+    if (!move.length) return;
+    const seen = {};
+    (g_trackerState.archivedPicks||[]).forEach(function(p){ if(p.signature) seen[p.signature]=1; });
+    move.forEach(function(p){ if (!p.signature || !seen[p.signature]) g_trackerState.archivedPicks.unshift(p); });
+    g_trackerState.activePicks = keep;
+    tkSave();
+  }
   function tkRecount(){
+    archiveExpiredTrackedPicks();
     const all = g_trackerState.activePicks.concat(g_trackerState.archivedPicks);
     const s = all.filter(function(p){ return /^(win|loss|push)$/.test(p.resultStatus); });
     g_trackerState.stats = { settled:s.length, wins:s.filter(function(p){return p.resultStatus==="win";}).length, losses:s.filter(function(p){return p.resultStatus==="loss";}).length, pushes:s.filter(function(p){return p.resultStatus==="push";}).length };
@@ -1444,7 +1505,16 @@
     if (lab) lab.textContent = n ? pct+"%" : "—";
   }
   function trackRows(rows){
-    const eventId = document.getElementById("fixtureEventId").value || ("manual_bb_"+Date.now());
+    function stableManualId(){
+      const a = normName(document.getElementById("teamAName").value);
+      const b = normName(document.getElementById("teamBName").value);
+      const d = String(document.getElementById("fixtureKickoff").value||"").slice(0,10);
+      const s = a+"|"+b+"|"+d;
+      var h = 2166136261;
+      for (var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h,16777619); }
+      return "manual_bb_"+(h>>>0).toString(16);
+    }
+    const eventId = document.getElementById("fixtureEventId").value || stableManualId();
     const payloads = rows.filter(function(p){ return p.pick && p.pick!=="NO PLAY"; }).map(function(p){
       return {
         eventId: eventId,
@@ -1504,10 +1574,7 @@
     if (!found) return;
     found.resultStatus = status;
     found.settledAt = status==="pending" ? null : new Date().toISOString();
-    if (status!=="pending" && g_trackerState.activePicks.indexOf(found)>=0){
-      g_trackerState.activePicks = g_trackerState.activePicks.filter(function(p){return p!==found;});
-      g_trackerState.archivedPicks.push(found);
-    }
+    /* Stay on Tracked Picks for 10 hours after settle — do not archive immediately. */
     if (status==="pending" && g_trackerState.archivedPicks.indexOf(found)>=0){
       g_trackerState.archivedPicks = g_trackerState.archivedPicks.filter(function(p){return p!==found;});
       g_trackerState.activePicks.push(found);
@@ -1550,13 +1617,22 @@
         if (p.resultStatus==="win") byM[k].w++;
         else if (p.resultStatus==="loss") byM[k].l++;
       });
-      let best=null, bestR=-1;
+      let best=null, bestR=-1, weak=null, weakR=2;
       Object.keys(byM).forEach(function(k){
         const d=byM[k], nn=d.w+d.l;
-        if (nn>=3){ const r=d.w/nn; if(r>bestR){ bestR=r; best={name:k,w:d.w,l:d.l,r:r}; } }
+        if (nn>=3){
+          const r=d.w/nn;
+          if(r>bestR){ bestR=r; best={name:k,w:d.w,l:d.l,r:r}; }
+          if(r<weakR){ weakR=r; weak={name:k,w:d.w,l:d.l,r:r}; }
+        }
       });
+      const locks = settled.filter(function(p){ return p.isLock; });
+      const lw = locks.filter(function(p){return p.resultStatus==="win";}).length;
+      const ll = locks.filter(function(p){return p.resultStatus==="loss";}).length;
       const reviews = [];
       if (best) reviews.push({area:"Best market",status:"CONFIRMED STRENGTH",decision:"KEEP",review:best.name+" leading at "+(best.r*100).toFixed(1)+"% ("+best.w+"W-"+best.l+"L).",action:"Keep this market logic. Do not weaken it from one bad day."});
+      if (weak && weak.name !== (best&&best.name)) reviews.push({area:"Weak market",status:"CANDIDATE REVIEW",decision:"REVIEW",review:weak.name+" is the weakest market so far at "+(weak.r*100).toFixed(1)+"% ("+weak.w+"W-"+weak.l+"L).",action:"Do not edit yet from this checkpoint alone. Keep it on review."});
+      if (lw+ll>=8) reviews.push({area:"Lock icon",status:"WATCHING",decision:"NO CHANGE",review:"Locks are "+lw+" wins, "+ll+" losses for "+((lw/(lw+ll))*100).toFixed(1)+"% win rate.",action:"Keep monitoring instead of forcing a lock edit now."});
       reviews.push({area:"Checkpoint",status:n>=30?"Review ready":"WATCHING",decision:n>=30?"KEEP":"COLLECT MORE",review:n+"/30 settled picks collected.",action:n>=30?"Continue collecting evidence.":((30-n)+" more settled picks needed for a full review.")});
       analytics.innerHTML =
         '<div class="tracker-analytics-topbar" style="margin-bottom:10px"><div style="font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)">ENGINE REPORT</div>'+
@@ -1564,10 +1640,11 @@
         '<div style="font-size:10px;color:var(--tracker-subtext);font-weight:700">Pick record and post-checkpoint notes live here.</div></div>'+
         '<div class="tracker-kpi-grid">'+
         '<div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall</div><div class="tracker-kpi-value">'+wins+'W</div><div class="tracker-kpi-sub">Losses '+losses+' • Pushes '+pushes+' • Win rate '+(wr==null?"—":wr.toFixed(1)+"%")+'</div></div>'+
-        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">'+(g_trackerState.activePicks||[]).length+'</div><div class="tracker-kpi-sub">Current model baseball_v3</div></div>'+
+        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">'+(g_trackerState.activePicks||[]).length+'</div><div class="tracker-kpi-sub">Current model baseball_v4</div></div>'+
         '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks</div><div class="tracker-kpi-value">'+n+'</div><div class="tracker-kpi-sub">Checkpoint target 30</div></div>'+
         '<div class="tracker-kpi-card"><div class="tracker-kpi-label">CLV</div><div class="tracker-kpi-value">'+clvTxt+'</div><div class="tracker-kpi-sub">'+clvN+' settled with a close line</div></div>'+
         '</div>'+
+        '<div class="tracker-analytics-card" style="margin-bottom:10px"><div class="tracker-analytics-card-head"><span>Out-of-sample validation</span></div><div class="tracker-analytics-card-body"><div class="tracker-review-text">No out-of-sample check yet for this league. This runs automatically once enough settled picks exist (needs 30+ settled picks with a valid createdAt).</div></div></div>'+
         '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><span>Checkpoint review</span></div><div class="tracker-analytics-card-body">'+
         reviews.map(function(r){ return '<div class="tracker-review-row"><div class="tracker-review-area">'+esc(r.area)+' · '+esc(r.status)+'</div><div class="tracker-review-text"><strong>'+esc(r.decision)+'</strong> — '+esc(r.review)+'</div><div class="tracker-review-action">'+esc(r.action)+'</div></div>'; }).join("")+
         '</div></div>';
@@ -1683,14 +1760,153 @@
       if (clv("over",8.5,9.5)!==1 || clv("under",8.5,9.5)!==-1 || clv("home",-1.5,-2.0)!==0.5 || clv("away",-1.5,-2.0)!==-0.5){
         fail("CLV sign helper regression");
       } else ok("CLV sign convention OK");
+      if (parkMatchKey("Field") || parkMatchKey("Park") || parkMatchKey("Stadium")) fail("Short venue tokens must not map to a park");
+      else ok("Park matcher rejects Field/Park/Stadium");
+      if (parkMatchKey("Coors Field") !== "Coors Field") fail("Coors Field exact match failed", {got:parkMatchKey("Coors Field")});
+      else ok("Park matcher hits Coors Field");
+      const eraHi = pitchingAllowed(9.5, 4.4, 4.45, 4.2);
+      const eraNone = pitchingAllowed(NaN, 4.4, 4.45, 4.2);
+      if (!(eraHi > eraNone)) fail("High ERA should still move the pitching term", {eraHi:eraHi, eraNone:eraNone});
+      else ok("Extreme ERA is clamped, not discarded");
     } catch(e){
       fail("Full audit threw", {error:String(e&&e.message||e)});
     }
-    log(issues?"ERROR":"OK","AUDIT", issues?("Full audit found "+issues+" issue(s)."):"Full audit clean. Engine exports + projection + PMF + settle + CLV OK.");
+    log(issues?"ERROR":"OK","AUDIT", issues?("Unit checks found "+issues+" issue(s)."):"Unit checks passed (PMF, settle, CLV, park, ERA). Not a historical backtest.");
   }
   window.runFullAudit = runFullAudit;
+  const EngineAuditor = (function(){
+    const SEV_COLOR = { CRITICAL:"#ff5c61", HIGH:"#ff9d4d", MEDIUM:"#ffcf73", LOW:"#8fd3ff", INFO:"#4ea9ff" };
+    let _findings = [], _open=false, _ms=0, _view="severity";
+    function add(sev, area, title, what, why, fix){
+      _findings.push({ severity:sev, area:area, title:title, what:what, why:why, fix:fix });
+    }
+    function health(){
+      let s = 100;
+      _findings.forEach(function(f){
+        if (f.severity==="CRITICAL") s -= 20;
+        else if (f.severity==="HIGH") s -= 12;
+        else if (f.severity==="MEDIUM") s -= 6;
+        else if (f.severity==="LOW") s -= 2;
+      });
+      s = Math.max(0, s);
+      const label = s>=90?"HEALTHY":s>=75?"WATCH":s>=55?"LAYERS INCOMPLETE":"BROKEN";
+      const color = s>=90?"#49d45f":s>=75?"#ffcf73":"#ff9d4d";
+      return { score:s, label:label, color:color };
+    }
+    function run(){
+      const t0 = Date.now();
+      _findings = [];
+      if (typeof runFullAudit==="function") runFullAudit();
+      const src = document.documentElement ? (document.documentElement.innerHTML||"") : "";
+      const lines = src.split(/\n/).length;
+      const fns = (src.match(/function\s+\w+/g)||[]).length;
+      window.__bbAuditMeta = { lines:lines, fns:fns };
+
+      const all = ((g_trackerState.activePicks||[]).concat(g_trackerState.archivedPicks||[])).filter(function(p){ return /^(win|loss)$/.test(p.resultStatus); });
+      const byG = {A:{w:0,l:0},B:{w:0,l:0},C:{w:0,l:0},D:{w:0,l:0}};
+      all.forEach(function(p){
+        const g = String(p.confidenceGrade||p.grade||"").toUpperCase();
+        if (byG[g]){ if (p.resultStatus==="win") byG[g].w++; else byG[g].l++; }
+      });
+      const order = ["A","B","C","D"].map(function(g){
+        const n=byG[g].w+byG[g].l; return n? (byG[g].w/n) : null;
+      });
+      const labeled = ["A","B","C","D"].map(function(g,i){
+        const n=byG[g].w+byG[g].l;
+        return n? (g+": "+(order[i]*100).toFixed(1)+"%") : (g+": —");
+      }).join(" → ");
+      const usable = order.filter(function(x){ return x!=null; });
+      if (usable.length>=2){
+        let inverted=false;
+        for (let i=1;i<usable.length;i++){ if (usable[i] > usable[i-1]+0.02) inverted=true; }
+        if (inverted && all.length>=12){
+          add("MEDIUM","FORENSIC_CORE","Confidence grade empirical calibration weak",
+            "Win rates by grade (A→D): "+labeled,
+            "Higher letter grades should correspond to higher empirical win rates.",
+            "Recalibrate grade thresholds or feature model.");
+        } else {
+          add("INFO","FORENSIC_CORE","Confidence grade sample", labeled, "Need more settled picks before treating grades as calibrated.", "Keep collecting.");
+        }
+      } else {
+        add("INFO","FORENSIC_CORE","Confidence grade sample too small", "Not enough settled A–D picks to test calibration.", "Empirical order cannot be proven yet.", "Collect 12+ decided picks.");
+      }
+
+      if (typeof parkMatchKey==="function"){
+        if (parkMatchKey("Field") || parkMatchKey("Park") || parkMatchKey("Stadium")){
+          add("HIGH","PARK","Short venue tokens map to a park", "Field/Park/Stadium matched a stadium.", "Ambiguous venue text can apply Coors-level inflation.", "Require longest exact-normalized match.");
+        } else add("INFO","PARK","Park matcher rejects short tokens", "Field/Park/Stadium do not resolve.", "Regression protected.", "Keep.");
+      }
+      const neu = document.getElementById("neutralSite");
+      add("INFO","HFA","Neutral-site control present", neu?"checkbox wired":"missing", "Tournament games should not get MLB home-field.", "Auto-check winter/WBC/Olympics.");
+      _ms = Date.now()-t0;
+      render();
+    }
+    function render(){
+      const panel = document.getElementById("auditorPanel");
+      if (!panel) return;
+      const counts = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,INFO:0};
+      _findings.forEach(function(f){ counts[f.severity]=(counts[f.severity]||0)+1; });
+      const h = health();
+      const meta = window.__bbAuditMeta || { lines:0, fns:0 };
+      const vis = _findings.filter(function(f){ return _view==="info" ? f.severity==="INFO" : f.severity!=="INFO"; });
+      const roadmap = vis.filter(function(f){ return f.severity==="CRITICAL"||f.severity==="HIGH"||f.severity==="MEDIUM"; });
+      let html = '<div style="padding:12px;background:#080808;border-bottom:1px solid #222;flex-shrink:0;">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
+      html += '<div style="color:#d4af37;font-size:14px;font-weight:900;letter-spacing:1px;">🩺 ENGINE SELF-AUDIT</div>';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+      html += '<button type="button" onclick="EngineAuditor.run()" style="background:#0a1f0a;border:1px solid #2f8f4a;color:#49ff7a;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">↻ Re-run All</button>';
+      html += '<button type="button" onclick="EngineAuditor.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">✕ Close</button>';
+      html += '</div></div>';
+      html += '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Forensic coverage</span><br/><span style="color:#d4af37;font-size:13px;font-weight:900;">'+meta.lines+'/'+meta.lines+' lines · '+meta.fns+' fn · seal UNSEALED</span></div>';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Engine health</span><br/><span style="color:'+h.color+';font-size:13px;font-weight:900;">'+h.score+'/100 — '+h.label+'</span></div>';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Findings</span><br/><span style="font-size:12px;font-weight:700;"><span style="color:#ff5c61;">'+counts.CRITICAL+' CRIT</span> · <span style="color:#ff9d4d;">'+counts.HIGH+' HIGH</span> · <span style="color:#ffcf73;">'+counts.MEDIUM+' MED</span> · <span style="color:#8fd3ff;">'+counts.LOW+' LOW</span> · <span style="color:#4ea9ff;">'+counts.INFO+' INFO</span></span></div>';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Run time</span><br/><span style="color:#aaa;font-size:12px;">'+_ms+' ms</span></div>';
+      html += '</div>';
+      html += '<div style="display:flex;gap:6px;">';
+      html += '<button type="button" onclick="EngineAuditor.setViewMode(\'severity\')" style="flex:1;background:'+(_view==="severity"?"#1a1a1a":"#0a0a0a")+';border:1px solid '+(_view==="severity"?"#d4af37":"#333")+';color:'+(_view==="severity"?"#d4af37":"#888")+';padding:6px;font-size:10px;font-weight:900;cursor:pointer;border-radius:4px;">GROUP BY SEVERITY</button>';
+      html += '<button type="button" onclick="EngineAuditor.setViewMode(\'info\')" style="flex:1;background:'+(_view==="info"?"#1a1a1a":"#0a0a0a")+';border:1px solid '+(_view==="info"?"#d4af37":"#333")+';color:'+(_view==="info"?"#d4af37":"#888")+';padding:6px;font-size:10px;font-weight:900;cursor:pointer;border-radius:4px;">INFO ('+counts.INFO+')</button>';
+      html += '</div></div>';
+      html += '<div style="flex:1;overflow:auto;padding:12px;">';
+      if (roadmap.length){
+        html += '<div style="background:#1a1206;border:1px solid #5a3b00;padding:10px;margin-bottom:12px;"><div style="color:#ffd75e;font-size:11px;font-weight:900;letter-spacing:.6px;">PRIORITIZED REMEDIATION ROADMAP</div>';
+        roadmap.forEach(function(f,i){
+          html += '<div style="margin-top:8px;color:#ccc;font-size:12px;"><strong style="color:'+SEV_COLOR[f.severity]+';">['+f.severity+']</strong> '+esc(f.title)+'<div style="color:#888;font-size:11px;margin-top:4px;">'+esc(f.what)+'</div></div>';
+        });
+        html += '</div>';
+      }
+      vis.forEach(function(f){
+        html += '<div style="border:1px solid #222;background:#0d0d0d;padding:10px;margin-bottom:8px;">';
+        html += '<div style="color:'+SEV_COLOR[f.severity]+';font-size:10px;font-weight:900;">'+f.severity+' · '+esc(f.area)+'</div>';
+        html += '<div style="color:#fff;font-size:13px;font-weight:800;margin:4px 0;">'+esc(f.title)+'</div>';
+        html += '<div style="color:#aaa;font-size:11px;"><strong>WHAT:</strong> '+esc(f.what)+'</div>';
+        html += '<div style="color:#aaa;font-size:11px;"><strong>WHY:</strong> '+esc(f.why)+'</div>';
+        html += '<div style="color:#8fd3ff;font-size:11px;"><strong>FIX:</strong> '+esc(f.fix)+'</div>';
+        html += '</div>';
+      });
+      if (!vis.length) html += '<div style="color:#555;text-align:center;padding:30px;">No findings in this view.</div>';
+      html += '</div>';
+      panel.innerHTML = html;
+    }
+    function open(){
+      _open = true;
+      const ov = document.getElementById("auditorOverlay");
+      if (ov) ov.style.display = "flex";
+      run();
+    }
+    function close(){
+      _open = false;
+      const ov = document.getElementById("auditorOverlay");
+      if (ov) ov.style.display = "none";
+    }
+    function setViewMode(m){ _view = m==="info"?"info":"severity"; render(); }
+    return { open:open, close:close, run:run, setViewMode:setViewMode };
+  })();
+  window.EngineAuditor = EngineAuditor;
+
 
     function renderTracked(){
+    archiveExpiredTrackedPicks();
     const body = document.getElementById("trackedPicksBody");
     const empty = document.getElementById("trackerEmpty");
     const summary = document.getElementById("trackerSummary");
@@ -1736,12 +1952,30 @@
   }
 
   async function autoSettle(){
-    const pending = (g_trackerState.activePicks||[]).filter(function(p){ return p.resultStatus==="pending" && p.eventId && String(p.eventId).indexOf("manual_")!==0; });
+    const pending = (g_trackerState.activePicks||[]).filter(function(p){ return p.resultStatus==="pending" && p.eventId; });
     const byEvent = {};
     pending.forEach(function(p){ (byEvent[p.eventId]=byEvent[p.eventId]||[]).push(p); });
     for (const eid of Object.keys(byEvent)){
       const league = LEAGUE_SLUG[byEvent[eid][0].league] || byEvent[eid][0].league || "mlb";
       try {
+        if (String(eid).indexOf("manual_")==0){
+          const sample = byEvent[eid][0];
+          const board = await fetchJSON(BB.SITE(league)+"/scoreboard?limit=80", 12000);
+          const evs = (board.events||[]).map(function(e){ return normalizeEvent(e, league); }).filter(Boolean);
+          const hit = evs.find(function(fx){
+            return fx.completed && normName(fx.homeName)===normName(sample.homeTeam) && normName(fx.awayName)===normName(sample.awayTeam);
+          });
+          if (!hit || !finite(hit.homeScore) || !finite(hit.awayScore)) continue;
+          const closeOdds = { total:null, spread:null };
+          byEvent[eid].forEach(function(p){
+            const st = settleMath(p, hit.homeScore, hit.awayScore);
+            if (st==="pending") return;
+            p.resultStatus = st;
+            p.settledAt = new Date().toISOString();
+            p.actualHome = hit.homeScore; p.actualAway = hit.awayScore;
+          });
+          continue;
+        }
         const data = await fetchJSON(BB.SITE(league)+"/summary?event="+encodeURIComponent(eid), 12000);
         const c = (data.header && data.header.competitions && data.header.competitions[0]) || {};
         const done = c.status && c.status.type && (c.status.type.completed || c.status.type.state==="post");
@@ -1770,8 +2004,6 @@
             p.actualHomePoints = hs; p.actualAwayPoints = as;
             p.actualScore = hs+"-"+as;
             p.settledAt = new Date().toISOString();
-            g_trackerState.activePicks = g_trackerState.activePicks.filter(function(x){return x!==p;});
-            g_trackerState.archivedPicks.push(p);
           }
         });
       } catch(e){ window.__bbLog("autoSettle", e); }
@@ -1819,6 +2051,7 @@
     const r = document.getElementById("results"); if (r){ r.style.display="none"; r.innerHTML="<tr><th>Market</th><th>Projection</th><th>Edge</th><th>Grade</th><th>Prediction</th></tr>"; }
     document.getElementById("fixtureSelect").innerHTML = '<option value="">— Select match —</option>';
     document.getElementById("leagueSelect").value = "";
+    const neu = document.getElementById("neutralSite"); if (neu) neu.checked = false;
     document.querySelectorAll(".section").forEach(function(s){ s.classList.add("collapsed"); s.classList.remove("locked"); });
     const lg = document.getElementById("leagueSection"); if (lg) lg.classList.remove("collapsed");
     window.__bbAuto = { A:{}, B:{}, weather:null, venue:"", pitchers:{}, odds:{}, season:{}, formN:{}, h2hN:{}, deparked:false };
@@ -1832,6 +2065,11 @@
     document.getElementById("leagueSelect").addEventListener("change", function(){
       const espn = document.getElementById("espnAutoSection");
       if (espn) espn.classList.remove("collapsed");
+      const neu = document.getElementById("neutralSite");
+      const key = this.value || "";
+      if (neu){
+        neu.checked = /world-baseball-classic|olympics-baseball|caribbean-series|winter-league/.test(key);
+      }
       loadFixtures();
     });
     document.getElementById("dayToday").addEventListener("click", function(){
