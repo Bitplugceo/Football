@@ -1,3 +1,4 @@
+X
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1307,6 +1308,34 @@
     return events;
   }
 
+  async function fetchH2HGames(slug, aId, bId, seasonsBack){
+    const leagueKey = currentLeagueKey();
+    const st = LEAGUE_SEASON_TYPE[leagueKey] || 2;
+    const curYear = scheduleSeasonYear(leagueKey);
+    const n = seasonsBack || 3;
+    const years = [];
+    for (let i=0;i<n;i++) years.push(curYear-i);
+    const results = await Promise.all(years.map(function(y){
+      return fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(aId)+"/schedule?season="+y+"&seasontype="+st+"&limit=200", 16000).catch(function(e){
+        log("WARN","FETCH","H2H season fetch failed", {season:y, error:String(e&&e.message||e)});
+        return null;
+      });
+    }));
+    const seen = {};
+    const events = [];
+    results.forEach(function(data){
+      if (!data) return;
+      (data.events||[]).forEach(function(e){
+        const nrm = normalizeEvent(e, slug);
+        if (!nrm || seen[nrm.id]) return;
+        seen[nrm.id] = 1;
+        nrm._norm = nrm;
+        events.push(nrm);
+      });
+    });
+    return lastCompletedForm(events, aId, 500).filter(function(g){ return g.oppId===String(bId); }).slice(0,10);
+  }
+
   function fillSeriesInput(id, arr){
     const el = document.getElementById(id);
     if (el) el.value = arr.join(",");
@@ -1400,7 +1429,7 @@
       markAuto("aAutoTag", formA.length>0);
       markAuto("bAutoTag", formB.length>0);
 
-      const h = lastCompletedForm(pair[0], aId, 200).filter(function(g){ return g.oppId===String(bId); }).slice(0,10);
+      const h = await fetchH2HGames(slug, aId, bId, 3);
       window.__bbAuto.h2hN = {
         A: h.map(function(x){ return x.scoredN; }),
         B: h.map(function(x){ return x.allowedN; })
