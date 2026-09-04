@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: bb_engine_v4_mlb_ui_20260904 -->
+  <!-- BUILD_MARKER: bb_engine_v4_mlb_ui_20260904_auditfix -->
   <title>Baseball Prediction Engine</title>
   <style>
     :root {
@@ -427,8 +427,41 @@
 <script>
 (function(){
   'use strict';
-  const APP_BUILD = "bb_engine_v4_mlb_ui_20260904";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260904_auditfix";
   window.__APP_BUILD_VERSION = APP_BUILD;
+
+  /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
+     but they now live in one place so thresholds cannot drift independently. */
+  const ENGINE_CONFIG = {
+    version: "baseball_v4.1_auditfix",
+    thresholds: { ft: 0.42, team: 0.32, spread: 0.36, pWin: 0.538 },
+    grades: { A: 0.585, B: 0.555, C: 0.538 },
+    recencyWeights: [1.40, 1.22, 1.06, 0.92, 0.80, 0.68, 0.56, 0.46, 0.36, 0.28],
+    extras: {
+      // Regulation NBs miss walk-off / extras coupling.
+      // P(tie after 9) * E[added runs | extras]. Coefficients are expressed as a
+      // fraction of the league scoring baseline (lg), not a flat MLB-tuned constant,
+      // so non-MLB run environments (winter ball, NCAA, WBC) get a proportional
+      // extras bump instead of an absolute number borrowed from MLB. 0.191/0.175 * lg
+      // reproduces the prior 0.85/0.78 runs at MLB's lg=4.45 baseline. Still an
+      // unbacktested heuristic — see Engine Report.
+      pTieTrigger: 0.02,
+      homeAddCoef: 0.191,
+      awayAddCoef: 0.175
+    },
+    hfa: { home: 0.12, away: -0.03 },
+    blend: {
+      seasonWMin: 0.32, seasonWMax: 0.84, seasonWDefault: 0.70,
+      formWFull: 0.26, formWMid: 0.18, formWThin: 0.12, formWTiny: 0.07,
+      dirtyFormScale: 0.55, dirtyH2HScale: 0.55
+    },
+    variance: { floorShare: 0.55, meanCoef: 1.28, meanAdd: 0.20, obsShrinkMax: 0.72, obsShrinkMin: 0.15 },
+    clampExp: { lo: 1.55, hi: 8.40 },
+    pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45 },
+    h2h: { minGames: 2, wDenom: 16, wMin: 0.05, wMax: 0.12 },
+    softClamp: { nTinyCap: 6 }
+  };
+  window.__ENGINE_CONFIG = ENGINE_CONFIG;
 
   const LEAGUE_SLUG = {
     mlb: "mlb", mlb_pre: "mlb", mlb_post: "mlb",
@@ -445,10 +478,33 @@
 
   const BB = {
     SITE: function(slug){ return "https://site.api.espn.com/apis/site/v2/sports/baseball/" + encodeURIComponent(slug); },
-    WORKER: (function(){ try { const o = localStorage.getItem("AF_ENGINE_RELAY_OVERRIDE"); if (o) return o; } catch(e){} return "https://thebetceo-engine.ridwantunde636.workers.dev/"; })(),
+    WORKER: (function(){
+      const DEFAULT_WORKER = "https://thebetceo-engine.ridwantunde636.workers.dev/";
+      const ALLOW = [
+        "https://thebetceo-engine.ridwantunde636.workers.dev/",
+        "https://thebetceo-engine.ridwantunde636.workers.dev",
+        "https://corsproxy.io/",
+        "https://api.allorigins.win/"
+      ];
+      try {
+        const o = String(localStorage.getItem("AF_ENGINE_RELAY_OVERRIDE")||"").trim();
+        if (!o) return DEFAULT_WORKER;
+        const ok = ALLOW.some(function(a){ return o === a || o.indexOf(a) === 0; });
+        if (!ok){
+          try { console.warn("AF_ENGINE_RELAY_OVERRIDE ignored — not on allowlist", o); } catch(e2){}
+          return DEFAULT_WORKER;
+        }
+        return o;
+      } catch(e){ return DEFAULT_WORKER; }
+    })(),
+    relayOverrideActive: false,
     requestCache: new Map(),
     lastTrust: "ESPN direct"
   };
+  try {
+    const ov = localStorage.getItem("AF_ENGINE_RELAY_OVERRIDE");
+    BB.relayOverrideActive = !!(ov && String(BB.WORKER).indexOf(String(ov).trim()) === 0);
+  } catch(e){ BB.relayOverrideActive = false; }
 
   function esc(s){
     return String(s==null?"":s)
@@ -574,7 +630,7 @@
   function displayLine(v){ if (!finite(v)) return "—"; return String(Math.round(Number(v)*2)/2); }
   function displaySigned(v){ if (!finite(v)) return "—"; const x=Math.round(Number(v)*2)/2; return x>0?"+"+x:String(x); }
   function weightedRecent(arr){
-    const w = [1.40,1.22,1.06,0.92,0.80,0.68,0.56,0.46,0.36,0.28];
+    const w = (ENGINE_CONFIG && ENGINE_CONFIG.recencyWeights) || [1.40,1.22,1.06,0.92,0.80,0.68,0.56,0.46,0.36,0.28];
     const clean = (arr||[]).map(Number).filter(finite);
     if (!clean.length) return NaN;
     const n = Math.min(clean.length, w.length);
@@ -585,7 +641,14 @@
   function trimmedWeighted(arr){
     const clean = (arr||[]).map(Number).filter(finite);
     if (!clean.length) return NaN;
-    if (clean.length <= 3) return weightedRecent(clean);
+    if (clean.length === 1) return clean[0];
+    if (clean.length <= 3){
+      const sorted = clean.slice().sort(function(a,b){ return a-b; });
+      const med = sorted[Math.floor(sorted.length/2)];
+      const cap = (ENGINE_CONFIG.softClamp && ENGINE_CONFIG.softClamp.nTinyCap) || 6;
+      const wins = clean.map(function(v){ return clamp(v, med - cap, med + cap); });
+      return weightedRecent(wins);
+    }
     const sorted = clean.slice().sort(function(a,b){ return a-b; });
     const lo = sorted[1], hi = sorted[sorted.length-2];
     const wins = clean.map(function(v){ return clamp(v, lo, hi); });
@@ -731,28 +794,33 @@
    * Today's park is applied once, after rates are park-neutral.
    */
   function blendRate(season, formN, lg, nForm, gp, dirtyForm){
+    const cfg = ENGINE_CONFIG.blend;
     let seasonW = 0;
     if (finite(season)){
-      seasonW = finite(gp) ? clamp(gp/40, 0.32, 0.84) : 0.70;
+      seasonW = finite(gp) ? clamp(gp/40, cfg.seasonWMin, cfg.seasonWMax) : cfg.seasonWDefault;
     }
     const prior = finite(season) ? (seasonW*season + (1-seasonW)*lg) : lg;
-    let w = nForm>=8 ? 0.26 : nForm>=5 ? 0.18 : nForm>=3 ? 0.12 : 0.07;
-    if (dirtyForm) w *= 0.55;
+    let w = nForm>=8 ? cfg.formWFull : nForm>=5 ? cfg.formWMid : nForm>=3 ? cfg.formWThin : cfg.formWTiny;
+    if (dirtyForm) w *= cfg.dirtyFormScale;
     const form = finite(formN) ? formN : prior;
     return (1-w)*prior + w*form;
   }
-  function pitchingAllowed(starterERA, teamRA, lg, teamERA){
+  function pitchingAllowed(starterERA, teamRA, lg, teamERA, bullpenERA){
     // Staff rate is team ERA when present (earned), else team RA.
-    // Rest-of-staff is shrunk hard to league so tonight's starter is not
-    // fully double-counted inside the season staff number.
+    // Rest-of-staff uses a real reliever/bullpen ERA when fetched; otherwise it is
+    // team pitching shrunk toward league (honest label: not a true bullpen split).
+    const cfg = ENGINE_CONFIG.pitching;
     const staff = finite(teamERA) ? teamERA : (finite(teamRA) ? teamRA : lg);
-    const rest = 0.30*staff + 0.70*lg;
+    const restRaw = finite(bullpenERA) && bullpenERA > 0 ? bullpenERA : staff;
+    const rest = finite(bullpenERA) && bullpenERA > 0
+      ? restRaw
+      : (cfg.restStaffW*staff + cfg.restLgW*lg);
     if (finite(starterERA) && starterERA > 0){
-      const era = clamp(starterERA, 0.80, 8.5);
+      const era = clamp(starterERA, cfg.eraLo, cfg.eraHi);
       if (era !== starterERA) log("WARN","PITCH","Starter ERA clamped", {raw:starterERA, used:era});
-      return era*(6/9) + rest*(3/9);
+      return era*(cfg.starterIP/9) + rest*(cfg.restIP/9);
     }
-    return 0.50*staff + 0.50*lg;
+    return cfg.noStarterStaffW*staff + (1-cfg.noStarterStaffW)*lg;
   }
   function projectMatchup(input){
     const base = leagueBase(input.leagueKey);
@@ -773,56 +841,77 @@
     const raA = blendRate(seaA.ra, defA_n, lg, nA, seaA.gp, dirty);
     const raB = blendRate(seaB.ra, defB_n, lg, nB, seaB.gp, dirty);
 
-    const pitchVsA = pitchingAllowed(input.bEra, raB, lg, seaB.era);
-    const pitchVsB = pitchingAllowed(input.aEra, raA, lg, seaA.era);
+    const pitchVsA = pitchingAllowed(input.bEra, raB, lg, seaB.era, seaB.bullpenEra);
+    const pitchVsB = pitchingAllowed(input.aEra, raA, lg, seaA.era, seaA.bullpenEra);
 
     let expA = (offA / Math.max(2.2, lg)) * pitchVsA;
     let expB = (offB / Math.max(2.2, lg)) * pitchVsB;
 
     const pf = parkFactor(input.venue);
-    expA *= pf;
-    expB *= pf;
+    // Today's park is applied only when last-10 is already de-parked.
+    // Manual typed form still carries historical park noise — stacking pf on top
+    // contaminates the rate (E010). Leave pf=1.0 on that path.
+    if (!dirty){
+      expA *= pf;
+      expB *= pf;
+    }
 
     const wx = weatherAdj(input.weather);
     expA += wx*0.5;
     expB += wx*0.5;
 
     if (!input.neutral){
-      expA += 0.12;
-      expB -= 0.03;
+      expA += ENGINE_CONFIG.hfa.home;
+      expB += ENGINE_CONFIG.hfa.away;
     }
 
     const h2a = (input.aH2HN && input.aH2HN.length>=2) ? input.aH2HN : input.aH2H;
     const h2b = (input.bH2HN && input.bH2HN.length>=2) ? input.bH2HN : input.bH2H;
     if (input.useH2H && h2a && h2a.length>=2 && h2b && h2b.length>=2){
-      let h2w = clamp(Math.min(h2a.length, h2b.length)/16, 0.05, 0.12);
-      if (dirty) h2w *= 0.55;
+      let h2w = clamp(Math.min(h2a.length, h2b.length)/ENGINE_CONFIG.h2h.wDenom, ENGINE_CONFIG.h2h.wMin, ENGINE_CONFIG.h2h.wMax);
+      if (dirty) h2w *= ENGINE_CONFIG.blend.dirtyH2HScale;
       expA = expA*(1-h2w) + trimmedWeighted(h2a)*h2w;
       expB = expB*(1-h2w) + trimmedWeighted(h2b)*h2w;
     }
 
-    expA = clamp(expA, 1.55, 8.40);
-    expB = clamp(expB, 1.55, 8.40);
+    expA = clamp(expA, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
+    expB = clamp(expB, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
 
     if (input.venue && !parkKnown(input.venue)){
       log("WARN","PARK","No park factor for venue, using 1.0", {venue:input.venue});
     }
 
-    // Independent 9-inning NBs miss walk-off / extras coupling (documented).
-    // One correction pass: P(tie after regulation) adds a small extras mass.
-    let varA = Math.max(base.sdTeam*base.sdTeam*0.55, expA*1.28 + 0.20);
-    let varB = Math.max(base.sdTeam*base.sdTeam*0.55, expB*1.28 + 0.20);
+    // Variance: shrink observed last-10 (or H2H) sample variance toward the
+    // mean-based prior so streaky and steady clubs are no longer identical.
+    function priorVar(exp){
+      const vcfg = ENGINE_CONFIG.variance;
+      return Math.max(base.sdTeam*base.sdTeam*vcfg.floorShare, exp*vcfg.meanCoef + vcfg.meanAdd);
+    }
+    function shrinkVar(obs, prior, nObs){
+      const vcfg = ENGINE_CONFIG.variance;
+      if (!finite(obs) || nObs < 2) return prior;
+      const w = clamp((nObs-1)/9, vcfg.obsShrinkMin, vcfg.obsShrinkMax);
+      return Math.max(prior * 0.55, w*obs + (1-w)*prior);
+    }
+    const formOffA = input.aScoredN || input.aScored || [];
+    const formOffB = input.bScoredN || input.bScored || [];
+    const sdA = stdDev(formOffA), sdB = stdDev(formOffB);
+    const obsVarA = sdA > 0 ? sdA*sdA : NaN;
+    const obsVarB = sdB > 0 ? sdB*sdB : NaN;
+    let varA = shrinkVar(obsVarA, priorVar(expA), formOffA.length);
+    let varB = shrinkVar(obsVarB, priorVar(expB), formOffB.length);
     let pHome = nbPmf(expA, varA, 20);
     let pAway = nbPmf(expB, varB, 20);
     let pTie = 0;
     for (let k=0;k<=20;k++) pTie += pHome[k]*pAway[k];
-    if (pTie > 0.02){
-      expA += pTie * 0.42;
-      expB += pTie * 0.38;
-      expA = clamp(expA, 1.55, 8.40);
-      expB = clamp(expB, 1.55, 8.40);
-      varA = Math.max(base.sdTeam*base.sdTeam*0.55, expA*1.28 + 0.20);
-      varB = Math.max(base.sdTeam*base.sdTeam*0.55, expB*1.28 + 0.20);
+    const ex = ENGINE_CONFIG.extras;
+    if (pTie > ex.pTieTrigger){
+      expA += pTie * ex.homeAddCoef * lg;
+      expB += pTie * ex.awayAddCoef * lg;
+      expA = clamp(expA, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
+      expB = clamp(expB, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
+      varA = shrinkVar(obsVarA, priorVar(expA), formOffA.length);
+      varB = shrinkVar(obsVarB, priorVar(expB), formOffB.length);
       pHome = nbPmf(expA, varA, 20);
       pAway = nbPmf(expB, varB, 20);
     }
@@ -831,11 +920,15 @@
       home: expA, away: expB, total: expA+expB,
       varHome: varA, varAway: varB, varTotal: varA+varB,
       pHome: pHome, pAway: pAway, pTie: pTie,
-      park: pf, weather: wx, sample: n, tier: sampleTier(n),
+      park: dirty ? 1 : pf, weather: wx, sample: n, tier: sampleTier(n),
       volRatio: Math.sqrt(varA+varB) / Math.max(3.2, base.sdGame),
-      hasSeason: !!(finite(seaA.rs) && finite(seaB.rs)),
+      hasSeason: !!(finite(seaA.rs) && finite(seaA.ra) && finite(seaB.rs) && finite(seaB.ra)),
       hasPitcher: finite(input.aEra) && finite(input.bEra),
-      deparked: !!input.deparked
+      missingStarterA: !finite(input.aEra),
+      missingStarterB: !finite(input.bEra),
+      deparked: !!input.deparked,
+      usedBullpenA: finite(seaA.bullpenEra),
+      usedBullpenB: finite(seaB.bullpenEra)
     };
   }
 
@@ -848,10 +941,11 @@
   }
   function gradeFromProb(pWin, tier, hasPitcher, hasSeason){
     if (!finite(pWin)) return "NaN";
+    const gcfg = ENGINE_CONFIG.grades;
     let g = "D";
-    if (pWin >= 0.585) g = "A";
-    else if (pWin >= 0.555) g = "B";
-    else if (pWin >= 0.535) g = "C";
+    if (pWin >= gcfg.A) g = "A";
+    else if (pWin >= gcfg.B) g = "B";
+    else if (pWin >= gcfg.C) g = "C";
     if (tier === "insufficient") return "NaN";
     if (tier === "thin") g = stepDown(g);
     if (!hasPitcher) g = stepDown(g);
@@ -859,11 +953,15 @@
     return g;
   }
 
-  window.__bbThresholds = { ft: 0.42, team: 0.32, spread: 0.36, pWin: 0.538 };
+  window.__bbThresholds = ENGINE_CONFIG.thresholds;
 
   /* ===================== FETCH ===================== */
-  async function fetchJSON(url, timeoutMs){
+  async function fetchJSON(url, timeoutMs, opts){
     timeoutMs = timeoutMs || 14000;
+    opts = opts || {};
+    const allowPublic = opts.allowPublicRelay !== false ? !!opts.allowPublicRelay : false;
+    // Money-relevant fetches default to ESPN direct + private worker only.
+    // Public CORS relays are opt-in (fixture listing can request them).
     const liveUrl = /\/summary\?|\/scoreboard/.test(url);
     const cached = BB.requestCache.get(url);
     if (!liveUrl && cached && Date.now()-cached.ts < 20*60*1000) return cached.data;
@@ -884,18 +982,20 @@
     }
     const attempts = [
       [url, "ESPN direct"],
-      [BB.WORKER+"?url="+encodeURIComponent(url), "relay"],
-      ["https://corsproxy.io/?url="+encodeURIComponent(url), "corsproxy"],
-      ["https://api.allorigins.win/raw?url="+encodeURIComponent(url), "allorigins"]
+      [BB.WORKER+"?url="+encodeURIComponent(url), "relay"]
     ];
+    if (allowPublic){
+      attempts.push(["https://corsproxy.io/?url="+encodeURIComponent(url), "corsproxy"]);
+      attempts.push(["https://api.allorigins.win/raw?url="+encodeURIComponent(url), "allorigins"]);
+    }
     let last = null;
     for (let i=0;i<attempts.length;i++){
       try {
         const data = await one(attempts[i][0], attempts[i][1]);
         BB.lastTrust = attempts[i][1];
-        BB.usedPublicRelay = i>=2;
+        BB.usedPublicRelay = attempts[i][1]==="corsproxy" || attempts[i][1]==="allorigins";
         if (!liveUrl) BB.requestCache.set(url, { data:data, ts:Date.now() });
-        if (i>=2) log("WARN","TRUST","Public CORS relay used", {source:attempts[i][1]});
+        if (BB.usedPublicRelay) log("WARN","TRUST","Public CORS relay used — stats not auto-trusted", {source:attempts[i][1]});
         return data;
       } catch(e){ last=e; log("WARN","NET", attempts[i][1]+" failed", {error:e.message}); }
     }
@@ -1018,7 +1118,7 @@
       let url = BB.SITE(slug)+"/scoreboard?dates="+dateKey+"&limit=200";
       const st = LEAGUE_SEASON_TYPE[currentLeagueKey()];
       if (st) url += "&seasontype="+st;
-      const data = await fetchJSON(url, 15000);
+      const data = await fetchJSON(url, 15000, { allowPublicRelay:true });
       const events = (data.events||[]).map(function(e){ return normalizeEvent(e, slug); }).filter(Boolean);
       const open = events.filter(function(fx){ return !fx.completed; });
       const done = events.filter(function(fx){ return fx.completed; });
@@ -1062,6 +1162,21 @@
     window.__bbAuto.weather = fx.weather||null;
     window.__bbAuto.pitchers = { home: fx.homePitcher, away: fx.awayPitcher };
     window.__bbAuto.odds = fx.odds || {};
+    const ctx = document.getElementById("fixtureContextStatus");
+    if (ctx){
+      const bits = [];
+      const od = fx.odds || {};
+      if (finite(od.total)) bits.push("Listed total "+od.total);
+      if (finite(od.spread)) bits.push("Listed home spread "+od.spread);
+      const hp = fx.homePitcher || {};
+      const ap = fx.awayPitcher || {};
+      if (hp.name) bits.push("A SP "+hp.name+(finite(hp.era)?" ERA "+Number(hp.era).toFixed(2):" (no ERA)"));
+      else bits.push("A SP unavailable");
+      if (ap.name) bits.push("B SP "+ap.name+(finite(ap.era)?" ERA "+Number(ap.era).toFixed(2):" (no ERA)"));
+      else bits.push("B SP unavailable");
+      if (BB.relayOverrideActive) bits.push("Relay override ON");
+      ctx.textContent = bits.join(" · ");
+    }
   }
 
   function lastCompletedForm(events, teamId){
@@ -1072,8 +1187,8 @@
       if (!fx.completed) return;
       if (!finite(fx.homeScore) || !finite(fx.awayScore)) return;
       const inn = fx.period || 9;
-      // Drop rain-shortened under 6 innings — not a full-game observation
-      if (inn && inn < 6) return;
+      // Official games stand at 5 innings (MLB 7.01). Drop only <5.
+      if (inn && inn < 5) return;
       let scored, allowed, oppId;
       if (String(fx.homeId)===id){ scored=fx.homeScore; allowed=fx.awayScore; oppId=fx.awayId; }
       else if (String(fx.awayId)===id){ scored=fx.awayScore; allowed=fx.homeScore; oppId=fx.homeId; }
@@ -1126,11 +1241,26 @@
     }
     return hits[0].id;
   }
+  function isWinterLeague(key){
+    return /winter-league|caribbean-series/.test(String(key||""));
+  }
+  function scheduleSeasonYear(key){
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    // Winter ball runs Oct–Feb across the year boundary. Jan–Apr lookups
+    // belong to the season that opened the previous calendar year.
+    if (isWinterLeague(key) && m <= 3) return y - 1;
+    return y;
+  }
   async function fetchTeamSchedule(slug, teamId){
-    const year = new Date().getFullYear();
-    const st = LEAGUE_SEASON_TYPE[currentLeagueKey()] || 2;
+    const leagueKey = currentLeagueKey();
+    const year = scheduleSeasonYear(leagueKey);
+    const altYear = year === new Date().getFullYear() ? year - 1 : new Date().getFullYear();
+    const st = LEAGUE_SEASON_TYPE[leagueKey] || 2;
     const urls = [
       BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?season="+year+"&seasontype="+st+"&limit=200",
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?season="+altYear+"&seasontype="+st+"&limit=200",
       BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?seasontype="+st+"&limit=200",
       BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?limit=200"
     ];
@@ -1174,7 +1304,7 @@
   }
 
   async function fetchSeasonRates(slug, teamId){
-    const out = { rs:NaN, ra:NaN, gp:NaN, era:NaN };
+    const out = { rs:NaN, ra:NaN, gp:NaN, era:NaN, bullpenEra:NaN };
     try {
       const data = await fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId), 14000);
       const items = (((data.team||{}).record)||{}).items || [];
@@ -1196,7 +1326,19 @@
       cats.forEach(function(c){
         if (String(c.name||"").toLowerCase()!=="pitching") return;
         (c.stats||[]).forEach(function(s){
-          if (String(s.name||"").toUpperCase()==="ERA" || String(s.abbreviation||"")==="ERA") out.era = Number(s.value);
+          const nm = String(s.name||"").toLowerCase();
+          const ab = String(s.abbreviation||"").toUpperCase();
+          if (nm==="era" || ab==="ERA") out.era = Number(s.value);
+          if (/bullpen|reliever|relief/.test(nm) && /era/.test(nm)) out.bullpenEra = Number(s.value);
+        });
+      });
+      // Some ESPN payloads nest relief pitching as its own category.
+      cats.forEach(function(c){
+        if (!/bullpen|relie/.test(String(c.name||"").toLowerCase())) return;
+        (c.stats||[]).forEach(function(s){
+          const nm = String(s.name||"").toLowerCase();
+          const ab = String(s.abbreviation||"").toUpperCase();
+          if (nm==="era" || ab==="ERA") out.bullpenEra = Number(s.value);
         });
       });
     } catch(e){}
@@ -1217,6 +1359,22 @@
       const pair = await Promise.all([fetchTeamSchedule(slug, aId), fetchTeamSchedule(slug, bId), fetchSeasonRates(slug, aId), fetchSeasonRates(slug, bId)]);
       const formA = lastCompletedForm(pair[0], aId);
       const formB = lastCompletedForm(pair[1], bId);
+      // E014: public-relay data must be explicitly confirmed before it is allowed
+      // to populate money-relevant fields. Declining aborts the fill entirely
+      // rather than silently trusting an unverified third-party relay.
+      if (BB.usedPublicRelay){
+        const proceed = window.confirm(
+          "Stats for this fetch came through a public CORS relay (" + (BB.lastTrust||"unknown source") + "), " +
+          "not directly from ESPN. This data is unverified and could be stale or altered.\n\n" +
+          "Use it anyway?"
+        );
+        if (!proceed){
+          setStatus("Fetch cancelled — public relay data was not applied.", "err");
+          log("WARN","TRUST","User declined public relay data", {source:BB.lastTrust});
+          return;
+        }
+        log("WARN","TRUST","User confirmed use of public relay data", {source:BB.lastTrust});
+      }
       window.__bbAuto.season = { A: pair[2]||{}, B: pair[3]||{} };
       window.__bbAuto.formN = {
         A: { scoredN: formA.map(function(x){return x.scoredN;}), allowedN: formA.map(function(x){return x.allowedN;}) },
@@ -1406,7 +1564,26 @@
     renderRows(rows, proj, data);
     trackRows(rows, proj, data);
     const st = document.getElementById("fixtureContextStatus");
-    if (st) st.textContent = "";
+    if (st){
+      const bits = [];
+      const od = (window.__bbAuto && window.__bbAuto.odds) || {};
+      if (finite(od.total)) bits.push("Listed total "+od.total);
+      if (finite(od.spread)) bits.push("Listed home spread "+od.spread);
+      if (proj.missingStarterA || proj.missingStarterB){
+        bits.push("Starter ERA missing (" +
+          (proj.missingStarterA?"home":"") +
+          (proj.missingStarterA&&proj.missingStarterB?"+":"") +
+          (proj.missingStarterB?"away":"") +
+          ") — pitching term is staff/league blend");
+      }
+      if (!proj.deparked) bits.push("Manual last-10 is not de-parked; today's park was not stacked");
+      if (!proj.hasSeason) bits.push("Season RS+RA incomplete — grade stepped down");
+      if (proj.usedBullpenA || proj.usedBullpenB) bits.push("Bullpen ERA used for rest-of-staff");
+      else bits.push("Rest-of-staff is team ERA/RA, not a true bullpen split");
+      if (BB.usedPublicRelay) bits.push("PUBLIC RELAY — do not treat numbers as verified");
+      if (BB.relayOverrideActive) bits.push("Relay override ON");
+      st.textContent = bits.join(" · ");
+    }
     window.__lastRun = { proj:proj, rows:rows, at:new Date().toISOString() };
     log("OK","ENGINE","run complete", {proj:proj, rows:rows.map(function(r){return r.pick;})});
   }
@@ -1430,8 +1607,8 @@
       const c1=document.createElement("td"), c2=document.createElement("td"), c3=document.createElement("td"), c4=document.createElement("td"), c5=document.createElement("td");
       c1.textContent = p.name;
       const dead = p.pick==="NO PLAY" || p.noLine || !finite(p.line);
-      c2.textContent = dead ? "NaN" : formatProjectionWhole(p.projection);
-      c3.textContent = dead ? "NaN" : formatEdge(p.edge);
+      c2.textContent = finite(p.projection) ? formatProjectionWhole(p.projection) : "NaN";
+      c3.textContent = finite(p.edge) ? formatEdge(p.edge) : (dead ? "—" : "NaN");
       c4.textContent = dead ? "NaN" : p.grade;
       c4.className = p.pick==="NO PLAY"?"conf-none":p.grade==="A"?"conf-a":p.grade==="B"?"conf-b":p.grade==="C"?"conf-c":p.grade==="D"?"conf-d":"conf-none";
       c5.className = p.pick==="NO PLAY"?"pred-noplay":(String(p.pick).indexOf("UNDER")>=0?"pred-under":"pred-over");
@@ -1521,8 +1698,12 @@
     function stableManualId(){
       const a = normName(document.getElementById("teamAName").value);
       const b = normName(document.getElementById("teamBName").value);
-      const d = String(document.getElementById("fixtureKickoff").value||"").slice(0,10);
-      const s = a+"|"+b+"|"+d;
+      const kick = String(document.getElementById("fixtureKickoff").value||"").trim();
+      const venue = normName(document.getElementById("fixtureVenue").value||"");
+      // Full kickoff timestamp (not calendar day) so doubleheaders / same-day
+      // rematches cannot collide. Venue is a secondary discriminator.
+      const d = kick || new Date().toISOString();
+      const s = a+"|"+b+"|"+d+"|"+venue;
       var h = 2166136261;
       for (var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h,16777619); }
       return "manual_bb_"+(h>>>0).toString(16);
@@ -2033,6 +2214,51 @@
     }
   }
 
+  function scoreboardDateKeyFromTs(ts){
+    try {
+      const fmt = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" });
+      const p = fmt.formatToParts(new Date(ts));
+      const y = p.find(function(x){return x.type==="year";}).value;
+      const m = p.find(function(x){return x.type==="month";}).value;
+      const da = p.find(function(x){return x.type==="day";}).value;
+      return y+m+da;
+    } catch(e){
+      const d = new Date(ts);
+      return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+    }
+  }
+  async function findCompletedManualGame(league, sample){
+    const keys = [];
+    const seenKey = {};
+    function pushKey(k){ if (k && !seenKey[k]){ seenKey[k]=1; keys.push(k); } }
+    const base = Date.parse(sample && sample.eventDate || 0);
+    if (finite(base)){
+      for (let d=-3; d<=4; d++) pushKey(scoreboardDateKeyFromTs(base + d*86400000));
+    }
+    for (let d=0; d<=14; d++) pushKey(localDateKey(-d));
+    const wantHome = normName(sample.homeTeam);
+    const wantAway = normName(sample.awayTeam);
+    const candidates = [];
+    for (let i=0;i<keys.length;i++){
+      try {
+        const data = await fetchJSON(BB.SITE(league)+"/scoreboard?dates="+keys[i]+"&limit=200", 12000);
+        (data.events||[]).forEach(function(e){
+          const fx = normalizeEvent(e, league);
+          if (!fx || !fx.completed) return;
+          if (normName(fx.homeName)!==wantHome || normName(fx.awayName)!==wantAway) return;
+          if (!finite(fx.homeScore) || !finite(fx.awayScore)) return;
+          candidates.push(fx);
+        });
+      } catch(e){}
+    }
+    if (!candidates.length) return null;
+    if (candidates.length === 1 || !finite(base)) return candidates[0];
+    // Doubleheader: pick the completed game whose start is closest to the tracked kickoff.
+    candidates.sort(function(a,b){
+      return Math.abs(Date.parse(a.date||0)-base) - Math.abs(Date.parse(b.date||0)-base);
+    });
+    return candidates[0];
+  }
   async function autoSettle(){
     const pending = (g_trackerState.activePicks||[]).filter(function(p){ return p.resultStatus==="pending" && p.eventId; });
     const byEvent = {};
@@ -2042,19 +2268,16 @@
       try {
         if (String(eid).indexOf("manual_")==0){
           const sample = byEvent[eid][0];
-          const board = await fetchJSON(BB.SITE(league)+"/scoreboard?limit=80", 12000);
-          const evs = (board.events||[]).map(function(e){ return normalizeEvent(e, league); }).filter(Boolean);
-          const hit = evs.find(function(fx){
-            return fx.completed && normName(fx.homeName)===normName(sample.homeTeam) && normName(fx.awayName)===normName(sample.awayTeam);
-          });
+          const hit = await findCompletedManualGame(league, sample);
           if (!hit || !finite(hit.homeScore) || !finite(hit.awayScore)) continue;
-          const closeOdds = { total:null, spread:null };
           byEvent[eid].forEach(function(p){
             const st = settleMath(p, hit.homeScore, hit.awayScore);
             if (st==="pending") return;
             p.resultStatus = st;
             p.settledAt = new Date().toISOString();
             p.actualHome = hit.homeScore; p.actualAway = hit.awayScore;
+            p.actualScore = hit.homeScore+"-"+hit.awayScore;
+            p.settledEventId = hit.id;
           });
           continue;
         }
@@ -2226,7 +2449,8 @@
     tkRecount(); updateBattery(); renderTracked();
     try { autoSettle(); } catch(e){}
     setInterval(function(){ if (document.visibilityState!=="hidden") autoSettle(); }, 5*60*1000);
-    log("OK","BOOT","Baseball engine ready", { build:APP_BUILD });
+    if (BB.relayOverrideActive) log("WARN","TRUST","Relay override active", {worker:BB.WORKER});
+    log("OK","BOOT","Baseball engine ready", { build:APP_BUILD, config:ENGINE_CONFIG.version, relayOverride:!!BB.relayOverrideActive });
   });
 
   window.runEngine = runEngine;
