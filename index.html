@@ -1,4 +1,4 @@
-M
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,7 +12,7 @@ M
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <!-- BUILD_MARKER: bb_engine_v4_mlb_ui_20260904_auditfix -->
+  <!-- BUILD_MARKER: bb_engine_v4_mlb_ui_20260904_deskfix -->
   <title>Baseball Prediction Engine</title>
   <style>
     :root {
@@ -127,7 +127,14 @@ M
     .track-push { background: #3a404c !important; color: #fff !important; font-weight: 800 !important; }
     .tracker-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: stretch; justify-content: flex-end; padding-top: env(safe-area-inset-top); z-index: 9999; }
     .tracker-modal.open { display: flex; }
-    .tracker-panel { width: 100%; height: 100%; background: var(--panel); color: var(--text); display: flex; flex-direction: column; overflow: hidden; }
+    .tracker-panel { width: 100%; height: 100%; background: var(--panel); color: var(--text); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    .tracker-delete-confirm { display:none; position:absolute; inset:0; z-index:30; align-items:center; justify-content:center; background:rgba(0,0,0,0.55); padding:24px 16px; }
+    .tracker-delete-confirm.open { display:flex; }
+    .tracker-delete-confirm-card { width:min(420px,100%); background:var(--panel); color:var(--text); border:1px solid var(--panel-border); border-radius:12px; padding:18px 16px 14px; box-shadow:0 10px 28px rgba(0,0,0,0.35); }
+    .tracker-delete-confirm-card p { margin:0 0 16px; font-size:15px; font-weight:700; line-height:1.35; white-space:pre-wrap; }
+    .tracker-delete-confirm-actions { display:flex; justify-content:flex-end; gap:12px; }
+    .tracker-delete-confirm-actions button { min-height:44px; min-width:72px; padding:0 16px; font-size:16px; font-weight:800; border-radius:8px; border:1px solid var(--panel-border); background:transparent; color:var(--text); cursor:pointer; }
+    .tracker-delete-confirm-actions .tracker-delete-ok { background:#d91f26; color:#fff; border-color:#d91f26; }
     .tracker-body-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
     .tracker-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--tracker-head-bg); color: var(--tracker-head-text); font-weight: 800; font-size: 13px; }
     .tracker-close { background: none !important; border: none !important; color: var(--tracker-head-text) !important; font-size: 18px !important; padding: 0 !important; margin: 0 !important; cursor: pointer !important; }
@@ -340,6 +347,10 @@ M
         <input id="bTeamTotal" placeholder="3.5 - 5.5" aria-label="Away team total runs" />
       </div>
     </div>
+    <div style="margin-top:6px;">
+      <label>F5 Total (first 5 innings)</label>
+      <input id="f5Market" placeholder="4.5 - 5.5" aria-label="First five innings total" />
+    </div>
   </div>
 
   <div class="section" id="teamASection">
@@ -403,6 +414,15 @@ M
         <button type="button" id="trackerCloseBtn" class="tracker-close" aria-label="Close">✕</button>
       </div>
     </div>
+    <div id="trackerDeleteConfirm" class="tracker-delete-confirm" aria-hidden="true">
+      <div class="tracker-delete-confirm-card" role="dialog" aria-modal="true">
+        <p id="trackerDeleteConfirmText"></p>
+        <div class="tracker-delete-confirm-actions">
+          <button type="button" id="trackerDeleteCancelBtn">Cancel</button>
+          <button type="button" id="trackerDeleteOkBtn" class="tracker-delete-ok">OK</button>
+        </div>
+      </div>
+    </div>
     <div class="tracker-summary" id="trackerSummary">0 live/recent • 0 pending • 0 wins • 0 losses</div>
     <div class="tracker-market-summary" id="trackerMarketSummary"></div>
     <div class="tracker-body-scroll" id="trackedPicksWrap">
@@ -428,14 +448,14 @@ M
 <script>
 (function(){
   'use strict';
-  const APP_BUILD = "bb_engine_v4_mlb_ui_20260904_auditfix";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260904_deskfix2";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
      but they now live in one place so thresholds cannot drift independently. */
   const ENGINE_CONFIG = {
     version: "baseball_v4.1_auditfix",
-    thresholds: { ft: 0.42, team: 0.32, spread: 0.36, pWin: 0.538 },
+    thresholds: { ft: 0.42, team: 0.32, spread: 0.36, f5: 0.28, pWin: 0.538 },
     grades: { A: 0.585, B: 0.555, C: 0.538 },
     recencyWeights: [1.40, 1.22, 1.06, 0.92, 0.80, 0.68, 0.56, 0.46, 0.36, 0.28],
     extras: {
@@ -456,7 +476,7 @@ M
     },
     variance: { floorShare: 0.55, meanCoef: 1.28, meanAdd: 0.20, obsShrinkMax: 0.72, obsShrinkMin: 0.15, missingPitcherInflate: 1.15 },
     clampExp: { lo: 1.55, hi: 8.40 },
-    pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45 },
+    pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45, ipMin: 3.5, ipMax: 7.2, f5Share: 0.58, vsLhpMult: 0.96 },
     h2h: { minGames: 2, wDenom: 16, wMin: 0.05, wMax: 0.12 },
     softClamp: { nTinyCap: 6, madMultiplier: 3.5 }
   };
@@ -807,10 +827,16 @@ M
     const form = finite(formN) ? formN : prior;
     return (1-w)*prior + w*form;
   }
-  function pitchingAllowed(starterERA, teamRA, lg, teamERA, bullpenERA){
-    // Staff rate is team ERA when present (earned), else team RA.
-    // Rest-of-staff uses a real reliever/bullpen ERA when fetched; otherwise it is
-    // team pitching shrunk toward league (honest label: not a true bullpen split).
+  function inferStarterIP(era, shortStart){
+    const cfg = ENGINE_CONFIG.pitching;
+    if (shortStart) return 5.0;
+    if (!finite(era)) return cfg.starterIP;
+    if (era >= 5.50) return 5.1;
+    if (era >= 4.50) return 5.5;
+    if (era <= 3.20) return 6.4;
+    return cfg.starterIP;
+  }
+  function pitchingAllowed(starterERA, teamRA, lg, teamERA, bullpenERA, starterIP, shortStart){
     const cfg = ENGINE_CONFIG.pitching;
     const staff = finite(teamERA) ? teamERA : (finite(teamRA) ? teamRA : lg);
     const restRaw = finite(bullpenERA) && bullpenERA > 0 ? bullpenERA : staff;
@@ -820,7 +846,9 @@ M
     if (finite(starterERA) && starterERA > 0){
       const era = clamp(starterERA, cfg.eraLo, cfg.eraHi);
       if (era !== starterERA) log("WARN","PITCH","Starter ERA clamped", {raw:starterERA, used:era});
-      return era*(cfg.starterIP/9) + rest*(cfg.restIP/9);
+      const sip = clamp(finite(starterIP) ? starterIP : inferStarterIP(era, shortStart), cfg.ipMin, cfg.ipMax);
+      const rip = clamp(9 - sip, 1.8, 5.5);
+      return era*(sip/9) + rest*(rip/9);
     }
     return cfg.noStarterStaffW*staff + (1-cfg.noStarterStaffW)*lg;
   }
@@ -843,11 +871,17 @@ M
     const raA = blendRate(seaA.ra, defA_n, lg, nA, seaA.gp, dirty);
     const raB = blendRate(seaB.ra, defB_n, lg, nB, seaB.gp, dirty);
 
-    const pitchVsA = pitchingAllowed(input.bEra, raB, lg, seaB.era, seaB.bullpenEra);
-    const pitchVsB = pitchingAllowed(input.aEra, raA, lg, seaA.era, seaA.bullpenEra);
+    const pitchVsA = pitchingAllowed(input.bEra, raB, lg, seaB.era, seaB.bullpenEra, input.bIp, input.shortStartB);
+    const pitchVsB = pitchingAllowed(input.aEra, raA, lg, seaA.era, seaA.bullpenEra, input.aIp, input.shortStartA);
 
     let expA = (offA / Math.max(2.2, lg)) * pitchVsA;
     let expB = (offB / Math.max(2.2, lg)) * pitchVsB;
+    const vsL = ENGINE_CONFIG.pitching.vsLhpMult || 0.96;
+    if (String(input.bHand||"").toUpperCase()==="L") expA *= vsL;
+    if (String(input.aHand||"").toUpperCase()==="L") expB *= vsL;
+    const f5Share = ENGINE_CONFIG.pitching.f5Share || 0.58;
+    const f5Home = expA * f5Share;
+    const f5Away = expB * f5Share;
 
     const pf = parkFactor(input.venue);
     // Today's park is applied only when last-10 is already de-parked.
@@ -932,6 +966,7 @@ M
 
     return {
       home: expA, away: expB, total: expA+expB,
+      f5Home: f5Home, f5Away: f5Away, f5Total: f5Home+f5Away,
       varHome: varA, varAway: varB, varTotal: varA+varB,
       pHome: pHome, pAway: pAway, pTie: pTie,
       park: dirty ? 1 : pf, weather: wx, sample: n, tier: sampleTier(n),
@@ -1040,16 +1075,33 @@ M
   function extractPitcher(comp){
     const list = (comp && comp.probables) || [];
     const p = list.find(function(x){ return /probableStartingPitcher|starter/i.test(String(x.name||x.abbreviation||"")); }) || list[0];
-    if (!p) return { name:"", era:NaN, record:"" };
-    let era = NaN;
+    if (!p) return { name:"", era:NaN, record:"", hand:"", ip:NaN };
+    let era = NaN, ip = NaN;
     (p.statistics||[]).forEach(function(st){
-      if (String(st.name||st.abbreviation||"").toUpperCase()==="ERA") era = parseFloat(st.displayValue||st.value);
+      const nm = String(st.name||st.abbreviation||"").toUpperCase();
+      const val = parseFloat(st.displayValue||st.value);
+      if (nm==="ERA") era = val;
+      if (nm==="IP" || nm==="INNINGSPITCHED" || nm==="AVGINNINGS" || nm==="IP/G" || nm==="IPG"){
+        if (finite(val) && val > 2 && val < 9.5) ip = val;
+      }
     });
     if (!finite(era) && p.record){
       const m = String(p.record).match(/(\d+\.\d+)/);
       if (m) era = parseFloat(m[1]);
     }
-    return { name: p.athlete && (p.athlete.displayName||p.athlete.fullName) || "", era: era, record: p.record||"" };
+    let hand = "";
+    const ath = p.athlete || {};
+    const hv = ath.hand || ath.handedness || ath.throws || "";
+    if (typeof hv === "string") hand = hv;
+    else if (hv && typeof hv === "object") hand = hv.displayValue || hv.abbreviation || hv.type || "";
+    const hs = String(hand).toUpperCase();
+    if (hs.indexOf("L")===0) hand = "L";
+    else if (hs.indexOf("R")===0) hand = "R";
+    else hand = "";
+    return {
+      name: ath.displayName || ath.fullName || "",
+      era: era, record: p.record||"", hand: hand, ip: ip
+    };
   }
   function extractOdds(comp){
     const raw = (comp && comp.odds && comp.odds[0]) || null;
@@ -1116,6 +1168,7 @@ M
       homePitcher: extractPitcher(home),
       awayPitcher: extractPitcher(away),
       odds: extractOdds(c),
+      isDH: /doubleheader|game\s*[12]|gm\s*[12]/i.test(String(ev.name||"")+" "+String(ev.shortName||"")+" "+String((c.notes||[]).map(function(n){return n.headline||n.text||"";}).join(" "))),
       raw: ev
     };
   }
@@ -1176,6 +1229,7 @@ M
     window.__bbAuto.weather = fx.weather||null;
     window.__bbAuto.pitchers = { home: fx.homePitcher, away: fx.awayPitcher };
     window.__bbAuto.odds = fx.odds || {};
+    window.__bbAuto.isDH = !!fx.isDH;
     const ctx = document.getElementById("fixtureContextStatus");
     if (ctx){
       const bits = [];
@@ -1516,6 +1570,12 @@ M
       useH2H: document.getElementById("useFTH2H").checked,
       aEra: aEra,
       bEra: bEra,
+      aIp: window.__bbAuto.pitchers && window.__bbAuto.pitchers.home ? window.__bbAuto.pitchers.home.ip : NaN,
+      bIp: window.__bbAuto.pitchers && window.__bbAuto.pitchers.away ? window.__bbAuto.pitchers.away.ip : NaN,
+      aHand: window.__bbAuto.pitchers && window.__bbAuto.pitchers.home ? window.__bbAuto.pitchers.home.hand : "",
+      bHand: window.__bbAuto.pitchers && window.__bbAuto.pitchers.away ? window.__bbAuto.pitchers.away.hand : "",
+      shortStartA: !!(window.__bbAuto && window.__bbAuto.isDH),
+      shortStartB: !!(window.__bbAuto && window.__bbAuto.isDH),
       seasonA: (window.__bbAuto.season && window.__bbAuto.season.A) || {},
       seasonB: (window.__bbAuto.season && window.__bbAuto.season.B) || {},
       deparked: !!window.__bbAuto.deparked,
@@ -1542,6 +1602,7 @@ M
     const aBand = parseBand(document.getElementById("aTeamTotal").value);
     const bBand = parseBand(document.getElementById("bTeamTotal").value);
     const sprBand = parseBand(document.getElementById("spreadLine").value);
+    const f5Band = parseBand((document.getElementById("f5Market")||{}).value || "");
 
     const rows = [];
     function addTotal(key, name, mu, band, family){
@@ -1549,11 +1610,17 @@ M
         rows.push({ marketKey:key, name:name, projection:mu, line:null, edge:null, prob:null, pick:"NO PLAY", side:"", grade:"NaN", family:family, noLine:true });
         return;
       }
-      const thresh = family==="team" ? th.team : th.ft;
-      // Decide strictly off the single line you entered (band.mid). If you typed
-      // a range, only its midpoint drives the pick — matching what the Edge
-      // column already displays. The outer ends no longer have to each clear.
-      const massMid = family==="team"
+      const thresh = family==="team" ? th.team : family==="f5" ? (th.f5||0.28) : th.ft;
+      // Basketball-style: decide vs mid (single line OR band mid). If the box
+      // is a range, smart-line then stresses the unfavourable end.
+      const massMid = family==="f5"
+        ? (function(){
+            const sd = Math.max(0.85, Math.sqrt(Math.max(0.4, proj.varTotal||4))*0.55);
+            const z = (band.mid - mu) / sd;
+            const pUnder = 1 / (1 + Math.exp(-1.7*z));
+            return { over: 1-pUnder, under: pUnder };
+          })()
+        : family==="team"
         ? massOverUnder(key==="tt_away" ? proj.pAway : proj.pHome, band.mid)
         : probOverJoint(proj, band.mid);
       const overEdge = mu - band.mid;
@@ -1567,6 +1634,26 @@ M
         pick = "OVER "+displayLine(band.mid); side="over"; showEdge=overEdge; used=band.mid; pWin=pOver;
       } else if (underOk){
         pick = "UNDER "+displayLine(band.mid); side="under"; showEdge=underEdge; used=band.mid; pWin=pUnder;
+      }
+      if (pick!=="NO PLAY" && band.isRange){
+        const halfWidth = (band.hi - band.lo) / 2;
+        const widthCap = Math.max(thresh * 2, 2.5);
+        if (halfWidth > widthCap){
+          pick="NO PLAY"; side=""; pWin=0.5;
+        } else {
+          const cons = side==="over"
+            ? Math.min(band.hi, band.mid + thresh)
+            : Math.max(band.lo, band.mid - thresh);
+          const consEdge = mu - cons;
+          const still = side==="over" ? consEdge >= thresh : consEdge <= -thresh;
+          if (!still){
+            pick="NO PLAY"; side=""; pWin=0.5;
+          } else {
+            used = cons;
+            showEdge = consEdge;
+            pick = (side==="over"?"OVER ":"UNDER ") + displayLine(cons);
+          }
+        }
       }
       const g = pick==="NO PLAY" ? "NaN" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
       rows.push({ marketKey:key, name:name, projection:mu, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:family, noLine:false });
@@ -1593,14 +1680,57 @@ M
       } else if (awayOk){
         pick = "AWAY "+displaySigned(-band.hi); side="away"; showEdge=awayEdge; used=band.hi; pWin=pAwayHi;
       }
-      const g = pick==="NO PLAY" ? "NaN" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
-      rows.push({ marketKey:key, name:name, projection:muMargin, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:"spread", noLine:false });
+      let g = pick==="NO PLAY" ? "NaN" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
+      const plusDog = (side==="home" && used >= 1.0) || (side==="away" && used <= -1.0);
+      const strongMargin = Math.abs(muMargin) >= 1.2;
+      if (pick!=="NO PLAY" && plusDog && !strongMargin){
+        if (g==="A") g = "B";
+        rows.push({ marketKey:key, name:name, projection:muMargin, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:"spread", noLine:false, plusDog:true, review:false });
+        return;
+      }
+      rows.push({ marketKey:key, name:name, projection:muMargin, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:"spread", noLine:false, plusDog:!!plusDog, review:false });
     }
 
     addTotal("ft_total", "Game Total", proj.total, ftBand, "ft");
+    addTotal("f5_total", "F5 Total", proj.f5Total, f5Band, "f5");
     addTotal("tt_home", "Team A Total", proj.home, aBand, "team");
     addTotal("tt_away", "Team B Total", proj.away, bBand, "team");
     addSpread("rl_home", "Handicap", proj.home-proj.away, sprBand);
+
+    if (!proj.hasPitcher){
+      rows.forEach(function(r){
+        if (r.family==="ft" || r.family==="spread" || r.family==="f5"){
+          r.pick = "NO PLAY";
+          r.side = "";
+          r.grade = "NaN";
+          r.prob = null;
+        }
+      });
+    }
+    const listedSpread = window.__bbAuto && window.__bbAuto.odds && finite(window.__bbAuto.odds.spread)
+      ? Number(window.__bbAuto.odds.spread) : NaN;
+    rows.forEach(function(r){
+      if (r.family!=="spread" || r.pick==="NO PLAY") return;
+      const margin = proj.home - proj.away;
+      if (finite(listedSpread) && listedSpread >= 1.0 && margin >= 1.0){
+        r.review = true;
+        if (r.grade==="A") r.grade = "B";
+      }
+      if (finite(listedSpread) && listedSpread <= -1.0 && margin <= -1.0){
+        r.review = true;
+        if (r.grade==="A") r.grade = "B";
+      }
+    });
+    rows.forEach(function(r){ r.track = false; });
+    const live = rows.filter(function(r){ return r.pick && r.pick!=="NO PLAY"; });
+    const ftLive = live.find(function(r){ return r.family==="ft"; });
+    const f5Live = live.find(function(r){ return r.family==="f5"; });
+    const teamLive = live.filter(function(r){ return r.family==="team"; }).sort(function(a,b){
+      return Math.abs(b.edge||0) - Math.abs(a.edge||0);
+    });
+    const rlLive = live.find(function(r){ return r.family==="spread" && !r.plusDog && !r.review; });
+    const chosen = ftLive || f5Live || teamLive[0] || rlLive || null;
+    if (chosen) chosen.track = true;
 
     renderRows(rows, proj, data);
     trackRows(rows, proj, data);
@@ -1611,11 +1741,7 @@ M
       if (finite(od.total)) bits.push("Listed total "+od.total);
       if (finite(od.spread)) bits.push("Listed home spread "+od.spread);
       if (proj.missingStarterA || proj.missingStarterB){
-        bits.push("Starter ERA missing (" +
-          (proj.missingStarterA?"home":"") +
-          (proj.missingStarterA&&proj.missingStarterB?"+":"") +
-          (proj.missingStarterB?"away":"") +
-          ") — pitching term is staff/league blend");
+        bits.push("Starter ERA missing — Game Total and Handicap forced NO PLAY");
       }
       if (!proj.deparked) bits.push("Manual last-10 is not de-parked; today's park was not stacked");
       if (!proj.hasSeason) bits.push("Season RS+RA incomplete — grade stepped down");
@@ -1662,7 +1788,7 @@ M
       table.appendChild(tr);
       const rank = {A:4,B:3,C:2,D:1}[p.grade]||0;
       const score = rank*1000 + Math.abs(p.edge||0)*20;
-      if (p.pick!=="NO PLAY" && rank>=3 && score>bestScore){ bestScore=score; best=idx; }
+      if (p.pick!=="NO PLAY" && p.track && !p.plusDog && !p.review && rank>=3 && score>bestScore){ bestScore=score; best=idx; }
     });
     if (best>=0){
       rows[best].isLock = true;
@@ -1686,7 +1812,16 @@ M
   var g_trackerState = window.g_trackerState = (function(){
     try {
       const x = JSON.parse(localStorage.getItem(TK)||"null");
-      if (x && Array.isArray(x.activePicks) && Array.isArray(x.archivedPicks)) return x;
+      if (x && Array.isArray(x.activePicks) && Array.isArray(x.archivedPicks)){
+        function ghost(p){
+          const line = Number(p && p.line);
+          const txt = String((p && p.predictionText) || "");
+          return !isFinite(line) || Math.abs(line)<1e-9 || /OVER 0|UNDER 0/.test(txt);
+        }
+        x.activePicks = x.activePicks.filter(function(p){ return !ghost(p); });
+        x.archivedPicks = x.archivedPicks.filter(function(p){ return !ghost(p); });
+        return x;
+      }
     } catch(e){}
     return { activePicks:[], archivedPicks:[], stats:{settled:0,wins:0,losses:0,pushes:0}, updatedAt:new Date().toISOString() };
   })();
@@ -1750,7 +1885,9 @@ M
       return "manual_bb_"+(h>>>0).toString(16);
     }
     const eventId = document.getElementById("fixtureEventId").value || stableManualId();
-    const payloads = rows.filter(function(p){ return p.pick && p.pick!=="NO PLAY"; }).map(function(p){
+    const payloads = rows.filter(function(p){
+      return p.track && p.pick && p.pick!=="NO PLAY" && !p.noLine && finite(p.line) && Math.abs(Number(p.line))>1e-9;
+    }).map(function(p){
       return {
         eventId: eventId,
         eventDate: document.getElementById("fixtureKickoff").value || new Date().toISOString(),
@@ -1775,10 +1912,19 @@ M
     if (g_trackerState.activePicks.length>400) g_trackerState.activePicks = g_trackerState.activePicks.slice(-400);
     tkRecount(); tkSave(); renderTracked();
   }
-  function settleMath(pick, home, away){
-    if (!finite(home) || !finite(away) || !pick) return "pending";
+  function settleMath(pick, home, away, extra){
+    extra = extra || {};
+    if (!pick) return "pending";
     const line = Number(pick.line);
-    const fam = pick.family || (String(pick.marketKey).indexOf("rl")===0 || String(pick.marketKey).indexOf("spread")>=0 ? "spread" : String(pick.marketKey).indexOf("tt")===0 ? "team" : "ft");
+    const fam = pick.family || (String(pick.marketKey).indexOf("rl")===0 || String(pick.marketKey).indexOf("spread")>=0 ? "spread" : String(pick.marketKey).indexOf("f5")===0 ? "f5" : String(pick.marketKey).indexOf("tt")===0 ? "team" : "ft");
+    if (fam==="f5"){
+      const tot = finite(extra.f5Total) ? extra.f5Total : (finite(pick.actualF5) ? Number(pick.actualF5) : NaN);
+      if (!finite(tot) || !finite(line)) return "pending";
+      if (Math.abs(tot-line)<1e-9) return "push";
+      const over = tot>line;
+      return (pick.side==="under") ? (over?"loss":"win") : (over?"win":"loss");
+    }
+    if (!finite(home) || !finite(away)) return "pending";
     if (fam==="ft"){
       const tot = home+away;
       if (!finite(line)) return "pending";
@@ -1816,13 +1962,46 @@ M
     }
     tkRecount(); tkSave(); renderTracked();
   }
+  function showTrackerDeleteConfirm(pickLabel, matchLabel){
+    return new Promise(function(resolve){
+      const overlay = document.getElementById("trackerDeleteConfirm");
+      const textEl = document.getElementById("trackerDeleteConfirmText");
+      const okBtn = document.getElementById("trackerDeleteOkBtn");
+      const cancelBtn = document.getElementById("trackerDeleteCancelBtn");
+      if (!overlay || !textEl || !okBtn || !cancelBtn){
+        resolve(window.confirm("Delete this pick permanently?\n\n"+(pickLabel||"")));
+        return;
+      }
+      textEl.textContent = "Delete this pick permanently?\n\n"+(pickLabel||"This pick")+(matchLabel?"\n"+matchLabel:"")+"\n\nThis cannot be undone.";
+      overlay.classList.add("open");
+      overlay.setAttribute("aria-hidden","false");
+      const finish = function(ok){
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden","true");
+        okBtn.removeEventListener("click", onOk);
+        cancelBtn.removeEventListener("click", onCancel);
+        overlay.removeEventListener("click", onOverlay);
+        resolve(!!ok);
+      };
+      const onOk = function(){ finish(true); };
+      const onCancel = function(){ finish(false); };
+      const onOverlay = function(e){ if (e.target===overlay) finish(false); };
+      okBtn.addEventListener("click", onOk);
+      cancelBtn.addEventListener("click", onCancel);
+      overlay.addEventListener("click", onOverlay);
+    });
+  }
   function deletePick(sig){
     const p = g_trackerState.activePicks.concat(g_trackerState.archivedPicks).find(function(x){return x.signature===sig;});
     if (!p) return;
-    if (!confirm('Delete "'+(p.predictionText||"pick")+'" for '+(p.homeTeam||"A")+' vs '+(p.awayTeam||"B")+'?')) return;
-    g_trackerState.activePicks = g_trackerState.activePicks.filter(function(x){return x.signature!==sig;});
-    g_trackerState.archivedPicks = g_trackerState.archivedPicks.filter(function(x){return x.signature!==sig;});
-    tkRecount(); tkSave(); renderTracked();
+    const label = p.predictionText || "pick";
+    const match = (p.homeTeam||"A")+" vs "+(p.awayTeam||"B");
+    showTrackerDeleteConfirm(label, match).then(function(ok){
+      if (!ok) return;
+      g_trackerState.activePicks = g_trackerState.activePicks.filter(function(x){return x.signature!==sig;});
+      g_trackerState.archivedPicks = g_trackerState.archivedPicks.filter(function(x){return x.signature!==sig;});
+      tkRecount(); tkSave(); renderTracked();
+    });
   }
   var __trackerView = "picks";
   function setTrackerModalView(view){
@@ -2330,6 +2509,19 @@ M
         const home = cs.find(function(x){return x.homeAway==="home";}) || cs[0];
         const away = cs.find(function(x){return x.homeAway==="away";}) || cs[1];
         const hs = scoreVal(home && home.score), as = scoreVal(away && away.score);
+        function sumFirstN(comp, n){
+          const ls = (comp && comp.linescores) || [];
+          if (ls.length < n) return NaN;
+          let s = 0;
+          for (let i=0;i<n;i++){
+            const v = scoreVal(ls[i] && (ls[i].value!=null ? ls[i].value : ls[i]));
+            if (!finite(v)) return NaN;
+            s += v;
+          }
+          return s;
+        }
+        const f5h = sumFirstN(home, 5), f5a = sumFirstN(away, 5);
+        const f5Total = finite(f5h) && finite(f5a) ? f5h+f5a : NaN;
         const closeOdds = extractOdds(c);
         byEvent[eid].forEach(function(p){
           if (p.family==="spread" || String(p.marketKey).indexOf("rl")===0){
@@ -2344,7 +2536,8 @@ M
             else if (p.side==="away") p.clv = p.closeLine - p.line;
             if (finite(p.clv)) window.g_driftErrors.push(Math.abs(p.clv));
           }
-          const st = settleMath(p, hs, as);
+          if (finite(f5Total)) p.actualF5 = f5Total;
+          const st = settleMath(p, hs, as, { f5Total:f5Total });
           if (st && st!=="pending"){
             p.resultStatus = st;
             p.actualHomePoints = hs; p.actualAwayPoints = as;
@@ -2388,7 +2581,7 @@ M
     if (league) league.classList.remove("collapsed");
   }
   function clearAll(preserveLeague){
-    ["teamAName","teamAId","teamBName","teamBId","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","fixtureKickoff","fixtureEventId","fixtureVenue"].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=""; });
+    ["teamAName","teamAId","teamBName","teamBId","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","f5Market","fixtureKickoff","fixtureEventId","fixtureVenue"].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=""; });
     const u = document.getElementById("useFTH2H"); if (u) u.checked=false;
     document.querySelectorAll(".autofill-indicator").forEach(function(el){ el.style.display="none"; });
     document.querySelectorAll(".last10-short-field").forEach(function(el){ el.classList.remove("last10-short-field"); });
@@ -2487,7 +2680,7 @@ M
       if (navigator.clipboard) navigator.clipboard.writeText(text).then(()=>{ this.textContent="✅"; const b=this; setTimeout(function(){ b.textContent="📋"; },1200); });
     });
     document.getElementById("inputsCopyBtn").addEventListener("click", function(){
-      const ids=["teamAName","teamBName","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal"];
+      const ids=["teamAName","teamBName","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","f5Market"];
       const data={}; ids.forEach(function(id){ const e=document.getElementById(id); if(e&&e.value) data[id]=e.value; });
       if (navigator.clipboard) navigator.clipboard.writeText(JSON.stringify(data,null,2));
     });
