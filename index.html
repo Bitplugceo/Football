@@ -1,3 +1,4 @@
+M
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1549,24 +1550,23 @@
         return;
       }
       const thresh = family==="team" ? th.team : th.ft;
-      const massLo = family==="team"
-        ? massOverUnder(family==="team" && key==="tt_away" ? proj.pAway : proj.pHome, band.lo)
-        : probOverJoint(proj, band.lo);
-      const massHi = family==="team"
-        ? massOverUnder(key==="tt_away" ? proj.pAway : proj.pHome, band.hi)
-        : probOverJoint(proj, band.hi);
-      // Unfavourable end: OVER must beat the HIGH number, UNDER must beat the LOW number
-      const overEdge = mu - band.hi;
-      const underEdge = band.lo - mu;
-      const pOver = massHi.over / Math.max(1e-9, massHi.over+massHi.under);
-      const pUnder = massLo.under / Math.max(1e-9, massLo.over+massLo.under);
+      // Decide strictly off the single line you entered (band.mid). If you typed
+      // a range, only its midpoint drives the pick — matching what the Edge
+      // column already displays. The outer ends no longer have to each clear.
+      const massMid = family==="team"
+        ? massOverUnder(key==="tt_away" ? proj.pAway : proj.pHome, band.mid)
+        : probOverJoint(proj, band.mid);
+      const overEdge = mu - band.mid;
+      const underEdge = band.mid - mu;
+      const pOver = massMid.over / Math.max(1e-9, massMid.over+massMid.under);
+      const pUnder = massMid.under / Math.max(1e-9, massMid.over+massMid.under);
       let pick="NO PLAY", side="", showEdge=mu-band.mid, used=band.mid, pWin=0.5;
       const overOk = overEdge >= thresh && pOver >= th.pWin;
       const underOk = underEdge >= thresh && pUnder >= th.pWin;
       if (overOk && (!underOk || overEdge >= underEdge)){
-        pick = "OVER "+displayLine(band.hi); side="over"; showEdge=overEdge; used=band.hi; pWin=pOver;
+        pick = "OVER "+displayLine(band.mid); side="over"; showEdge=overEdge; used=band.mid; pWin=pOver;
       } else if (underOk){
-        pick = "UNDER "+displayLine(band.lo); side="under"; showEdge=underEdge; used=band.lo; pWin=pUnder;
+        pick = "UNDER "+displayLine(band.mid); side="under"; showEdge=underEdge; used=band.mid; pWin=pUnder;
       }
       const g = pick==="NO PLAY" ? "NaN" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
       rows.push({ marketKey:key, name:name, projection:mu, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:family, noLine:false });
