@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -289,7 +288,7 @@ S
         <option value="world-baseball-classic">World Baseball Classic</option>
       </optgroup>
     </select>
-    <label style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;">
+    <label style="margin-top:8px;display:none;align-items:center;gap:8px;font-size:13px;">
       <input type="checkbox" id="neutralSite" /> Neutral site (no home-field)
     </label>
   </div>
@@ -439,16 +438,14 @@ S
     grades: { A: 0.585, B: 0.555, C: 0.538 },
     recencyWeights: [1.40, 1.22, 1.06, 0.92, 0.80, 0.68, 0.56, 0.46, 0.36, 0.28],
     extras: {
-      // Regulation NBs miss walk-off / extras coupling.
-      // P(tie after 9) * E[added runs | extras]. Coefficients are expressed as a
-      // fraction of the league scoring baseline (lg), not a flat MLB-tuned constant,
-      // so non-MLB run environments (winter ball, NCAA, WBC) get a proportional
-      // extras bump instead of an absolute number borrowed from MLB. 0.191/0.175 * lg
-      // reproduces the prior 0.85/0.78 runs at MLB's lg=4.45 baseline. Still an
-      // unbacktested heuristic — see Engine Report.
+      // Regulation NBs miss walk-off / extras coupling. Rather than a flat
+      // coefficient * league-average bump, each team's added-runs term is now
+      // its OWN per-inning scoring rate (exp/9) plus a shared runner-on-second
+      // boost (the automatic extra-innings runner). runnerBoostRuns is a
+      // sabermetric estimate of that runner's expected run value, not a
+      // backtested figure — see Engine Report.
       pTieTrigger: 0.02,
-      homeAddCoef: 0.191,
-      awayAddCoef: 0.175
+      runnerBoostRuns: 0.50
     },
     hfa: { home: 0.12, away: -0.03 },
     blend: {
@@ -456,11 +453,11 @@ S
       formWFull: 0.26, formWMid: 0.18, formWThin: 0.12, formWTiny: 0.07,
       dirtyFormScale: 0.55, dirtyH2HScale: 0.55
     },
-    variance: { floorShare: 0.55, meanCoef: 1.28, meanAdd: 0.20, obsShrinkMax: 0.72, obsShrinkMin: 0.15 },
+    variance: { floorShare: 0.55, meanCoef: 1.28, meanAdd: 0.20, obsShrinkMax: 0.72, obsShrinkMin: 0.15, missingPitcherInflate: 1.15 },
     clampExp: { lo: 1.55, hi: 8.40 },
     pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45 },
     h2h: { minGames: 2, wDenom: 16, wMin: 0.05, wMax: 0.12 },
-    softClamp: { nTinyCap: 6 }
+    softClamp: { nTinyCap: 6, madMultiplier: 3.5 }
   };
   window.__ENGINE_CONFIG = ENGINE_CONFIG;
 
@@ -643,16 +640,19 @@ S
     const clean = (arr||[]).map(Number).filter(finite);
     if (!clean.length) return NaN;
     if (clean.length === 1) return clean[0];
-    if (clean.length <= 3){
-      const sorted = clean.slice().sort(function(a,b){ return a-b; });
-      const med = sorted[Math.floor(sorted.length/2)];
-      const cap = (ENGINE_CONFIG.softClamp && ENGINE_CONFIG.softClamp.nTinyCap) || 6;
-      const wins = clean.map(function(v){ return clamp(v, med - cap, med + cap); });
-      return weightedRecent(wins);
-    }
+    // Continuous robust clamp: winsorize to median +/- k*MAD (median absolute
+    // deviation, 1.4826-scaled for normal-consistency) instead of a hard
+    // n<=3 vs n>3 branch. Small samples get a naturally wider effective
+    // clamp because MAD itself is noisier at low n -- no artificial cliff
+    // at the sample-size boundary.
     const sorted = clean.slice().sort(function(a,b){ return a-b; });
-    const lo = sorted[1], hi = sorted[sorted.length-2];
-    const wins = clean.map(function(v){ return clamp(v, lo, hi); });
+    const med = sorted[Math.floor(sorted.length/2)];
+    const absDevs = clean.map(function(v){ return Math.abs(v-med); }).sort(function(a,b){ return a-b; });
+    const madRaw = absDevs[Math.floor(absDevs.length/2)];
+    const cap = (ENGINE_CONFIG.softClamp && ENGINE_CONFIG.softClamp.nTinyCap) || 6;
+    const k = (ENGINE_CONFIG.softClamp && ENGINE_CONFIG.softClamp.madMultiplier) || 3.5;
+    const mad = madRaw > 0 ? madRaw*1.4826 : cap/k;
+    const wins = clean.map(function(v){ return clamp(v, med - k*mad, med + k*mad); });
     return weightedRecent(wins);
   }
   function normalCdf(x){
@@ -884,9 +884,13 @@ S
 
     // Variance: shrink observed last-10 (or H2H) sample variance toward the
     // mean-based prior so streaky and steady clubs are no longer identical.
-    function priorVar(exp){
+    // The prior itself widens when the specific starter facing this lineup is
+    // unknown, since the mean already fell back to a team/league blend that
+    // carries more inherent uncertainty than a real starter-specific estimate.
+    function priorVar(exp, missingPitcher){
       const vcfg = ENGINE_CONFIG.variance;
-      return Math.max(base.sdTeam*base.sdTeam*vcfg.floorShare, exp*vcfg.meanCoef + vcfg.meanAdd);
+      const p = Math.max(base.sdTeam*base.sdTeam*vcfg.floorShare, exp*vcfg.meanCoef + vcfg.meanAdd);
+      return missingPitcher ? p * vcfg.missingPitcherInflate : p;
     }
     function shrinkVar(obs, prior, nObs){
       const vcfg = ENGINE_CONFIG.variance;
@@ -899,20 +903,28 @@ S
     const sdA = stdDev(formOffA), sdB = stdDev(formOffB);
     const obsVarA = sdA > 0 ? sdA*sdA : NaN;
     const obsVarB = sdB > 0 ? sdB*sdB : NaN;
-    let varA = shrinkVar(obsVarA, priorVar(expA), formOffA.length);
-    let varB = shrinkVar(obsVarB, priorVar(expB), formOffB.length);
+    // expA's opponent pitcher is B's starter (input.bEra); expB's opponent
+    // pitcher is A's starter (input.aEra) -- see pitchVsA/pitchVsB above.
+    const missingPitcherForA = !finite(input.bEra);
+    const missingPitcherForB = !finite(input.aEra);
+    let varA = shrinkVar(obsVarA, priorVar(expA, missingPitcherForA), formOffA.length);
+    let varB = shrinkVar(obsVarB, priorVar(expB, missingPitcherForB), formOffB.length);
     let pHome = nbPmf(expA, varA, 20);
     let pAway = nbPmf(expB, varB, 20);
     let pTie = 0;
     for (let k=0;k<=20;k++) pTie += pHome[k]*pAway[k];
     const ex = ENGINE_CONFIG.extras;
     if (pTie > ex.pTieTrigger){
-      expA += pTie * ex.homeAddCoef * lg;
-      expB += pTie * ex.awayAddCoef * lg;
+      // Per-team extras bump: each team's own per-inning scoring rate plus the
+      // shared runner-on-second boost, instead of a flat global coefficient.
+      const extraRateA = (expA/9) + ex.runnerBoostRuns;
+      const extraRateB = (expB/9) + ex.runnerBoostRuns;
+      expA += pTie * extraRateA;
+      expB += pTie * extraRateB;
       expA = clamp(expA, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
       expB = clamp(expB, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
-      varA = shrinkVar(obsVarA, priorVar(expA), formOffA.length);
-      varB = shrinkVar(obsVarB, priorVar(expB), formOffB.length);
+      varA = shrinkVar(obsVarA, priorVar(expA, missingPitcherForA), formOffA.length);
+      varB = shrinkVar(obsVarB, priorVar(expB, missingPitcherForB), formOffB.length);
       pHome = nbPmf(expA, varA, 20);
       pAway = nbPmf(expB, varB, 20);
     }
