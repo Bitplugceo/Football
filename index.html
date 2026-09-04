@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -173,9 +172,23 @@ S
     .tracker-analytics-card-head { display:flex; justify-content:space-between; padding:9px 12px; background:linear-gradient(90deg,var(--tracker-head-bg) 0%,#434b5a 100%); color:var(--tracker-head-text); font-size:11px; font-weight:900; letter-spacing:.6px; text-transform:uppercase; }
     .tracker-analytics-card-body { padding:12px; }
     .tracker-review-row { border:1px solid var(--table-border); background:var(--panel-soft); padding:10px 12px; margin-bottom:8px; }
+    .tracker-review-top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px; }
     .tracker-review-area { font-size:11px; font-weight:900; text-transform:uppercase; }
+    .tracker-review-status { border:1px solid var(--table-border); background:var(--panel); color:var(--tracker-strong); padding:4px 7px; font-size:10px; font-weight:900; letter-spacing:.5px; text-transform:uppercase; white-space:nowrap; }
+    .tracker-review-status.confirmed { border-color:#17973f; color:#17973f; }
+    .tracker-review-status.candidate { border-color:#d98a00; color:#d98a00; }
+    .tracker-review-status.watching { border-color:#4b5568; color:#4b5568; }
     .tracker-review-text { font-size:12px; font-weight:800; margin:4px 0; }
     .tracker-review-action { font-size:10px; font-weight:700; color:var(--tracker-subtext); }
+    .tracker-empty-note { font-size:12px; font-weight:700; color:var(--tracker-subtext); line-height:1.45; }
+    .tracker-report-subtitle { font-size:11px; font-weight:700; color:var(--tracker-subtext); margin-bottom:10px; line-height:1.4; }
+    .tracker-analytics-card-title { font-size:11px; font-weight:900; letter-spacing:.6px; text-transform:uppercase; }
+    .tracker-analytics-card-meta { font-size:10px; font-weight:700; opacity:.85; }
+    .tracker-analytics-table { width:100%; border-collapse:collapse; font-size:11px; }
+    .tracker-analytics-table th, .tracker-analytics-table td { padding:7px 6px; border-bottom:1px solid var(--table-border); text-align:left; }
+    .tracker-analytics-table th.num, .tracker-analytics-table td.num, .tracker-analytics-table th.rate, .tracker-analytics-table td.rate { text-align:right; }
+    .tracker-analytics-table td.note { color:var(--tracker-subtext); font-weight:700; }
+    .tracker-analytics-grid.two { display:grid; grid-template-columns:1fr; gap:8px; }
     .engine-battery-pct { min-width:26px; }
     #fetchStatus { font-size: 10px; margin-top: 6px; min-height: 16px; font-weight: 700; }
     #fetchStatus.ok { color:#2f8f4a; }
@@ -1606,48 +1619,117 @@ S
       const pushes = settled.filter(function(p){ return p.resultStatus==="push"; }).length;
       const n = settled.length;
       const wr = n ? (wins/n*100) : null;
-      const clvRows = settled.filter(function(p){ return finite(p.clv); });
-      const clvN = clvRows.length;
-      const clvAvg = clvN ? clvRows.reduce(function(s,p){return s+p.clv;},0)/clvN : null;
-      const clvTxt = clvAvg==null ? "—" : ((clvAvg>=0?"+":"")+clvAvg.toFixed(2));
+      const trackerMin = 30;
+      const checkpointStatus = n>=trackerMin ? "Review ready" : "Watching";
+      function formatPct(v){ return finite(v) ? (Number(v).toFixed(1)+"%") : "—"; }
+      function statusClass(status){
+        const key = String(status||"").toLowerCase();
+        if (key.indexOf("confirmed")>=0) return "confirmed";
+        if (key.indexOf("candidate")>=0) return "candidate";
+        return "watching";
+      }
+      function marketLabel(key){
+        const map = { ft_total:"Game Total", tt_home:"Team A Total", tt_away:"Team B Total", rl_home:"Handicap", ft:"Game Total" };
+        return map[String(key||"")] || String(key||"Other");
+      }
       const byM = {};
+      const byTeam = {};
+      const byGrade = { A:{w:0,l:0,p:0}, B:{w:0,l:0,p:0}, C:{w:0,l:0,p:0}, D:{w:0,l:0,p:0} };
+      let lockW=0, lockL=0, lockP=0;
       settled.forEach(function(p){
-        const k = p.marketName || p.marketKey || "other";
-        byM[k] = byM[k] || {w:0,l:0};
-        if (p.resultStatus==="win") byM[k].w++;
-        else if (p.resultStatus==="loss") byM[k].l++;
-      });
-      let best=null, bestR=-1, weak=null, weakR=2;
-      Object.keys(byM).forEach(function(k){
-        const d=byM[k], nn=d.w+d.l;
-        if (nn>=3){
-          const r=d.w/nn;
-          if(r>bestR){ bestR=r; best={name:k,w:d.w,l:d.l,r:r}; }
-          if(r<weakR){ weakR=r; weak={name:k,w:d.w,l:d.l,r:r}; }
+        const mk = marketLabel(p.marketKey || p.marketName || "other");
+        byM[mk] = byM[mk] || {w:0,l:0,p:0};
+        if (p.resultStatus==="win") byM[mk].w++;
+        else if (p.resultStatus==="loss") byM[mk].l++;
+        else byM[mk].p++;
+        [p.homeTeam, p.awayTeam].forEach(function(tm){
+          if (!tm) return;
+          byTeam[tm] = byTeam[tm] || {w:0,l:0,p:0};
+          if (p.resultStatus==="win") byTeam[tm].w++;
+          else if (p.resultStatus==="loss") byTeam[tm].l++;
+          else byTeam[tm].p++;
+        });
+        const g = String(p.confidenceGrade||p.grade||"").toUpperCase();
+        if (byGrade[g]){
+          if (p.resultStatus==="win") byGrade[g].w++;
+          else if (p.resultStatus==="loss") byGrade[g].l++;
+          else byGrade[g].p++;
+        }
+        if (p.isLock){
+          if (p.resultStatus==="win") lockW++;
+          else if (p.resultStatus==="loss") lockL++;
+          else lockP++;
         }
       });
-      const locks = settled.filter(function(p){ return p.isLock; });
-      const lw = locks.filter(function(p){return p.resultStatus==="win";}).length;
-      const ll = locks.filter(function(p){return p.resultStatus==="loss";}).length;
+      function rec(d){ const s=d.w+d.l+d.p, dec=d.w+d.l; return { settled:s, wins:d.w, losses:d.l, pushes:d.p, winPct: dec? (d.w/dec*100):NaN }; }
+      const marketRows = Object.keys(byM).map(function(k){ return Object.assign({ label:k }, rec(byM[k])); }).sort(function(a,b){ return (b.winPct||0)-(a.winPct||0); });
+      const teamRows = Object.keys(byTeam).map(function(k){ return Object.assign({ label:k }, rec(byTeam[k])); }).sort(function(a,b){ return (b.winPct||0)-(a.winPct||0); });
+      const bestMarket = marketRows.filter(function(r){ return r.settled>=4 && r.winPct>=70; })[0];
+      const weakMarket = marketRows.slice().reverse().filter(function(r){ return r.settled>=4 && r.winPct<=45; })[0];
+      const strongTeam = teamRows.filter(function(r){ return r.settled>=2 && r.winPct>=70; })[0];
+      const weakTeam = teamRows.slice().reverse().filter(function(r){ return r.settled>=2 && r.winPct<=45; })[0];
+      const lockSettled = lockW+lockL+lockP;
+      const lockPct = (lockW+lockL) ? (lockW/(lockW+lockL)*100) : NaN;
       const reviews = [];
-      if (best) reviews.push({area:"Best market",status:"CONFIRMED STRENGTH",decision:"KEEP",review:best.name+" leading at "+(best.r*100).toFixed(1)+"% ("+best.w+"W-"+best.l+"L).",action:"Keep this market logic. Do not weaken it from one bad day."});
-      if (weak && weak.name !== (best&&best.name)) reviews.push({area:"Weak market",status:"CANDIDATE REVIEW",decision:"REVIEW",review:weak.name+" is the weakest market so far at "+(weak.r*100).toFixed(1)+"% ("+weak.w+"W-"+weak.l+"L).",action:"Do not edit yet from this checkpoint alone. Keep it on review."});
-      if (lw+ll>=8) reviews.push({area:"Lock icon",status:"WATCHING",decision:"NO CHANGE",review:"Locks are "+lw+" wins, "+ll+" losses for "+((lw/(lw+ll))*100).toFixed(1)+"% win rate.",action:"Keep monitoring instead of forcing a lock edit now."});
-      reviews.push({area:"Checkpoint",status:n>=30?"Review ready":"WATCHING",decision:n>=30?"KEEP":"COLLECT MORE",review:n+"/30 settled picks collected.",action:n>=30?"Continue collecting evidence.":((30-n)+" more settled picks needed for a full review.")});
+      if (n < trackerMin){
+        reviews.push({ area:"Checkpoint", decision:"COLLECT MORE", status:"Watching", review:n+"/"+trackerMin+" settled picks collected so far.", action:(trackerMin-n)+" more settled picks are needed before the tracker can give a full review." });
+      } else {
+        reviews.push({ area:"Checkpoint", decision:"KEEP", status:"Review ready", review:n+"/"+trackerMin+" settled picks collected.", action:"Continue collecting evidence." });
+        if (bestMarket) reviews.push({ area:"Best market", decision:"KEEP", status: bestMarket.settled>=6?"Confirmed strength":"Candidate strength", review:bestMarket.label+" is leading at "+formatPct(bestMarket.winPct)+" with "+bestMarket.wins+" wins and "+bestMarket.losses+" losses.", action:"Keep this market logic as it is. Do not weaken it from one bad day." });
+        if (weakMarket && (!bestMarket || weakMarket.label!==bestMarket.label)) reviews.push({ area:"Weak market", decision:"REVIEW", status: weakMarket.settled>=6?"Candidate review":"Watching", review:weakMarket.label+" is the weakest market so far at "+formatPct(weakMarket.winPct)+" with "+weakMarket.losses+" losses.", action:"Do not edit yet from this checkpoint alone. Keep it on review and only change if it repeats." });
+        if (lockSettled>=5){
+          let dec="NO CHANGE", st="Watching", act="Lock performance is acceptable. Keep monitoring instead of forcing a lock edit now.";
+          if (lockPct<=50){ dec="REVIEW"; st="Candidate review"; act="Lock performance is weak. Watch the next checkpoint before touching lock logic."; }
+          else if (lockPct>=65){ dec="KEEP"; st="Confirmed strength"; act="Lock performance is healthy. Keep the current lock behavior unless a later checkpoint says otherwise."; }
+          reviews.push({ area:"Lock icon", decision:dec, status:st, review:"Locks are "+lockW+" wins, "+lockL+" losses, "+lockP+" pushes for "+formatPct(lockPct)+" win rate.", action:act });
+        }
+        if (strongTeam) reviews.push({ area:"Strong team signal", decision:"KEEP", status:"Watching", review:strongTeam.label+" is trending strong at "+formatPct(strongTeam.winPct)+" across "+strongTeam.settled+" settled picks.", action:"Treat this as a positive team note. Keep collecting more team-by-team evidence." });
+        if (weakTeam && (!strongTeam || weakTeam.label!==strongTeam.label)) reviews.push({ area:"Weak team signal", decision:"WATCH", status: weakTeam.settled>=4?"Candidate review":"Watching", review:weakTeam.label+" is underperforming at "+formatPct(weakTeam.winPct)+" across "+weakTeam.settled+" settled picks.", action:"Keep this team on watch. Do not apply a global engine edit from one team alone." });
+      }
+      function tableRows(rows, empty){
+        if (!rows.length) return '<tr><td colspan="6" class="note">'+empty+'</td></tr>';
+        return rows.map(function(r){
+          return '<tr><td>'+esc(r.label)+'</td><td class="num">'+r.settled+'</td><td class="num">'+r.wins+'</td><td class="num">'+r.losses+'</td><td class="num">'+r.pushes+'</td><td class="rate">'+formatPct(r.winPct)+'</td></tr>';
+        }).join("");
+      }
+      const gradeRows = ["A","B","C","D"].map(function(g){ return Object.assign({ label:g }, rec(byGrade[g])); }).filter(function(r){ return r.settled>0; });
+      const shadowRows = [
+        { label:"All tracked picks", settled:n, wins:wins, losses:losses, pushes:pushes, winPct:wr },
+        { label:"Locks only", settled:lockSettled, wins:lockW, losses:lockL, pushes:lockP, winPct:lockPct }
+      ];
+      const oosNote = n>=trackerMin
+        ? "Win rate on the most recent 30% of settled picks will appear here once createdAt coverage is complete for this league."
+        : "No out-of-sample check yet for this league. This runs automatically once enough settled picks exist (needs 30+ settled picks with a valid createdAt) and refreshes periodically during the retraining pipeline.";
       analytics.innerHTML =
         '<div class="tracker-analytics-topbar" style="margin-bottom:10px"><div style="font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)">ENGINE REPORT</div>'+
         '<div style="font-size:15px;font-weight:900">Tracked results and learning</div>'+
-        '<div style="font-size:10px;color:var(--tracker-subtext);font-weight:700">Pick record and post-checkpoint notes live here.</div></div>'+
+        '<div style="font-size:10px;color:var(--tracker-subtext);font-weight:700">Pick record, feedback, and post-checkpoint suggestions live here.</div></div>'+
         '<div class="tracker-kpi-grid">'+
-        '<div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall</div><div class="tracker-kpi-value">'+wins+'W</div><div class="tracker-kpi-sub">Losses '+losses+' • Pushes '+pushes+' • Win rate '+(wr==null?"—":wr.toFixed(1)+"%")+'</div></div>'+
+        '<div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall</div><div class="tracker-kpi-value">'+wins+'W</div><div class="tracker-kpi-sub">Losses '+losses+' • Pushes '+pushes+' • Win rate '+formatPct(wr)+'</div></div>'+
         '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">'+(g_trackerState.activePicks||[]).length+'</div><div class="tracker-kpi-sub">Current model baseball_v4</div></div>'+
-        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks</div><div class="tracker-kpi-value">'+n+'</div><div class="tracker-kpi-sub">Checkpoint target 30</div></div>'+
-        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">CLV</div><div class="tracker-kpi-value">'+clvTxt+'</div><div class="tracker-kpi-sub">'+clvN+' settled with a close line</div></div>'+
+        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks</div><div class="tracker-kpi-value">'+n+'</div><div class="tracker-kpi-sub">Checkpoint target '+trackerMin+'</div></div>'+
+        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Review status</div><div class="tracker-kpi-value">'+esc(checkpointStatus)+'</div><div class="tracker-kpi-sub">Current version only</div></div>'+
         '</div>'+
-        '<div class="tracker-analytics-card" style="margin-bottom:10px"><div class="tracker-analytics-card-head"><span>Out-of-sample validation</span></div><div class="tracker-analytics-card-body"><div class="tracker-review-text">No out-of-sample check yet for this league. This runs automatically once enough settled picks exist (needs 30+ settled picks with a valid createdAt).</div></div></div>'+
-        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><span>Checkpoint review</span></div><div class="tracker-analytics-card-body">'+
-        reviews.map(function(r){ return '<div class="tracker-review-row"><div class="tracker-review-area">'+esc(r.area)+' · '+esc(r.status)+'</div><div class="tracker-review-text"><strong>'+esc(r.decision)+'</strong> — '+esc(r.review)+'</div><div class="tracker-review-action">'+esc(r.action)+'</div></div>'; }).join("")+
-        '</div></div>';
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Out-of-sample validation</div><div class="tracker-analytics-card-meta">Not yet available</div></div><div class="tracker-analytics-card-body"><div class="tracker-empty-note">'+esc(oosNote)+'</div></div></div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Checkpoint review</div><div class="tracker-analytics-card-meta">'+esc(checkpointStatus)+'</div></div><div class="tracker-analytics-card-body"><div class="tracker-review-list">'+
+        reviews.map(function(r){
+          return '<div class="tracker-review-row"><div class="tracker-review-top"><div class="tracker-review-area">'+esc(r.area)+'</div><div class="tracker-review-status '+statusClass(r.status)+'">'+esc(r.status)+'</div></div><div class="tracker-review-text"><strong>'+esc(r.decision)+'</strong> — '+esc(r.review)+'</div><div class="tracker-review-action">'+esc(r.action)+'</div></div>';
+        }).join("")+
+        '</div></div></div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Measurement lab</div><div class="tracker-analytics-card-meta">Tracked-pick evidence only</div></div><div class="tracker-analytics-card-body"><div class="tracker-report-subtitle">This layer measures what the engine actually saved to tracker.</div><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Experiment</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(shadowRows, "Need settled tracked picks before the shadow test can say anything useful.")+
+        '</tbody></table></div></div></div>'+
+        '<div class="tracker-analytics-grid two">'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Confidence performance</div><div class="tracker-analytics-card-meta">Do higher grades actually win more?</div></div><div class="tracker-analytics-card-body"><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Grade</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(gradeRows, "No graded settled picks yet.")+
+        '</tbody></table></div></div></div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Market performance</div><div class="tracker-analytics-card-meta">Tracked-pick evidence only</div></div><div class="tracker-analytics-card-body"><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Market</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(marketRows, "No settled market rows yet.")+
+        '</tbody></table></div></div></div>'+
+        '</div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Team signals</div><div class="tracker-analytics-card-meta">Home and away names from saved picks</div></div><div class="tracker-analytics-card-body"><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Team</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(teamRows.slice(0,8), "No team sample yet.")+
+        '</tbody></table></div></div></div>';
     }
   }
   window.setTrackerModalView = setTrackerModalView;
