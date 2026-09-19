@@ -1,3 +1,4 @@
+S
 <!-- SECTION 1 — html-document -->
 <!DOCTYPE html>
 <html lang="en">
@@ -142,7 +143,9 @@
     .tracker-close { background: none !important; border: none !important; color: var(--tracker-head-text) !important; font-size: 18px !important; padding: 0 !important; margin: 0 !important; cursor: pointer !important; }
     .tracker-summary { padding: 14px 16px; background: var(--tracker-summary-bg); font-size: 12px; font-weight: 800; }
     .tracker-empty { padding: 18px 16px; color: var(--tracker-subtext); font-size: 12px; font-weight: 700; }
-    .tracker-manual-btn { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; padding: 3px 6px !important; margin: 0 !important; min-width: 26px !important; font-size: 10px !important; font-weight: 800 !important; }
+    .tracker-manual-settle { display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:-2px; }
+    .tracker-manual-btn { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; box-shadow:none !important; padding: 0 !important; margin: 0 !important; width:28px !important; min-width: 28px !important; height:16px !important; min-height:16px !important; font-size: 9px !important; line-height:16px !important; font-weight: 800 !important; }
+    body.dark-mode .tracker-manual-btn { background:#1a1a1a !important; color:#fff !important; border-color:#2a2a2a !important; }
     .pred-home { background: #3a9c35 !important; color: #fff !important; font-weight: 800 !important; }
     .pred-away { background: #c91920 !important; color: #fff !important; font-weight: 800 !important; }
     .manual-settle-overlay { display:none; position:fixed; inset:0; z-index:10050; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:18px; box-sizing:border-box; }
@@ -371,29 +374,9 @@
         <input id="bTeamTotal" placeholder="3.5 - 5.5" aria-label="Away team total runs" />
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
-      <div>
-        <label>Winner (no line)</label>
-        <input id="winnerMarket" placeholder="HOME/AWAY" aria-label="Winner" />
-      </div>
-      <div>
-        <label>F5 Total (first 5 innings)</label>
-        <input id="f5Market" placeholder="4.5 - 5.5" aria-label="F5 total" />
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
-      <div>
-        <label>F5 Team A</label>
-        <input id="f5TeamA" placeholder="2.5" aria-label="F5 home total" />
-      </div>
-      <div>
-        <label>F5 Team B</label>
-        <input id="f5TeamB" placeholder="2.5" aria-label="F5 away total" />
-      </div>
-    </div>
     <div style="margin-top:6px;">
-      <label>F5 Handicap (Home, signed)</label>
-      <input id="f5Spread" placeholder="-0.5" aria-label="F5 home handicap" />
+      <label>Winner (no line)</label>
+      <input id="winnerMarket" placeholder="HOME/AWAY" aria-label="Winner" />
     </div>
   </div>
 
@@ -441,7 +424,7 @@
   <button id="auditCopyBtn" type="button" title="Copy Audit" style="background:#d4af37!important;color:#111!important;box-shadow:0 2px 8px rgba(212,175,55,.35)!important;font-weight:700!important;border:none!important;padding:5px 14px!important;font-size:12px!important;">📋</button>
   <button id="inputsCopyBtn" type="button" title="Copy Inputs &amp; Market Lines" style="background:#d4af37!important;color:#111!important;box-shadow:0 2px 8px rgba(212,175,55,.35)!important;font-weight:700!important;border:none!important;padding:5px 14px!important;font-size:12px!important;">🗒️</button>
 </div>
-<div class="context-line" id="fixtureContextStatus" style="text-align:center;"></div>
+<div class="context-line" id="fixtureContextStatus" style="display:none;text-align:center;"></div>
 <div class="table-wrap">
   <table id="results" style="display:none;">
     <tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>
@@ -762,7 +745,18 @@
   }
 
 /* SECTION 24 — display-line */
-  function displayLine(v){ if (!finite(v)) return "—"; return String(snapRunTotal(v)); }
+  function displayLine(v){
+    if (!finite(v)) return "—";
+    var x = snapRunTotal(v);
+    if (Math.abs(x - Math.round(x)) < 1e-9) x = x + (x >= 0 ? 0.5 : -0.5);
+    return String(x);
+  }
+  function bookHalfLine(v){
+    if (!finite(v)) return NaN;
+    var x = snapRunTotal(v);
+    if (Math.abs(x - Math.round(x)) < 1e-9) x = x + (x >= 0 ? 0.5 : -0.5);
+    return x;
+  }
 
 /* SECTION 25 — display-signed */
   function displaySigned(v){ if (!finite(v)) return "—"; const x=Math.round(Number(v)*2)/2; return x>0?"+"+x:String(x); }
@@ -1858,10 +1852,6 @@
     const aBand = parseBand(document.getElementById("aTeamTotal").value);
     const bBand = parseBand(document.getElementById("bTeamTotal").value);
     const sprBand = parseBand(document.getElementById("spreadLine").value);
-    const f5Band = parseBand((document.getElementById("f5Market")||{}).value);
-    const f5aBand = parseBand((document.getElementById("f5TeamA")||{}).value);
-    const f5bBand = parseBand((document.getElementById("f5TeamB")||{}).value);
-    const f5sBand = parseBand((document.getElementById("f5Spread")||{}).value);
 
     const rows = [];
 
@@ -1872,7 +1862,7 @@
         return;
       }
       const thresh = family==="team" ? th.team : th.ft;
-      // Basketball-style: decide vs mid (single line OR band mid). If the box
+      // Decide vs mid (single line or band mid). If the box
       // is a range, smart-line then stresses the unfavourable end.
       const awaySide = key==="tt_away" || key==="f5_away";
       const massMid = family==="team"
@@ -1894,35 +1884,24 @@
         const halfWidth = (band.hi - band.lo) / 2;
         const widthCap = Math.max(thresh * 2, 2.5);
         if (halfWidth > widthCap){
-          pick="NO PLAY"; side=""; pWin=null;
-        } else {
-          const cons = side==="over"
-            ? Math.min(band.hi, band.mid + thresh)
-            : Math.max(band.lo, band.mid - thresh);
-          const consEdge = side==="over" ? (mu - cons) : (cons - mu);
-          const still = consEdge >= thresh;
-          if (!still){
-            pick="NO PLAY"; side=""; pWin=null;
-          } else {
-            used = cons;
-            showEdge = consEdge;
-            pick = (side==="over"?"OVER ":"UNDER ") + displayLine(cons);
-          }
+          pick="NO PLAY"; side=""; pWin=null; showEdge=null;
         }
       }
       if (pick!=="NO PLAY"){
-        used = snapRunTotal(used);
+        used = bookHalfLine(band.mid);
         showEdge = side==="over" ? (mu - used) : (used - mu);
         pick = (side==="over"?"OVER ":"UNDER ") + displayLine(used);
         const massUsed = family==="team"
-          ? massOverUnder(key==="tt_away" || key==="f5_away" ? proj.pAway : proj.pHome, used)
+          ? massOverUnder(key==="tt_away" ? proj.pAway : proj.pHome, used)
           : probOverJoint(proj, used);
         const pO = massUsed.over / Math.max(1e-9, massUsed.over+massUsed.under);
         const pU = massUsed.under / Math.max(1e-9, massUsed.over+massUsed.under);
         pWin = side==="over" ? pO : pU;
+      } else {
+        used = null; showEdge = null; pWin = null;
       }
       const g = pick==="NO PLAY" ? "" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
-      rows.push({ marketKey:key, name:name, projection:mu, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:family, noLine:false });
+      rows.push({ marketKey:key, name:name, projection:mu, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:family, noLine:pick==="NO PLAY" });
     }
 
 /* SECTION 78 — add-spread */
@@ -1963,17 +1942,6 @@
     addTotal("tt_home", "Team A Total", proj.home, aBand, "team");
     addTotal("tt_away", "Team B Total", proj.away, bBand, "team");
     addSpread("rl_home", "Handicap", proj.home-proj.away, sprBand);
-
-    const f5H = (finite(proj.homeReg) ? proj.homeReg : proj.home) * 5/9;
-    const f5A = (finite(proj.awayReg) ? proj.awayReg : proj.away) * 5/9;
-    const holdPH = proj.pHome, holdPA = proj.pAway;
-    proj.pHome = nbPmf(f5H, Math.max(0.8, (proj.varHome||f5H)*5/9), 15);
-    proj.pAway = nbPmf(f5A, Math.max(0.8, (proj.varAway||f5A)*5/9), 15);
-    addTotal("f5_total", "F5 Total", f5H+f5A, f5Band, "ft");
-    addTotal("f5_home", "F5 Team A", f5H, f5aBand, "team");
-    addTotal("f5_away", "F5 Team B", f5A, f5bBand, "team");
-    addSpread("f5_rl", "F5 Handicap", f5H-f5A, f5sBand);
-    proj.pHome = holdPH; proj.pAway = holdPA;
 
     (function addWinner(){
       let home=0, away=0, tie=0;
@@ -2025,22 +1993,7 @@
     renderRows(rows, proj, data);
     trackRows(rows, proj, data);
     const st = document.getElementById("fixtureContextStatus");
-    if (st){
-      const bits = [];
-      const od = (window.__bbAuto && window.__bbAuto.odds) || {};
-      if (finite(od.total)) bits.push("Listed total "+od.total);
-      if (finite(od.spread)) bits.push("Listed home spread "+od.spread);
-      if (proj.missingStarterA || proj.missingStarterB){
-        bits.push("Starter ERA missing — Game Total and Handicap forced NO PLAY");
-      }
-      if (!proj.deparked) bits.push("Manual last-10 is not de-parked; today's park was not stacked");
-      if (!proj.hasSeason) bits.push("Season RS+RA incomplete — grade stepped down");
-      if (proj.usedBullpenA || proj.usedBullpenB) bits.push("Bullpen ERA used for rest-of-staff");
-      else bits.push("Rest-of-staff is team ERA/RA, not a true bullpen split");
-      if (BB.usedPublicRelay) bits.push("PUBLIC RELAY — do not treat numbers as verified");
-      if (BB.relayOverrideActive) bits.push("Relay override ON");
-      st.textContent = bits.join(" · ");
-    }
+    if (st){ st.textContent = ""; st.style.display = "none"; }
     window.__lastRun = { proj:proj, rows:rows, at:new Date().toISOString() };
     log("OK","ENGINE","run complete", {proj:proj, rows:rows.map(function(r){return r.pick;})});
   }
@@ -2108,18 +2061,7 @@
       '<div><div style="font-size:9px;color:var(--muted)">HOME EXP</div><div style="font-size:18px;font-weight:900">'+(finite(netA)?netA.toFixed(1):"—")+'</div></div>'+
       '<div><div style="font-size:9px;color:var(--muted)">TOTAL</div><div style="font-size:18px;font-weight:900">'+(proj && finite(proj.total)?proj.total.toFixed(1):"—")+'</div></div>'+
       '<div><div style="font-size:9px;color:var(--muted)">AWAY EXP</div><div style="font-size:18px;font-weight:900">'+(finite(netB)?netB.toFixed(1):"—")+'</div></div></div>';
-    const why = [];
-    if (proj && proj.deparked) why.push("Park applied to de-parked last-10");
-    else why.push("Manual last-10 — today park not stacked");
-    if (proj && proj.hasPitcher) why.push("Both starter ERAs present");
-    else why.push("Starter ERA missing on at least one side");
-    if (proj && finite(proj.weather) && proj.weather) why.push("Weather adj "+proj.weather);
-    if (why.length && table.rows[1]){
-      const note = document.createElement("div");
-      note.className = "why-pick-body";
-      note.textContent = why.join(" · ");
-      table.parentNode.insertBefore(note, table.nextSibling);
-    }
+    document.querySelectorAll(".why-pick-body").forEach(function(n){ n.remove(); });
     document.querySelectorAll(".section").forEach(function(s){
       if (s.id==="leagueSection") return;
       s.classList.add("collapsed");
@@ -2849,22 +2791,26 @@
       const live = (window.g_liveBaseball||{})[p.eventId];
       if (st==="pending" && live && live.live){
         status = '<div class="tracker-live-stack tracker-disp-toggle" data-sig="'+sig+'"><div class="tracker-live-tag">LIVE</div><div>'+esc(String(live.home||"0"))+' : '+esc(String(live.away||"0"))+'</div><div>'+esc(live.detail||((live.period?live.period+"th":"")))+'</div></div>'+
-          '<div class="act" data-box="'+sig+'" style="display:none;margin-top:4px">'+
-          '<button class="tracker-manual-btn" data-settle="win" data-sig="'+sig+'">W</button> '+
-          '<button class="tracker-manual-btn" data-settle="loss" data-sig="'+sig+'">L</button> '+
-          '<button class="tracker-manual-btn" data-settle="push" data-sig="'+sig+'">P</button></div>';
+          '<div class="tracker-manual-settle act" data-box="'+sig+'" style="display:none">'+
+          '<div style="font-size:8px;font-weight:900;opacity:.6;margin-bottom:1px">SETTLE</div>'+
+          '<button class="tracker-manual-btn" data-settle="win" data-sig="'+sig+'">W</button>'+
+          '<button class="tracker-manual-btn" data-settle="loss" data-sig="'+sig+'">L</button>'+
+          '<button class="tracker-manual-btn" data-settle="push" data-sig="'+sig+'">P</button>'+
+          '<div class="tracker-custom-settle-btn" data-settle="win" data-sig="'+sig+'" style="font-size:8px;text-decoration:underline;cursor:pointer;margin-top:2px;font-weight:800;opacity:.7">CUSTOM</div></div>';
       } else if (st==="pending"){
         status = '<div class="tracker-disp-toggle" data-sig="'+sig+'" style="cursor:pointer;text-decoration:underline">PENDING</div>'+
-          '<div class="act" data-box="'+sig+'" style="display:none;margin-top:4px">'+
-          '<button class="tracker-manual-btn" data-settle="win" data-sig="'+sig+'">W</button> '+
-          '<button class="tracker-manual-btn" data-settle="loss" data-sig="'+sig+'">L</button> '+
-          '<button class="tracker-manual-btn" data-settle="push" data-sig="'+sig+'">P</button></div>';
+          '<div class="tracker-manual-settle act" data-box="'+sig+'" style="display:none">'+
+          '<div style="font-size:8px;font-weight:900;opacity:.6;margin-bottom:1px">SETTLE</div>'+
+          '<button class="tracker-manual-btn" data-settle="win" data-sig="'+sig+'">W</button>'+
+          '<button class="tracker-manual-btn" data-settle="loss" data-sig="'+sig+'">L</button>'+
+          '<button class="tracker-manual-btn" data-settle="push" data-sig="'+sig+'">P</button>'+
+          '<div class="tracker-custom-settle-btn" data-settle="win" data-sig="'+sig+'" style="font-size:8px;text-decoration:underline;cursor:pointer;margin-top:2px;font-weight:800;opacity:.7">CUSTOM</div></div>';
       } else if (p.actualScore){
         status = st.toUpperCase()+'<div class="tracker-status-score">'+esc(p.actualScore)+'</div>';
       }
       return "<tr><td>"+esc(when)+"</td><td>"+esc(String(p.league||"").toUpperCase())+"</td><td>"+esc((p.homeTeam||"A")+" vs "+(p.awayTeam||"B"))+
-        "</td><td>"+esc(p.marketName||p.marketKey)+"</td><td>"+esc(displayLine(p.line))+"</td><td><span class='del' data-sig='"+sig+"' style='cursor:pointer'>"+esc(p.predictionText)+"</span>"+(p.isLock?" 🔒":"")+
-        "</td><td>"+esc(p.confidenceGrade||"—")+"</td><td class='"+cls+"'>"+status+"</td></tr>";
+        "</td><td style='font-weight:800'>"+esc(p.marketName||p.marketKey)+"</td><td>"+esc(finite(p.line)?displayLine(p.line):"—")+"</td><td style='white-space:nowrap;font-size:11px'><span class='del' data-sig='"+sig+"' style='cursor:pointer'>"+esc((function(){ var txt=String(p.predictionText||""); if(p.family==="winner") return txt; var ln=finite(p.line)?displayLine(p.line):""; if(ln&&/OVER|UNDER/.test(txt)) return txt.replace(/OVER\s+[-\d.]+/,"OVER "+ln).replace(/UNDER\s+[-\d.]+/,"UNDER "+ln); return txt; })())+"</span>"+(p.isLock?" <span class='lock'>🔒</span>":"")+
+        "</td><td class='conf-none'>"+esc(p.confidenceGrade||"—")+"</td><td class='"+cls+"'><div class='tracker-status-stack'>"+status+"</div></td></tr>";
     }).join("");
     if (empty) empty.style.display = vis.length ? "none" : "block";
     if (summary) summary.textContent = vis.length+" live/recent • "+pending+" pending • "+(stats.wins||0)+" wins • "+(stats.losses||0)+" losses";
@@ -3107,7 +3053,7 @@
     document.getElementById("autoFetchBtn").addEventListener("click", autoFetch);
     document.getElementById("runBtn").addEventListener("click", runEngine);
     document.getElementById("clearBtn").addEventListener("click", clearAll);
-    ["aFTScored","aFTAllowed","bFTScored","bFTAllowed","ftMarket","spreadLine","aTeamTotal","bTeamTotal","f5Market","f5TeamA","f5TeamB","f5Spread","winnerMarket"].forEach(function(id){
+    ["aFTScored","aFTAllowed","bFTScored","bFTAllowed","ftMarket","spreadLine","aTeamTotal","bTeamTotal","winnerMarket"].forEach(function(id){
       const el=document.getElementById(id); if(el) el.addEventListener("blur", applyLast10Alert);
     });
 
@@ -3121,7 +3067,7 @@
     document.getElementById("trackerModal").addEventListener("click", function(e){ if(e.target===this){ this.classList.remove("open"); document.body.classList.remove("tracker-open"); } });
     document.getElementById("trackedPicksBody").addEventListener("click", function(e){
       const tog = e.target.closest(".tracker-disp-toggle");
-      if (tog){ const box=document.querySelector('.act[data-box="'+tog.getAttribute("data-sig")+'"]'); if(box) box.style.display="block"; tog.style.display="none"; }
+      if (tog){ const box=document.querySelector('.act[data-box="'+tog.getAttribute("data-sig")+'"]'); if(box) box.style.display="flex"; tog.style.display="none"; }
       const btn = e.target.closest("[data-settle]");
       if (btn) applyManual(decodeURIComponent(btn.getAttribute("data-sig")), btn.getAttribute("data-settle"));
       const del = e.target.closest(".del");
@@ -3174,7 +3120,7 @@
       if (navigator.clipboard) navigator.clipboard.writeText(text).then(()=>{ this.textContent="✅"; const b=this; setTimeout(function(){ b.textContent="📋"; },1200); });
     });
     document.getElementById("inputsCopyBtn").addEventListener("click", function(){
-      const ids=["teamAName","teamBName","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","winnerMarket","f5Market","f5TeamA","f5TeamB","f5Spread"];
+      const ids=["teamAName","teamBName","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","winnerMarket"];
       const data={}; ids.forEach(function(id){ const e=document.getElementById(id); if(e&&e.value) data[id]=e.value; });
       if (navigator.clipboard) navigator.clipboard.writeText(JSON.stringify(data,null,2));
     });
