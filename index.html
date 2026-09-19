@@ -1,4 +1,3 @@
-S
 <!-- SECTION 1 — html-document -->
 <!DOCTYPE html>
 <html lang="en">
@@ -515,7 +514,7 @@ S
   'use strict';
 
 /* SECTION 8 — app-build */
-  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_featureport";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_auditfix";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
@@ -537,14 +536,14 @@ S
       pTieTrigger: 0.02,
       runnerBoostRuns: 0.50
     },
-    hfa: { home: 0.12, away: -0.03 },
+    hfa: { home: 0.12, away: -0.12 },
     blend: {
       seasonWMin: 0.32, seasonWMax: 0.84, seasonWDefault: 0.70,
       formWFull: 0.26, formWMid: 0.18, formWThin: 0.12, formWTiny: 0.07,
       dirtyFormScale: 0.55, dirtyH2HScale: 0.55
     },
     variance: { floorShare: 0.55, meanCoef: 1.28, meanAdd: 0.20, obsShrinkMax: 0.72, obsShrinkMin: 0.15, missingPitcherInflate: 1.15 },
-    clampExp: { lo: 1.55, hi: 8.40 },
+    clampExp: { lo: 1.55, hi: 11.50 },
     pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45, ipMin: 3.5, ipMax: 7.2, vsLhpMult: 0.96 },
     h2h: { minGames: 2, wDenom: 16, wMin: 0.05, wMax: 0.12 },
     softClamp: { nTinyCap: 6, madMultiplier: 3.5 }
@@ -717,6 +716,19 @@ S
   function parseSeries(val){
     return String(val||"").split(/[,\s]+/).map(function(t){ return parseFloat(t); }).filter(finite).slice(0,10);
   }
+  function parseSeriesStrict(val){
+    const parts = String(val||"").split(/[,\s]+/).map(function(t){ return t.trim(); }).filter(Boolean);
+    const values = [];
+    for (let i=0;i<parts.length;i++){
+      const n = parseFloat(parts[i]);
+      if (!finite(n)) return { ok:false, values:[], bad:parts[i] };
+      values.push(n);
+    }
+    return { ok:true, values:values.slice(0,10) };
+  }
+  function seriesKey(val){
+    return parseSeries(val).map(function(x){ return String(x); }).join(",");
+  }
 
 /* SECTION 20 — half-snap */
   function half(n){ return Math.round(Number(n)*2)/2; }
@@ -829,7 +841,7 @@ S
     let best = null, bestLen = 0;
     keys.forEach(function(k){
       const nk = normVenue(k);
-      if (Math.min(nk.length, nv.length) < 10) return;
+      if (Math.min(nk.length, nv.length) < 5) return;
       if (nv.indexOf(nk)>=0 || nk.indexOf(nv)>=0){
         if (nk.length > bestLen){ best = k; bestLen = nk.length; }
       }
@@ -886,7 +898,7 @@ S
 
 /* SECTION 38 — nb-pmf */
   function nbPmf(mu, variance, cap){
-    cap = cap || 20;
+    cap = cap || 24;
     const out = new Array(cap+1).fill(0);
     if (!finite(mu) || mu <= 0){ out[0]=1; return out; }
     const v = Math.max(variance||0, mu*1.22);
@@ -1091,10 +1103,12 @@ S
     const missingPitcherForB = !finite(input.aEra);
     let varA = shrinkVar(obsVarA, priorVar(expA, missingPitcherForA), formOffA.length);
     let varB = shrinkVar(obsVarB, priorVar(expB, missingPitcherForB), formOffB.length);
-    let pHome = nbPmf(expA, varA, 20);
-    let pAway = nbPmf(expB, varB, 20);
+    const capN = 24;
+    const homeReg = expA, awayReg = expB;
+    let pHome = nbPmf(expA, varA, capN);
+    let pAway = nbPmf(expB, varB, capN);
     let pTie = 0;
-    for (let k=0;k<=20;k++) pTie += pHome[k]*pAway[k];
+    for (let k=0;k<=capN;k++) pTie += pHome[k]*pAway[k];
     const ex = ENGINE_CONFIG.extras;
     if (pTie > ex.pTieTrigger){
       // Per-team extras bump: each team's own per-inning scoring rate plus the
@@ -1107,14 +1121,15 @@ S
       expB = clamp(expB, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
       varA = shrinkVar(obsVarA, priorVar(expA, missingPitcherForA), formOffA.length);
       varB = shrinkVar(obsVarB, priorVar(expB, missingPitcherForB), formOffB.length);
-      pHome = nbPmf(expA, varA, 20);
-      pAway = nbPmf(expB, varB, 20);
+      pHome = nbPmf(expA, varA, capN);
+      pAway = nbPmf(expB, varB, capN);
       pTie = 0;
-      for (let k=0;k<=20;k++) pTie += pHome[k]*pAway[k];
+      for (let k=0;k<=capN;k++) pTie += pHome[k]*pAway[k];
     }
 
     return {
       home: expA, away: expB, total: expA+expB,
+      homeReg: homeReg, awayReg: awayReg,
       varHome: varA, varAway: varB, varTotal: varA+varB,
       pHome: pHome, pAway: pAway, pTie: pTie,
       park: dirty ? 1 : pf, weather: wx, sample: n, tier: sampleTier(n),
@@ -1442,7 +1457,8 @@ S
       if (String(fx.homeId)===id){ scored=fx.homeScore; allowed=fx.awayScore; oppId=fx.awayId; }
       else if (String(fx.awayId)===id){ scored=fx.awayScore; allowed=fx.homeScore; oppId=fx.homeId; }
       else return;
-      const pf = Math.max(0.84, parkFactor(fx.venue||""));
+      const rawPf = parkFactor(fx.venue||"");
+      const pf = finite(rawPf) && rawPf>0 ? rawPf : 1;
       rows.push({ date:fx.date, scored:scored, allowed:allowed, scoredN: scored/pf, allowedN: allowed/pf, venue:fx.venue||"", inn:inn||9, oppId:String(oppId||""), eventId:fx.id });
     });
     rows.sort(function(a,b){ return Date.parse(b.date||0)-Date.parse(a.date||0); });
@@ -1564,12 +1580,16 @@ S
     const n = seasonsBack || 3;
     const years = [];
     for (let i=0;i<n;i++) years.push(curYear-i);
-    const results = await Promise.all(years.map(function(y){
-      return fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(aId)+"/schedule?season="+y+"&seasontype="+st+"&limit=200", 16000).catch(function(e){
-        log("WARN","FETCH","H2H season fetch failed", {season:y, error:String(e&&e.message||e)});
-        return null;
+    const jobs = [];
+    years.forEach(function(y){
+      [aId, bId].forEach(function(tid){
+        jobs.push(fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(tid)+"/schedule?season="+y+"&seasontype="+st+"&limit=200", 16000).catch(function(e){
+          log("WARN","FETCH","H2H season fetch failed", {season:y, team:tid, error:String(e&&e.message||e)});
+          return null;
+        }));
       });
-    }));
+    });
+    const results = await Promise.all(jobs);
     const seen = {};
     const events = [];
     results.forEach(function(data){
@@ -1686,6 +1706,12 @@ S
       fillSeriesInput("aFTAllowed", formA.map(function(x){return x.allowed;}));
       fillSeriesInput("bFTScored", formB.map(function(x){return x.scored;}));
       fillSeriesInput("bFTAllowed", formB.map(function(x){return x.allowed;}));
+      window.__bbAuto.formRaw = {
+        aFTScored: document.getElementById("aFTScored").value,
+        aFTAllowed: document.getElementById("aFTAllowed").value,
+        bFTScored: document.getElementById("bFTScored").value,
+        bFTAllowed: document.getElementById("bFTAllowed").value
+      };
       markAuto("aAutoTag", formA.length>0);
       markAuto("bAutoTag", formB.length>0);
 
@@ -1701,6 +1727,10 @@ S
         document.getElementById("useFTH2H").checked = h.length>=2;
         markAuto("h2hAutoTag", true);
       }
+      window.__bbAuto.h2hRaw = {
+        aFTH2H: document.getElementById("aFTH2H").value,
+        bFTH2H: document.getElementById("bFTH2H").value
+      };
 
       applyLast10Alert();
       const noteA = document.getElementById("teamAName").value || "Team A";
@@ -1769,14 +1799,14 @@ S
       aAllowed: parseSeries(document.getElementById("aFTAllowed").value),
       bScored: parseSeries(document.getElementById("bFTScored").value),
       bAllowed: parseSeries(document.getElementById("bFTAllowed").value),
-      aScoredN: (nA && nA.scoredN && nA.scoredN.length===parseSeries(document.getElementById("aFTScored").value).length) ? nA.scoredN : null,
-      aAllowedN: (nA && nA.allowedN && nA.allowedN.length===parseSeries(document.getElementById("aFTAllowed").value).length) ? nA.allowedN : null,
-      bScoredN: (nB && nB.scoredN && nB.scoredN.length===parseSeries(document.getElementById("bFTScored").value).length) ? nB.scoredN : null,
-      bAllowedN: (nB && nB.allowedN && nB.allowedN.length===parseSeries(document.getElementById("bFTAllowed").value).length) ? nB.allowedN : null,
+      aScoredN: (nA && nA.scoredN && seriesKey((window.__bbAuto.formRaw||{}).aFTScored)===seriesKey(document.getElementById("aFTScored").value)) ? nA.scoredN : null,
+      aAllowedN: (nA && nA.allowedN && seriesKey((window.__bbAuto.formRaw||{}).aFTAllowed)===seriesKey(document.getElementById("aFTAllowed").value)) ? nA.allowedN : null,
+      bScoredN: (nB && nB.scoredN && seriesKey((window.__bbAuto.formRaw||{}).bFTScored)===seriesKey(document.getElementById("bFTScored").value)) ? nB.scoredN : null,
+      bAllowedN: (nB && nB.allowedN && seriesKey((window.__bbAuto.formRaw||{}).bFTAllowed)===seriesKey(document.getElementById("bFTAllowed").value)) ? nB.allowedN : null,
       aH2H: parseSeries(document.getElementById("aFTH2H").value),
       bH2H: parseSeries(document.getElementById("bFTH2H").value),
-      aH2HN: (window.__bbAuto.h2hN && window.__bbAuto.h2hN.A) || null,
-      bH2HN: (window.__bbAuto.h2hN && window.__bbAuto.h2hN.B) || null,
+      aH2HN: (window.__bbAuto.h2hN && window.__bbAuto.h2hN.A && seriesKey((window.__bbAuto.h2hRaw||{}).aFTH2H)===seriesKey(document.getElementById("aFTH2H").value)) ? window.__bbAuto.h2hN.A : null,
+      bH2HN: (window.__bbAuto.h2hN && window.__bbAuto.h2hN.B && seriesKey((window.__bbAuto.h2hRaw||{}).bFTH2H)===seriesKey(document.getElementById("bFTH2H").value)) ? window.__bbAuto.h2hN.B : null,
       useH2H: document.getElementById("useFTH2H").checked,
       aEra: aEra,
       bEra: bEra,
@@ -1788,7 +1818,12 @@ S
       shortStartB: !!(window.__bbAuto && window.__bbAuto.isDH),
       seasonA: (window.__bbAuto.season && window.__bbAuto.season.A) || {},
       seasonB: (window.__bbAuto.season && window.__bbAuto.season.B) || {},
-      deparked: !!window.__bbAuto.deparked,
+      deparked: !!(window.__bbAuto.deparked
+        && nA && nB
+        && seriesKey((window.__bbAuto.formRaw||{}).aFTScored)===seriesKey(document.getElementById("aFTScored").value)
+        && seriesKey((window.__bbAuto.formRaw||{}).aFTAllowed)===seriesKey(document.getElementById("aFTAllowed").value)
+        && seriesKey((window.__bbAuto.formRaw||{}).bFTScored)===seriesKey(document.getElementById("bFTScored").value)
+        && seriesKey((window.__bbAuto.formRaw||{}).bFTAllowed)===seriesKey(document.getElementById("bFTAllowed").value)),
       neutral: !!(document.getElementById("neutralSite") && document.getElementById("neutralSite").checked)
     };
   }
@@ -1798,6 +1833,16 @@ S
   function runEngine(){
     applyLast10Alert();
     const data = collectInput();
+    const seriesFields = ["aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H"];
+    for (let i=0;i<seriesFields.length;i++){
+      const el = document.getElementById(seriesFields[i]);
+      if (!el || !String(el.value||"").trim()) continue;
+      const chk = parseSeriesStrict(el.value);
+      if (!chk.ok){
+        setStatus("Bad last-10 token '"+chk.bad+"' in "+seriesFields[i]+". Fix it before Run.", "err");
+        return;
+      }
+    }
     if (data.aScored.length<4 || data.bScored.length<4){
       alert("Need at least 4 scored games for both teams. Fetch stats or type last-10 runs.");
       return;
@@ -1829,8 +1874,9 @@ S
       const thresh = family==="team" ? th.team : th.ft;
       // Basketball-style: decide vs mid (single line OR band mid). If the box
       // is a range, smart-line then stresses the unfavourable end.
+      const awaySide = key==="tt_away" || key==="f5_away";
       const massMid = family==="team"
-        ? massOverUnder(key==="tt_away" ? proj.pAway : proj.pHome, band.mid)
+        ? massOverUnder(awaySide ? proj.pAway : proj.pHome, band.mid)
         : probOverJoint(proj, band.mid);
       const overEdge = mu - band.mid;
       const underEdge = band.mid - mu;
@@ -1918,7 +1964,8 @@ S
     addTotal("tt_away", "Team B Total", proj.away, bBand, "team");
     addSpread("rl_home", "Handicap", proj.home-proj.away, sprBand);
 
-    const f5H = proj.home * 5/9, f5A = proj.away * 5/9;
+    const f5H = (finite(proj.homeReg) ? proj.homeReg : proj.home) * 5/9;
+    const f5A = (finite(proj.awayReg) ? proj.awayReg : proj.away) * 5/9;
     const holdPH = proj.pHome, holdPA = proj.pAway;
     proj.pHome = nbPmf(f5H, Math.max(0.8, (proj.varHome||f5H)*5/9), 15);
     proj.pAway = nbPmf(f5A, Math.max(0.8, (proj.varAway||f5A)*5/9), 15);
@@ -1939,8 +1986,8 @@ S
       const denom = Math.max(1e-9, home+away);
       const pHomeW = home/denom, pAwayW = away/denom;
       let pick="NO PLAY", side="", pWin=null, showEdge=null;
-      if (pHomeW >= th.pWin && pHomeW >= pAwayW){ pick="HOME"; side="home"; pWin=pHomeW; showEdge=(pHomeW-0.5)*10; }
-      else if (pAwayW >= th.pWin){ pick="AWAY"; side="away"; pWin=pAwayW; showEdge=(pAwayW-0.5)*10; }
+      if (pHomeW >= th.pWin && pHomeW >= pAwayW){ pick="HOME"; side="home"; pWin=pHomeW; showEdge=null; }
+      else if (pAwayW >= th.pWin){ pick="AWAY"; side="away"; pWin=pAwayW; showEdge=null; }
       const g = pick==="NO PLAY" ? "" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
       rows.push({ marketKey:"winner", name:"Winner", projection:null, line:null, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:"winner", noLine:false });
     })();
@@ -1969,20 +2016,11 @@ S
         if (r.grade==="A") r.grade = "B";
       }
     });
-    rows.forEach(function(r){ r.track = false; });
-    const live = rows.filter(function(r){ return r.pick && r.pick!=="NO PLAY"; });
-    const ftLive = live.find(function(r){ return r.family==="ft"; });
-    const teamLive = live.filter(function(r){ return r.family==="team"; }).sort(function(a,b){
-      return Math.abs(b.edge||0) - Math.abs(a.edge||0);
+    rows.forEach(function(r){
+      r.track = !!(r.pick && r.pick!=="NO PLAY" && !r.plusDog && !r.review);
     });
-    const rlLive = live.find(function(r){ return r.family==="spread" && !r.plusDog && !r.review; });
-    const winLive = live.find(function(r){ return r.family==="winner"; });
-    const f5Live = live.find(function(r){ return String(r.marketKey||"").indexOf("f5")===0; });
-    const chosen = ftLive || winLive || teamLive[0] || rlLive || f5Live || null;
-    if (chosen) chosen.track = true;
-    live.forEach(function(r){
-      if (r !== chosen && r.pick && r.pick!=="NO PLAY") r.alsoLive = true;
-    });
+    const live = rows.filter(function(r){ return r.track; });
+    const chosen = live[0] || null;
 
     renderRows(rows, proj, data);
     trackRows(rows, proj, data);
@@ -2162,9 +2200,14 @@ S
 
 /* SECTION 87 — update-battery */
   function updateBattery(){
-    const s = (g_trackerState.stats||{});
-    const n = (s.wins||0)+(s.losses||0);
-    const pct = n ? Math.round(100*(s.wins||0)/n) : 0;
+    const lg = currentLeagueKey();
+    const all = (g_trackerState.activePicks||[]).concat(g_trackerState.archivedPicks||[]);
+    const decided = all.filter(function(p){
+      return /^(win|loss)$/.test(String(p.resultStatus||"")) && (!lg || String(p.league||"")===lg);
+    });
+    const n = decided.length;
+    const wins = decided.filter(function(p){ return p.resultStatus==="win"; }).length;
+    const pct = n ? Math.round(100*wins/n) : 0;
     const fill = document.getElementById("enginePerfFill");
     const lab = document.getElementById("enginePerfPct");
     if (fill){ fill.style.width = (n?pct:0)+"%"; fill.style.background = pct>=55?"#49d45f":pct>=48?"#d98a00":"#c91920"; }
@@ -2260,7 +2303,7 @@ S
       return (pick.side==="under") ? (over?"loss":"win") : (over?"win":"loss");
     }
     if (fam==="team"){
-      const actual = pick.marketKey==="tt_away" ? away : home;
+      const actual = (pick.marketKey==="tt_away" || pick.marketKey==="f5_away") ? away : home;
       if (!finite(line)) return "pending";
       if (Math.abs(actual-line)<1e-9) return "push";
       const over = actual>line;
@@ -2901,13 +2944,19 @@ S
           const sample = byEvent[eid][0];
           const hit = await findCompletedManualGame(league, sample);
           if (!hit || !finite(hit.homeScore) || !finite(hit.awayScore)) continue;
+          let f5 = { home:NaN, away:NaN };
+          try {
+            const box = await fetchJSON(BB.SITE(league)+"/summary?event="+encodeURIComponent(hit.id), 12000);
+            const cc = (box.header && box.header.competitions && box.header.competitions[0]) || {};
+            f5 = f5ScoresFromCompetitors(cc.competitors||[]);
+          } catch(e){}
           byEvent[eid].forEach(function(p){
-            const st = settleMath(p, hit.homeScore, hit.awayScore);
+            const st = settleMath(p, hit.homeScore, hit.awayScore, { f5Home:f5.home, f5Away:f5.away });
             if (st==="pending") return;
             p.resultStatus = st;
             p.settledAt = new Date().toISOString();
             p.actualHome = hit.homeScore; p.actualAway = hit.awayScore;
-            p.actualScore = hit.homeScore+"-"+hit.awayScore;
+            p.actualScore = String(p.marketKey||"").indexOf("f5")===0 && finite(f5.home) ? (f5.home+"-"+f5.away+" F5") : (hit.homeScore+"-"+hit.awayScore);
             p.settledEventId = hit.id;
           });
           continue;
@@ -3022,7 +3071,7 @@ S
     const neu = document.getElementById("neutralSite"); if (neu) neu.checked = false;
     document.querySelectorAll(".section").forEach(function(s){ s.classList.add("collapsed"); s.classList.remove("locked"); });
     const lg = document.getElementById("leagueSection"); if (lg) lg.classList.remove("collapsed");
-    window.__bbAuto = { A:{}, B:{}, weather:null, venue:"", pitchers:{}, odds:{}, season:{}, formN:{}, h2hN:{}, deparked:false };
+    window.__bbAuto = { A:{}, B:{}, weather:null, venue:"", pitchers:{}, odds:{}, season:{}, formN:{}, h2hN:{}, formRaw:{}, h2hRaw:{}, deparked:false };
     setStatus("");
     document.getElementById("fixtureContextStatus").textContent = "";
   }
@@ -3132,7 +3181,10 @@ S
 
     tkRecount(); updateBattery(); renderTracked();
     try { autoSettle(); } catch(e){}
-    setInterval(function(){ if (document.visibilityState!=="hidden") autoSettle(); }, 5*60*1000);
+    setInterval(function(){
+      if (document.visibilityState==="hidden") return;
+      autoSettle();
+    }, 20*1000);
     if (BB.relayOverrideActive) log("WARN","TRUST","Relay override active", {worker:BB.WORKER});
     log("OK","BOOT","Baseball engine ready", { build:APP_BUILD, config:ENGINE_CONFIG.version, relayOverride:!!BB.relayOverrideActive });
   });
