@@ -1,5 +1,4 @@
-K
-
+/* SECTION 1 — html-document */
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,6 +14,8 @@ K
   <meta http-equiv="Expires" content="0" />
   <!-- BUILD_MARKER: bb_engine_v4_mlb_ui_20260904_deskfix -->
   <title>Baseball Prediction Engine</title>
+
+/* SECTION 2 — css-tokens-and-layout */
   <style>
     :root {
       --bg: #efefef; --text: #1f2430; --panel: #ffffff; --panel-border: #dedede;
@@ -208,6 +209,8 @@ K
 </head>
 <body>
 <script>(function(){try{if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.style.background='#0c0c0c';document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('dark-mode');});}}catch(e){}})();</script>
+
+/* SECTION 3 — html-pin-overlay */
 <div id="engineLockOverlay">
   <div class="engine-lock-card">
     <div class="engine-lock-title">🔒 TheBetCeo ⚡</div>
@@ -219,6 +222,8 @@ K
 </div>
 <script>
 (function(){
+
+/* SECTION 4 — pin-lock */
   var PIN_FNV = 4177456266; // FNV-1a of the unlock code — not stored in plaintext
   var UNLOCK_FLAG = "f8feec8a";
   var overlay = document.getElementById('engineLockOverlay');
@@ -254,6 +259,8 @@ K
   inputEl.addEventListener('keydown', function(e){ if(e.key==='Enter') tryUnlock(); });
 })();
 </script>
+
+/* SECTION 5 — html-app-shell */
 <header class="app-header">
   <span class="brand-name">TheBetCeo ⚡️</span>
   <span class="header-center">
@@ -401,6 +408,8 @@ K
   </table>
 </div>
 
+
+/* SECTION 6 — html-tracker-modal */
 <div id="trackerModal" class="tracker-modal" aria-hidden="true">
   <div class="tracker-panel">
     <div class="tracker-head">
@@ -435,6 +444,8 @@ K
   </div>
 </div>
 
+
+/* SECTION 7 — html-debug-overlays */
 <div id="afdbOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.96);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
   <div id="afdbPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
 </div>
@@ -445,11 +456,15 @@ K
 <script>
 (function(){
   'use strict';
+
+/* SECTION 8 — app-build */
   const APP_BUILD = "bb_engine_v4_mlb_ui_20260904_deskfix4";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
      but they now live in one place so thresholds cannot drift independently. */
+
+/* SECTION 9 — engine-config */
   const ENGINE_CONFIG = {
     version: "baseball_v4.1_auditfix",
     thresholds: { ft: 0.42, team: 0.32, spread: 0.36, pWin: 0.538 },
@@ -479,6 +494,8 @@ K
   };
   window.__ENGINE_CONFIG = ENGINE_CONFIG;
 
+
+/* SECTION 10 — league-slug */
   const LEAGUE_SLUG = {
     mlb: "mlb", mlb_pre: "mlb", mlb_post: "mlb",
     "college-baseball": "college-baseball",
@@ -492,6 +509,8 @@ K
   };
   const LEAGUE_SEASON_TYPE = { mlb: 2, mlb_pre: 1, mlb_post: 3 };
 
+
+/* SECTION 11 — espn-endpoints */
   const BB = {
     SITE: function(slug){ return "https://site.api.espn.com/apis/site/v2/sports/baseball/" + encodeURIComponent(slug); },
     WORKER: (function(){
@@ -522,6 +541,8 @@ K
     BB.relayOverrideActive = !!(ov && String(BB.WORKER).indexOf(String(ov).trim()) === 0);
   } catch(e){ BB.relayOverrideActive = false; }
 
+
+/* SECTION 12 — esc */
   function esc(s){
     return String(s==null?"":s)
       .replace(/&/g,"&amp;")
@@ -531,6 +552,8 @@ K
   }
 
   const LOG = [];
+
+/* SECTION 13 — engine-log */
   function log(level, section, msg, data){
     const row = { ts: new Date().toLocaleTimeString([], {hour12:false}), level: level, section: section, msg: String(msg||""), data: data||null };
     LOG.unshift(row);
@@ -539,6 +562,8 @@ K
   }
   window.__bbLog = function(ctx, err){ try { log("WARN", ctx, err && err.message ? err.message : String(err)); } catch(e){} };
 
+
+/* SECTION 14 — afdb-debug */
   const AFDB = (function(){
     let _isOpen = false;
     let _level = "ALL";
@@ -610,22 +635,36 @@ K
 
   window.g_driftErrors = window.g_driftErrors || [];
 
+
+/* SECTION 15 — clamp */
   function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+/* SECTION 16 — finite */
   function finite(x){ if (x===null || x===undefined || x==="") return false; return Number.isFinite(Number(x)); }
+
+/* SECTION 17 — avg */
   function avg(arr){
     const x = (arr||[]).map(Number).filter(finite);
     return x.length ? x.reduce(function(a,b){return a+b;},0)/x.length : NaN;
   }
+
+/* SECTION 18 — std-dev */
   function stdDev(arr){
     const x = (arr||[]).map(Number).filter(finite);
     if (x.length < 2) return 0;
     const m = avg(x);
     return Math.sqrt(x.reduce(function(s,v){ return s+(v-m)*(v-m); },0)/x.length);
   }
+
+/* SECTION 19 — parse-series */
   function parseSeries(val){
     return String(val||"").split(/[,\s]+/).map(function(t){ return parseFloat(t); }).filter(finite).slice(0,10);
   }
+
+/* SECTION 20 — half-snap */
   function half(n){ return Math.round(Number(n)*2)/2; }
+
+/* SECTION 21 — snap-run-total */
   function snapRunTotal(n){
     const x = Number(n);
     if (!finite(x)) return NaN;
@@ -636,6 +675,8 @@ K
     const up = Math.floor(x) + 1.5;
     return (Math.abs(x - down) <= Math.abs(x - up)) ? down : up;
   }
+
+/* SECTION 22 — parse-band */
   function parseBand(val){
     if (!val || !String(val).trim()) return null;
     const raw = String(val).trim();
@@ -649,12 +690,20 @@ K
     if (!finite(n)) return null;
     return { lo:n, hi:n, mid:n, isRange:false, raw:raw };
   }
+
+/* SECTION 23 — parse-line */
   function parseLine(val){
     const b = parseBand(val);
     return b ? b.mid : null;
   }
+
+/* SECTION 24 — display-line */
   function displayLine(v){ if (!finite(v)) return "—"; return String(snapRunTotal(v)); }
+
+/* SECTION 25 — display-signed */
   function displaySigned(v){ if (!finite(v)) return "—"; const x=Math.round(Number(v)*2)/2; return x>0?"+"+x:String(x); }
+
+/* SECTION 26 — weighted-recent */
   function weightedRecent(arr){
     const w = (ENGINE_CONFIG && ENGINE_CONFIG.recencyWeights) || [1.40,1.22,1.06,0.92,0.80,0.68,0.56,0.46,0.36,0.28];
     const clean = (arr||[]).map(Number).filter(finite);
@@ -664,6 +713,8 @@ K
     for (let i=0;i<n;i++){ s += clean[i]*w[i]; tw += w[i]; }
     return tw ? s/tw : avg(clean);
   }
+
+/* SECTION 27 — trimmed-weighted */
   function trimmedWeighted(arr){
     const clean = (arr||[]).map(Number).filter(finite);
     if (!clean.length) return NaN;
@@ -683,15 +734,21 @@ K
     const wins = clean.map(function(v){ return clamp(v, med - k*mad, med + k*mad); });
     return weightedRecent(wins);
   }
+
+/* SECTION 28 — normal-cdf */
   function normalCdf(x){
     const t = 1/(1+0.2316419*Math.abs(x));
     const d = 0.3989423*Math.exp(-x*x/2);
     let p = d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
     return x>0 ? 1-p : p;
   }
+
+/* SECTION 29 — sample-tier */
   function sampleTier(n){ if (n>=8) return "full"; if (n>=4) return "thin"; return "insufficient"; }
 
   /* Park factors — run environment vs league average. Keys match ESPN venue names. */
+
+/* SECTION 30 — park-factor-table */
   const PARK_FACTOR = {
     "Coors Field": 1.28, "Fenway Park": 1.09, "Great American Ball Park": 1.14,
     "Globe Life Field": 1.06, "Oriole Park at Camden Yards": 1.10,
@@ -706,7 +763,11 @@ K
     "Oakland Coliseum": 0.94, "Sutter Health Park": 1.02, "Rogers Centre": 1.02,
     "Nationals Park": 1.01
   };
+
+/* SECTION 31 — norm-venue */
   function normVenue(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,""); }
+
+/* SECTION 32 — park-match-key */
   function parkMatchKey(venue){
     if (!venue) return null;
     const nv = normVenue(venue);
@@ -723,12 +784,18 @@ K
     });
     return best;
   }
+
+/* SECTION 33 — park-factor */
   function parkFactor(venue){
     const key = parkMatchKey(venue);
     return key ? PARK_FACTOR[key] : 1;
   }
+
+/* SECTION 34 — park-known */
   function parkKnown(venue){ return !!parkMatchKey(venue); }
 
+
+/* SECTION 35 — league-base-table */
   const LEAGUE_BASE = {
     mlb: { team: 4.45, total: 8.90, sdTeam: 3.05, sdGame: 4.15 },
     mlb_pre: { team: 5.10, total: 10.20, sdTeam: 3.40, sdGame: 4.60 },
@@ -742,8 +809,12 @@ K
     "puerto-rican-winter-league": { team: 4.50, total: 9.00, sdTeam: 3.10, sdGame: 4.20 },
     "venezuelan-winter-league": { team: 4.70, total: 9.40, sdTeam: 3.20, sdGame: 4.30 }
   };
+
+/* SECTION 36 — league-base */
   function leagueBase(key){ return LEAGUE_BASE[key] || LEAGUE_BASE.mlb; }
 
+
+/* SECTION 37 — weather-adj */
   function weatherAdj(weather){
     if (!weather) return 0;
     const t = Number(weather.temperature);
@@ -760,6 +831,8 @@ K
     return clamp(a, -0.28, 0.28);
   }
 
+
+/* SECTION 38 — nb-pmf */
   function nbPmf(mu, variance, cap){
     cap = cap || 20;
     const out = new Array(cap+1).fill(0);
@@ -787,12 +860,16 @@ K
     if (sum>0) for (let k=0;k<=cap;k++) out[k]/=sum;
     return out;
   }
+
+/* SECTION 39 — conv-total */
   function convTotal(pH, pA){
     const n = pH.length, m = pA.length;
     const tot = new Array(n+m-1).fill(0);
     for (let i=0;i<n;i++) for (let j=0;j<m;j++) tot[i+j] += pH[i]*pA[j];
     return tot;
   }
+
+/* SECTION 40 — mass-over-under */
   function massOverUnder(pmf, line){
     let over=0, under=0, push=0;
     for (let k=0;k<pmf.length;k++){
@@ -802,6 +879,8 @@ K
     }
     return { over:over, under:under, push:push };
   }
+
+/* SECTION 41 — cover-home */
   function coverHome(pH, pA, homeLine){
     let cover=0, fail=0, push=0;
     for (let i=0;i<pH.length;i++){
@@ -822,6 +901,8 @@ K
    * Opponent starter + bullpen is the pitching term.
    * Today's park is applied once, after rates are park-neutral.
    */
+
+/* SECTION 42 — blend-rate */
   function blendRate(season, formN, lg, nForm, gp, dirtyForm){
     const cfg = ENGINE_CONFIG.blend;
     let seasonW = 0;
@@ -834,6 +915,8 @@ K
     const form = finite(formN) ? formN : prior;
     return (1-w)*prior + w*form;
   }
+
+/* SECTION 43 — infer-starter-ip */
   function inferStarterIP(era, shortStart){
     const cfg = ENGINE_CONFIG.pitching;
     if (shortStart) return 5.0;
@@ -843,6 +926,8 @@ K
     if (era <= 3.20) return 6.4;
     return cfg.starterIP;
   }
+
+/* SECTION 44 — pitching-allowed */
   function pitchingAllowed(starterERA, teamRA, lg, teamERA, bullpenERA, starterIP, shortStart){
     const cfg = ENGINE_CONFIG.pitching;
     const staff = finite(teamERA) ? teamERA : (finite(teamRA) ? teamRA : lg);
@@ -859,6 +944,8 @@ K
     }
     return cfg.noStarterStaffW*staff + (1-cfg.noStarterStaffW)*lg;
   }
+
+/* SECTION 45 — project-matchup */
   function projectMatchup(input){
     const base = leagueBase(input.leagueKey);
     const lg = base.team;
@@ -926,11 +1013,15 @@ K
     // The prior itself widens when the specific starter facing this lineup is
     // unknown, since the mean already fell back to a team/league blend that
     // carries more inherent uncertainty than a real starter-specific estimate.
+
+/* SECTION 46 — prior-var */
     function priorVar(exp, missingPitcher){
       const vcfg = ENGINE_CONFIG.variance;
       const p = Math.max(base.sdTeam*base.sdTeam*vcfg.floorShare, exp*vcfg.meanCoef + vcfg.meanAdd);
       return missingPitcher ? p * vcfg.missingPitcherInflate : p;
     }
+
+/* SECTION 47 — shrink-var */
     function shrinkVar(obs, prior, nObs){
       const vcfg = ENGINE_CONFIG.variance;
       if (!finite(obs) || nObs < 2) return prior;
@@ -984,13 +1075,19 @@ K
     };
   }
 
+
+/* SECTION 48 — prob-over-joint */
   function probOverJoint(proj, line){
     const tot = convTotal(proj.pHome, proj.pAway);
     return massOverUnder(tot, line);
   }
+
+/* SECTION 49 — step-down-grade */
   function stepDown(g){
     return g==="A"?"B":g==="B"?"C":g==="C"?"D":g;
   }
+
+/* SECTION 50 — grade-from-prob */
   function gradeFromProb(pWin, tier, hasPitcher, hasSeason){
     if (!finite(pWin)) return "NaN";
     const gcfg = ENGINE_CONFIG.grades;
@@ -1008,6 +1105,8 @@ K
   window.__bbThresholds = ENGINE_CONFIG.thresholds;
 
   /* ===================== FETCH ===================== */
+
+/* SECTION 51 — fetch-json */
   async function fetchJSON(url, timeoutMs, opts){
     timeoutMs = timeoutMs || 14000;
     opts = opts || {};
@@ -1054,6 +1153,8 @@ K
     throw last || new Error("ESPN fetch failed");
   }
 
+
+/* SECTION 52 — local-date-key */
   function localDateKey(offset){
     const d = new Date();
     d.setDate(d.getDate() + (offset||0));
@@ -1069,12 +1170,16 @@ K
       return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
     }
   }
+
+/* SECTION 53 — score-val */
   function scoreVal(s){
     if (s==null) return null;
     if (typeof s === "object") return finite(s.value) ? Number(s.value) : parseFloat(s.displayValue);
     const n = parseFloat(s);
     return finite(n) ? n : null;
   }
+
+/* SECTION 54 — extract-pitcher */
   function extractPitcher(comp){
     const list = (comp && comp.probables) || [];
     const p = list.find(function(x){ return /probableStartingPitcher|starter/i.test(String(x.name||x.abbreviation||"")); }) || list[0];
@@ -1106,6 +1211,8 @@ K
       era: era, record: p.record||"", hand: hand, ip: ip
     };
   }
+
+/* SECTION 55 — extract-odds */
   function extractOdds(comp){
     const raw = (comp && comp.odds && comp.odds[0]) || null;
     if (!raw) return { total:null, spread:null, homeMl:null, awayMl:null };
@@ -1127,6 +1234,8 @@ K
   let fixtureCache = [];
   window.__bbAuto = { A:{}, B:{}, weather:null, venue:"", pitchers:{}, odds:{}, season:{}, formN:{}, h2hN:{}, deparked:false };
 
+
+/* SECTION 56 — set-status */
   function setStatus(txt, kind){
     const el = document.getElementById("fetchStatus");
     if (!el) return;
@@ -1137,12 +1246,18 @@ K
       warn.classList.toggle("active", kind==="err");
     }
   }
+
+/* SECTION 57 — current-slug */
   function currentSlug(){
     const key = document.getElementById("leagueSelect").value;
     return LEAGUE_SLUG[key] || "";
   }
+
+/* SECTION 58 — current-league-key */
   function currentLeagueKey(){ return document.getElementById("leagueSelect").value || "mlb"; }
 
+
+/* SECTION 59 — normalize-event */
   function normalizeEvent(ev, slug){
     const c = (ev.competitions||[])[0];
     if (!c) return null;
@@ -1176,6 +1291,8 @@ K
     };
   }
 
+
+/* SECTION 60 — load-fixtures */
   async function loadFixtures(){
     const slug = currentSlug();
     const sel = document.getElementById("fixtureSelect");
@@ -1220,6 +1337,8 @@ K
     }
   }
 
+
+/* SECTION 61 — apply-fixture */
   function applyFixture(fx){
     document.getElementById("teamAName").value = fx.homeName||"";
     document.getElementById("teamBName").value = fx.awayName||"";
@@ -1250,6 +1369,8 @@ K
     }
   }
 
+
+/* SECTION 62 — last-completed-form */
   function lastCompletedForm(events, teamId){
     const id = String(teamId);
     const rows = [];
@@ -1272,12 +1393,18 @@ K
     return cap ? rows.slice(0, cap) : rows;
   }
 
+
+/* SECTION 63 — format-fixture-time */
   function formatFixtureTime(dateStr){
     if (!dateStr) return "--:--";
     try { return new Date(dateStr).toLocaleTimeString([], { hour:"numeric", minute:"2-digit", hour12:true }); }
     catch(e){ return "--:--"; }
   }
+
+/* SECTION 64 — norm-name */
   function normName(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
+
+/* SECTION 65 — resolve-team-id */
   async function resolveTeamId(slug, name){
     const n = normName(name);
     if (!n) return "";
@@ -1312,9 +1439,13 @@ K
     }
     return hits[0].id;
   }
+
+/* SECTION 66 — is-winter-league */
   function isWinterLeague(key){
     return /winter-league|caribbean-series/.test(String(key||""));
   }
+
+/* SECTION 67 — schedule-season-year */
   function scheduleSeasonYear(key){
     const now = new Date();
     const y = now.getFullYear();
@@ -1324,6 +1455,8 @@ K
     if (isWinterLeague(key) && m <= 3) return y - 1;
     return y;
   }
+
+/* SECTION 68 — fetch-team-schedule */
   async function fetchTeamSchedule(slug, teamId){
     const leagueKey = currentLeagueKey();
     const year = scheduleSeasonYear(leagueKey);
@@ -1365,6 +1498,8 @@ K
     return events;
   }
 
+
+/* SECTION 69 — fetch-h2h-games */
   async function fetchH2HGames(slug, aId, bId, seasonsBack){
     const leagueKey = currentLeagueKey();
     const st = LEAGUE_SEASON_TYPE[leagueKey] || 2;
@@ -1393,15 +1528,21 @@ K
     return lastCompletedForm(events, aId, 500).filter(function(g){ return g.oppId===String(bId); }).slice(0,10);
   }
 
+
+/* SECTION 70 — fill-series-input */
   function fillSeriesInput(id, arr){
     const el = document.getElementById(id);
     if (el) el.value = arr.join(",");
   }
+
+/* SECTION 71 — mark-auto */
   function markAuto(id, on){
     const el = document.getElementById(id);
     if (el) el.style.display = on ? "inline" : "none";
   }
 
+
+/* SECTION 72 — fetch-season-rates */
   async function fetchSeasonRates(slug, teamId){
     const out = { rs:NaN, ra:NaN, gp:NaN, era:NaN, bullpenEra:NaN };
     try {
@@ -1443,6 +1584,8 @@ K
     } catch(e){}
     return out;
   }
+
+/* SECTION 73 — auto-fetch */
   async function autoFetch(){
     const slug = currentSlug();
     if (!slug){ setStatus("Select a league first."); return; }
@@ -1529,6 +1672,8 @@ K
     }
   }
 
+
+/* SECTION 74 — apply-last10-alert */
   function applyLast10Alert(){
     const ids = ["aFTScored","aFTAllowed","bFTScored","bFTAllowed"];
     const short = [];
@@ -1549,6 +1694,8 @@ K
   }
 
   /* ===================== ENGINE RUN ===================== */
+
+/* SECTION 75 — collect-input */
   function collectInput(){
     const aEra = window.__bbAuto.pitchers && window.__bbAuto.pitchers.home ? window.__bbAuto.pitchers.home.era : NaN;
     const bEra = window.__bbAuto.pitchers && window.__bbAuto.pitchers.away ? window.__bbAuto.pitchers.away.era : NaN;
@@ -1586,6 +1733,8 @@ K
     };
   }
 
+
+/* SECTION 76 — run-engine */
   function runEngine(){
     applyLast10Alert();
     const data = collectInput();
@@ -1607,6 +1756,8 @@ K
     const sprBand = parseBand(document.getElementById("spreadLine").value);
 
     const rows = [];
+
+/* SECTION 77 — add-total */
     function addTotal(key, name, mu, band, family){
       if (!band){
         rows.push({ marketKey:key, name:name, projection:mu, line:null, edge:null, prob:null, pick:"NO PLAY", side:"", grade:"NaN", family:family, noLine:true });
@@ -1658,6 +1809,8 @@ K
       const g = pick==="NO PLAY" ? "NaN" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
       rows.push({ marketKey:key, name:name, projection:mu, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:family, noLine:false });
     }
+
+/* SECTION 78 — add-spread */
     function addSpread(key, name, muMargin, band){
       if (!band){
         rows.push({ marketKey:key, name:name, projection:muMargin, line:null, edge:null, prob:null, pick:"NO PLAY", side:"", grade:"NaN", family:"spread", noLine:true });
@@ -1753,15 +1906,21 @@ K
     log("OK","ENGINE","run complete", {proj:proj, rows:rows.map(function(r){return r.pick;})});
   }
 
+
+/* SECTION 79 — format-projection-whole */
   function formatProjectionWhole(val){
     if (!finite(val)) return "NaN";
     return String(Math.round(Number(val)));
   }
+
+/* SECTION 80 — format-edge */
   function formatEdge(edge){
     if (!finite(edge)) return "NaN";
     const e = Math.round(edge*10)/10;
     return (e>0?"+":"")+e.toFixed(1);
   }
+
+/* SECTION 81 — render-rows */
   function renderRows(rows, proj){
     const table = document.getElementById("results");
     table.style.display = "table";
@@ -1823,16 +1982,22 @@ K
     } catch(e){}
     return { activePicks:[], archivedPicks:[], stats:{settled:0,wins:0,losses:0,pushes:0}, updatedAt:new Date().toISOString() };
   })();
+
+/* SECTION 82 — tracker-save */
   function tkSave(){
     g_trackerState.updatedAt = new Date().toISOString();
     try { localStorage.setItem(TK, JSON.stringify(g_trackerState)); } catch(e){ window.__bbLog("tkSave", e); }
     updateBattery();
   }
   const LIVE_MS = 10 * 60 * 60 * 1000;
+
+/* SECTION 83 — pick-ref-ts */
   function pickRefTs(p){
     const s = Date.parse(p && (p.settledAt || p.eventDate || p.createdAt) || 0);
     return finite(s) ? s : 0;
   }
+
+/* SECTION 84 — is-live-tracked */
   function isLiveTracked(p){
     if (!p) return false;
     if (String(p.resultStatus||"pending")==="pending") return true;
@@ -1840,6 +2005,8 @@ K
     if (!ts) return true;
     return (Date.now() - ts) < LIVE_MS;
   }
+
+/* SECTION 85 — archive-expired-tracked-picks */
   function archiveExpiredTrackedPicks(){
     const keep=[], move=[];
     (g_trackerState.activePicks||[]).forEach(function(p){
@@ -1853,12 +2020,16 @@ K
     g_trackerState.activePicks = keep;
     tkSave();
   }
+
+/* SECTION 86 — tracker-recount */
   function tkRecount(){
     archiveExpiredTrackedPicks();
     const all = g_trackerState.activePicks.concat(g_trackerState.archivedPicks);
     const s = all.filter(function(p){ return /^(win|loss|push)$/.test(p.resultStatus); });
     g_trackerState.stats = { settled:s.length, wins:s.filter(function(p){return p.resultStatus==="win";}).length, losses:s.filter(function(p){return p.resultStatus==="loss";}).length, pushes:s.filter(function(p){return p.resultStatus==="push";}).length };
   }
+
+/* SECTION 87 — update-battery */
   function updateBattery(){
     const s = (g_trackerState.stats||{});
     const n = (s.wins||0)+(s.losses||0);
@@ -1868,7 +2039,11 @@ K
     if (fill){ fill.style.width = (n?pct:0)+"%"; fill.style.background = pct>=55?"#49d45f":pct>=48?"#d98a00":"#c91920"; }
     if (lab) lab.textContent = n ? pct+"%" : "—";
   }
+
+/* SECTION 88 — track-rows */
   function trackRows(rows){
+
+/* SECTION 89 — stable-manual-id */
     function stableManualId(){
       const a = normName(document.getElementById("teamAName").value);
       const b = normName(document.getElementById("teamBName").value);
@@ -1910,6 +2085,8 @@ K
     if (g_trackerState.activePicks.length>400) g_trackerState.activePicks = g_trackerState.activePicks.slice(-400);
     tkRecount(); tkSave(); renderTracked();
   }
+
+/* SECTION 90 — settle-math */
   function settleMath(pick, home, away, extra){
     extra = extra || {};
     if (!pick) return "pending";
@@ -1940,6 +2117,8 @@ K
     }
     return "pending";
   }
+
+/* SECTION 91 — apply-manual-settle */
   function applyManual(sig, status){
     let found=null;
     g_trackerState.activePicks.concat(g_trackerState.archivedPicks).forEach(function(p){ if(p.signature===sig) found=p; });
@@ -1953,6 +2132,8 @@ K
     }
     tkRecount(); tkSave(); renderTracked();
   }
+
+/* SECTION 92 — tracker-delete-confirm */
   function showTrackerDeleteConfirm(pickLabel, matchLabel){
     return new Promise(function(resolve){
       const overlay = document.getElementById("trackerDeleteConfirm");
@@ -1982,6 +2163,8 @@ K
       overlay.addEventListener("click", onOverlay);
     });
   }
+
+/* SECTION 93 — delete-pick */
   function deletePick(sig){
     const p = g_trackerState.activePicks.concat(g_trackerState.archivedPicks).find(function(x){return x.signature===sig;});
     if (!p) return;
@@ -1995,6 +2178,8 @@ K
     });
   }
   var __trackerView = "picks";
+
+/* SECTION 94 — tracker-modal-view */
   function setTrackerModalView(view){
     __trackerView = (view === "report") ? "report" : "picks";
     const isReport = __trackerView === "report";
@@ -2125,6 +2310,8 @@ K
     }
   }
   window.setTrackerModalView = setTrackerModalView;
+
+/* SECTION 95 — run-self-test */
   function runSelfTest(opts){
     opts = opts || {};
     if (opts.openDebug && window.AFDB) AFDB.open();
@@ -2170,6 +2357,8 @@ K
     })();
   }
   window.runSelfTest = runSelfTest;
+
+/* SECTION 96 — run-full-audit */
   function runFullAudit(){
     if (window.AFDB) AFDB.open();
     let issues=0;
@@ -2248,6 +2437,8 @@ K
     log(issues?"ERROR":"OK","AUDIT", issues?("Unit checks found "+issues+" issue(s)."):"Unit checks passed (PMF, settle, CLV, park, ERA). Not a historical backtest.");
   }
   window.runFullAudit = runFullAudit;
+
+/* SECTION 97 — engine-auditor */
   const EngineAuditor = (function(){
     const SEV_COLOR = { CRITICAL:"#ff5c61", HIGH:"#ff9d4d", MEDIUM:"#ffcf73", LOW:"#8fd3ff", INFO:"#4ea9ff" };
     let _findings = [], _open=false, _ms=0, _view="severity";
@@ -2379,6 +2570,8 @@ K
   window.EngineAuditor = EngineAuditor;
 
 
+
+/* SECTION 98 — render-tracked */
     function renderTracked(){
     archiveExpiredTrackedPicks();
     const body = document.getElementById("trackedPicksBody");
@@ -2425,6 +2618,8 @@ K
     }
   }
 
+
+/* SECTION 99 — scoreboard-date-key */
   function scoreboardDateKeyFromTs(ts){
     try {
       const fmt = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" });
@@ -2438,6 +2633,8 @@ K
       return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
     }
   }
+
+/* SECTION 100 — find-completed-manual-game */
   async function findCompletedManualGame(league, sample){
     const keys = [];
     const seenKey = {};
@@ -2470,6 +2667,8 @@ K
     });
     return candidates[0];
   }
+
+/* SECTION 101 — auto-settle */
   async function autoSettle(){
     const pending = (g_trackerState.activePicks||[]).filter(function(p){ return p.resultStatus==="pending" && p.eventId; });
     const byEvent = {};
@@ -2528,6 +2727,8 @@ K
   }
 
   /* ===================== UI ===================== */
+
+/* SECTION 102 — make-sections-collapsible */
   function makeSectionsCollapsible(){
     document.querySelectorAll(".section").forEach(function(section){
       if (section.querySelector(".section-toggle")) return;
@@ -2557,6 +2758,8 @@ K
     const league = document.getElementById("leagueSection");
     if (league) league.classList.remove("collapsed");
   }
+
+/* SECTION 103 — clear-all */
   function clearAll(preserveLeague){
     ["teamAName","teamAId","teamBName","teamBId","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","fixtureKickoff","fixtureEventId","fixtureVenue"].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=""; });
     const u = document.getElementById("useFTH2H"); if (u) u.checked=false;
@@ -2579,6 +2782,8 @@ K
     document.getElementById("fixtureContextStatus").textContent = "";
   }
 
+
+/* SECTION 104 — boot-listeners */
   document.addEventListener("DOMContentLoaded", function(){
         makeSectionsCollapsible();
 
