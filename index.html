@@ -1,1 +1,3228 @@
-PLACEHOLDER_USE_LOCAL_FILE
+<!-- SECTION 1 — html-document -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://site.api.espn.com https://sports.core.api.espn.com https://thebetceo-engine.ridwantunde636.workers.dev https://corsproxy.io https://api.allorigins.win; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="BB Engine" />
+  <meta name="theme-color" content="#c91920" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <!-- BUILD_MARKER: bb_engine_v4_mlb_ui_20260904_deskfix -->
+  <title>Baseball Prediction Engine</title>
+
+<!-- SECTION 2 — css-tokens-and-layout -->
+  <style>
+    :root {
+      --bg: #efefef; --text: #1f2430; --panel: #ffffff; --panel-border: #dedede;
+      --panel-soft: #f6f7f9; --panel-soft-2: #eceff3; --input-bg: #ffffff;
+      --input-border: #cfd4da; --table-head: #3a404c; --muted: #7b8088;
+      --chip-text: #2a2f38; --shadow: 0 2px 8px rgba(0,0,0,0.05);
+      --section-toggle-text: #20242c; --section-toggle-icon: #d91f26;
+      --injury-title: #20242c; --table-border: #dfe2e7;
+      --tracker-head-bg: #3a404c; --tracker-head-text: #ffffff;
+      --tracker-summary-bg: #f6f7f9; --tracker-chip-bg: #f6f7f9;
+      --tracker-chip-border: #dfe2e7; --tracker-strong: #20242c;
+      --tracker-subtext: #5a5f6b; --tracker-mini-head-bg: #eceff3;
+      --tracker-mini-head-text: #2a2f38;
+    }
+    body.dark-mode {
+      --bg: #0c0c0c; --text: #f2f2f2; --panel: #161616; --panel-border: #2a2a2a;
+      --panel-soft: #121212; --panel-soft-2: #0f0f0f; --input-bg: #1c1c1c;
+      --input-border: #333; --table-head: #1a1a1a; --muted: #9a9a9a;
+      --chip-text: #e8e8e8; --shadow: 0 2px 10px rgba(0,0,0,0.45);
+      --section-toggle-text: #f2f2f2; --section-toggle-icon: #e53935;
+      --injury-title: #cfcfcf; --table-border: #2a2a2a;
+      --tracker-head-bg: #141414; --tracker-head-text: #ffffff;
+      --tracker-summary-bg: #121212; --tracker-chip-bg: #1a1a1a;
+      --tracker-chip-border: #2e2e2e; --tracker-strong: #ffffff;
+      --tracker-subtext: #a0a0a0; --tracker-mini-head-bg: #1a1a1a;
+      --tracker-mini-head-text: #ffffff;
+    }
+    button, input, select, .section, table, th, td, .tracker-panel, .fixture-day, .autocomplete-list, .league-box { border-radius: 0; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html { -webkit-text-size-adjust: 100%; background: var(--bg); height: 100%; }
+    html, body { background-color: var(--bg); }
+    body {
+      margin: 0; padding: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      -webkit-text-size-adjust: 100%;
+      min-height: 100vh; min-height: -webkit-fill-available;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    body.tracker-open { position: fixed; width: 100%; left: 0; right: 0; overflow: hidden; }
+    body.bb-last10-alert { background: #4a0d0d !important; }
+    body.bb-last10-alert .wrapper { outline: 4px solid #d92d2a; }
+    body::before {
+      content: ""; position: fixed; top: 0; left: 0; right: 0;
+      height: env(safe-area-inset-top, 0px); background: #c91920; z-index: 10000; pointer-events: none;
+    }
+    .app-header {
+      position: relative; display: flex; align-items: center; justify-content: space-between;
+      margin: 0 0 10px 0; padding-top: calc(env(safe-area-inset-top, 20px) + 12px);
+      padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right));
+      padding-bottom: 10px; min-height: 54px;
+      background: linear-gradient(90deg, #c91920 0%, #d91f26 50%, #b91520 100%);
+      color: #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+    }
+    .brand-name { font-size: 15px; font-weight: 800; letter-spacing: 0.3px; color: #fff; }
+    .brand-right { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255,255,255,0.85); text-transform: uppercase; }
+    .theme-toggle { background: none !important; border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: 1.5px !important; color: rgba(255,255,255,0.85) !important; text-transform: uppercase !important; cursor: pointer !important; }
+    .header-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; }
+    .engine-battery { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #fff; }
+    .engine-battery-shell { width: 22px; height: 11px; border: 1.5px solid rgba(255,255,255,0.85); border-radius: 2px; position: relative; padding: 1px; }
+    .engine-battery-shell::after { content: ''; position: absolute; right: -3px; top: 3px; width: 2px; height: 5px; background: rgba(255,255,255,0.85); border-radius: 0 1px 1px 0; }
+    .engine-battery-fill { height: 100%; border-radius: 1px; background: #49d45f; transition: width 0.4s ease, background-color 0.4s ease; }
+    .wrapper { max-width: 760px; margin: 10px auto; padding: 0 10px; width: 100%; box-sizing: border-box; }
+    .section { border: 1px solid var(--panel-border); background: var(--panel); margin: 8px 0; width: 100%; box-shadow: var(--shadow); color: var(--text); }
+    .section-toggle { width: 100%; background: none !important; border: none; padding: 12px 10px; margin: 0 !important; color: var(--section-toggle-text) !important; display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
+    .section-toggle .toggle-title { display: block; font-weight: 800; }
+    .section-toggle .toggle-icon { font-size: 15px; line-height: 1; transition: transform 0.2s ease; color: var(--section-toggle-icon) !important; }
+    .section-body { padding: 0 10px 10px; }
+    .section.collapsed .section-body { display: none; }
+    .section.collapsed .section-toggle .toggle-icon { transform: rotate(-90deg); }
+    h3 { margin: 0; font-size: 16px; font-weight: 800; }
+    label { display: block; font-size: 12px; margin-bottom: 4px; color: var(--text); font-weight: 600; }
+    input, .league-box, select.league-box { width: 100%; max-width: 260px; box-sizing: border-box; display: block; }
+    input, .league-box { padding: 6px 8px; font-size: 12px; background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border); margin-bottom: 6px; appearance: none; }
+    input::placeholder { color: var(--muted); opacity: 0.75; }
+    input:focus { outline: none; border-color: #4aa346; box-shadow: 0 0 0 2px rgba(74,163,70,0.12); }
+    input[type="checkbox"] { width: 12px !important; height: 12px !important; margin-right: 6px !important; appearance: checkbox !important; -webkit-appearance: checkbox !important; }
+    button { padding: 8px 16px; margin: 6px; font-weight: 700; background: #313744; color: #fff; border: none; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .fetch-btn { background: #49a443 !important; color: #fff !important; padding: 6px 12px !important; font-size: 12px !important; font-weight: 700 !important; border: none !important; margin-top: 4px; }
+    .fixture-toolbar { display: flex; gap: 8px; margin: 10px 0 8px; flex-wrap: wrap; }
+    .fixture-day { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; padding: 6px 10px !important; font-size: 12px !important; font-weight: 700; margin: 0; min-width: 90px !important; text-align: center; cursor: pointer; }
+    .fixture-day.active { background: #49a443 !important; color: #fff !important; border-color: #49a443 !important; }
+    body.dark-mode .fixture-day { background: #1c1c1c !important; color: #f2f2f2 !important; border-color: #333 !important; }
+    body.dark-mode .fixture-day.active { background: #49a443 !important; color: #fff !important; border-color: #49a443 !important; }
+    .actions { text-align: center; padding-bottom: 20px; }
+    #runBtn, #clearBtn { opacity: 1 !important; border: none !important; cursor: pointer !important; padding: 5px 14px !important; font-size: 12px !important; font-weight: 700 !important; width: auto !important; }
+    #runBtn { background: #3a9c35 !important; color: #fff !important; }
+    #clearBtn { background: #3a404c !important; color: #fff !important; }
+    .table-wrap { overflow-x: auto; margin: 0 6px 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; background: var(--panel) !important; }
+    th, td { border: 1px solid var(--table-border); padding: 10px 8px !important; text-align: center; vertical-align: middle; }
+    th { background: var(--table-head) !important; color: #fff !important; font-weight: 700; }
+    td { background: var(--panel) !important; color: var(--text) !important; font-weight: 600 !important; }
+    .pred-over { background: #3a9c35 !important; color: #fff !important; font-weight: 800 !important; }
+    .pred-under { background: #c91920 !important; color: #fff !important; font-weight: 800 !important; }
+    .pred-noplay { background: transparent !important; color: var(--muted) !important; font-weight: 700 !important; }
+    .conf-a { background: #2f8f4a !important; color: #fff !important; font-weight: 800 !important; }
+    .conf-b { background: #4aa346 !important; color: #fff !important; font-weight: 800 !important; }
+    .conf-c { background: #d98a00 !important; color: #fff !important; font-weight: 800 !important; }
+    .conf-d { background: #c91920 !important; color: #fff !important; font-weight: 800 !important; }
+    .conf-none { background: var(--panel-soft-2) !important; color: var(--muted) !important; font-weight: 700 !important; }
+    .lock { font-size: 4px !important; display: inline-block; vertical-align: middle; transform: translateY(-1px); margin-left: 4px; margin-right: 0; }
+    .autofill-indicator { font-size: 10px; color: #2f8f4a; display: none; }
+    .last10-short-field { border: 2px solid #d92d2a !important; background: #ffe8e8 !important; }
+    #last10SeriesAlert { display: none; margin: 8px 0 0; padding: 10px 12px; border: 2px solid #d92d2a; background: #4a0d0d; color: #fff; font-size: 13px; font-weight: 700; }
+    #last10SeriesAlert.visible { display: block; }
+    .track-pending { background: #eceff3 !important; color: #2a2f38 !important; font-weight: 800 !important; }
+    .track-win { background: #3a9c35 !important; color: #fff !important; font-weight: 800 !important; }
+    .track-loss { background: #c91920 !important; color: #fff !important; font-weight: 800 !important; }
+    .track-push { background: #3a404c !important; color: #fff !important; font-weight: 800 !important; }
+    .tracker-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: stretch; justify-content: flex-end; padding-top: env(safe-area-inset-top); z-index: 9999; }
+    .tracker-modal.open { display: flex; }
+    .tracker-panel { width: 100%; height: 100%; background: var(--panel); color: var(--text); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    .tracker-delete-confirm { display:none; position:absolute; inset:0; z-index:30; align-items:center; justify-content:center; background:rgba(0,0,0,0.55); padding:24px 16px; }
+    .tracker-delete-confirm.open { display:flex; }
+    .tracker-delete-confirm-card { width:min(420px,100%); background:var(--panel); color:var(--text); border:1px solid var(--panel-border); border-radius:12px; padding:18px 16px 14px; box-shadow:0 10px 28px rgba(0,0,0,0.35); }
+    .tracker-delete-confirm-card p { margin:0 0 16px; font-size:15px; font-weight:700; line-height:1.35; white-space:pre-wrap; }
+    .tracker-delete-confirm-actions { display:flex; justify-content:flex-end; gap:12px; }
+    .tracker-delete-confirm-actions button { min-height:44px; min-width:72px; padding:0 16px; font-size:16px; font-weight:800; border-radius:8px; border:1px solid var(--panel-border); background:transparent; color:var(--text); cursor:pointer; }
+    .tracker-delete-confirm-actions .tracker-delete-ok { background:#d91f26; color:#fff; border-color:#d91f26; }
+    .tracker-body-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+    .tracker-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--tracker-head-bg); color: var(--tracker-head-text); font-weight: 800; font-size: 13px; }
+    .tracker-close { background: none !important; border: none !important; color: var(--tracker-head-text) !important; font-size: 18px !important; padding: 0 !important; margin: 0 !important; cursor: pointer !important; }
+    .tracker-summary { padding: 14px 16px; background: var(--tracker-summary-bg); font-size: 12px; font-weight: 800; }
+    .tracker-empty { padding: 18px 16px; color: var(--tracker-subtext); font-size: 12px; font-weight: 700; }
+    .tracker-manual-settle { display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:-2px; }
+    .tracker-manual-btn { background: #eceff3 !important; color: #2a2f38 !important; border: 1px solid #d7dbe1 !important; box-shadow:none !important; padding: 0 !important; margin: 0 !important; width:28px !important; min-width: 28px !important; height:16px !important; min-height:16px !important; font-size: 9px !important; line-height:16px !important; font-weight: 800 !important; }
+    body.dark-mode .tracker-manual-btn { background:#1a1a1a !important; color:#fff !important; border-color:#2a2a2a !important; }
+    .pred-home { background: #3a9c35 !important; color: #fff !important; font-weight: 800 !important; }
+    .pred-away { background: #c91920 !important; color: #fff !important; font-weight: 800 !important; }
+    .manual-settle-overlay { display:none; position:fixed; inset:0; z-index:10050; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; padding:18px; box-sizing:border-box; }
+    .manual-settle-overlay.open { display:flex; }
+    .manual-settle-card { width:min(420px,100%); background:var(--panel); color:var(--text); border:1px solid var(--panel-border); box-shadow:var(--shadow); padding:16px 14px 12px; }
+    .manual-settle-title { font-size:15px; font-weight:900; margin:0 0 8px; }
+    .manual-settle-match { font-size:13px; font-weight:800; margin:0 0 4px; }
+    .manual-settle-market { font-size:11px; font-weight:700; color:var(--muted); margin:0 0 12px; }
+    .manual-settle-card input { width:100%; max-width:none; margin:0 0 12px; font-size:16px; padding:10px 8px; }
+    .manual-settle-actions { display:flex; justify-content:flex-end; gap:8px; }
+    .manual-settle-actions button { margin:0; min-width:72px; }
+    .tracker-live-stack { display:grid; gap:2px; justify-items:center; font-size:9px; line-height:1.2; }
+    .tracker-live-tag { color:#c91920; font-weight:900; letter-spacing:.4px; }
+    .tracker-status-score { font-size:9px; font-weight:800; opacity:.85; }
+    .why-pick-body { margin-top:4px; padding:6px 8px; background:var(--panel-soft); border:1px solid var(--table-border); text-align:left; font-size:10px; }
+    #syndicateDashboard { background:var(--panel); border:1px solid var(--panel-border); margin:10px 0; padding:0; box-shadow:var(--shadow); }
+    #trackedPicksTable { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 0; }
+    #trackedPicksTable th, #trackedPicksTable td { border: 1px solid var(--table-border); padding: 10px 2px !important; text-align: center; font-size: 10px !important; white-space: normal !important; overflow-wrap: anywhere !important; }
+    #engineLockOverlay { position: fixed; inset: 0; z-index: 2000000; background: #0c0c0e; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    #engineLockOverlay.hidden { display: none; }
+    .engine-lock-card { width: 100%; max-width: 300px; background: #17171a; border: 1px solid #2b2b30; border-radius: 14px; padding: 28px 22px; text-align: center; }
+    .engine-lock-title { color: #d4af37; font-size: 16px; font-weight: 900; margin: 0 0 6px 0; }
+    .engine-lock-sub { color: #9aa0a8; font-size: 12px; margin: 0 0 18px 0; }
+    .engine-lock-input { width: 100%; font-size: 22px; letter-spacing: 8px; text-align: center; padding: 12px 10px; border-radius: 8px; border: 1px solid #3a3a40; background: #0c0c0e; color: #fff; margin-bottom: 12px; }
+    .engine-lock-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #c91920; color: #fff; font-weight: 800; font-size: 14px; cursor: pointer; }
+    .engine-lock-error { color: #ff5c61; font-size: 12px; font-weight: 700; min-height: 16px; margin-top: 10px; }
+    .muted { color: var(--muted); font-size: 10px; font-weight: 600; }
+    .why-pick-body { margin-top: 4px; padding: 6px 8px; background: var(--panel-soft); border: 1px solid var(--table-border); text-align: left; font-size: 10px; }
+    .why-pick-list { margin: 0; padding-left: 14px; }
+
+    .header-error-btn { background:none!important;border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;font-size:18px!important;line-height:1!important;cursor:pointer!important;opacity:0;pointer-events:none; }
+    .header-error-btn.active { opacity:1; pointer-events:auto; }
+    .tracker-head { position:relative; }
+    .tracker-head-actions { display:flex; align-items:center; gap:8px; }
+    .tracker-insights-btn { background:none!important;border:none!important;box-shadow:none!important;color:var(--tracker-head-text)!important;font-size:16px!important;padding:0!important;margin:0!important;cursor:pointer!important; }
+    .tracker-market-summary { display:none !important; flex-wrap:wrap; gap:8px; padding:10px 16px; border-bottom:1px solid var(--panel-border); }
+    .tracker-body-scroll { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding-bottom:max(8px, env(safe-area-inset-bottom)); }
+    .tracker-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    #trackedPicksTable { width:100%; table-layout:fixed; border-collapse:collapse; margin-top:0; }
+    #trackedPicksTable th:nth-child(1){width:12%;} #trackedPicksTable th:nth-child(2){width:8%;}
+    #trackedPicksTable th:nth-child(3){width:18%;} #trackedPicksTable th:nth-child(4){width:14%;}
+    #trackedPicksTable th:nth-child(5){width:10%;} #trackedPicksTable th:nth-child(6){width:14%;}
+    #trackedPicksTable th:nth-child(7){width:8%;} #trackedPicksTable th:nth-child(8){width:16%;}
+    .tracker-market-chip { display:inline-flex; align-items:center; padding:9px 11px; background:linear-gradient(180deg,#fff 0%,#f6f7f9 100%); border:1px solid #d9dee5; color:var(--tracker-strong); font-size:10px; font-weight:800; }
+    body.dark-mode .tracker-market-chip { background:linear-gradient(180deg,#171717 0%,#121212 100%); border-color:#2f3338; }
+    .tracker-panel.analytics-view #trackerSummary,
+    .tracker-panel.analytics-view #trackerMarketSummary,
+    .tracker-panel.analytics-view #trackerEmpty,
+    .tracker-panel.analytics-view .tracker-table-wrap { display:none !important; }
+    .tracker-panel.analytics-view #trackerAnalyticsPanel { display:block !important; }
+    .tracker-analytics-panel { padding:10px; border-bottom:1px solid var(--panel-border); background:var(--tracker-summary-bg); display:none; }
+    .tracker-kpi-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .tracker-kpi-card { border:1px solid var(--table-border); background:var(--panel); padding:12px; display:grid; gap:4px; }
+    .tracker-kpi-card.featured { background:linear-gradient(135deg,#17973f 0%,#127731 100%); border-color:#127731; color:#fff; }
+    .tracker-kpi-label { font-size:10px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:var(--muted); }
+    .tracker-kpi-card.featured .tracker-kpi-label, .tracker-kpi-card.featured .tracker-kpi-value, .tracker-kpi-card.featured .tracker-kpi-sub { color:#fff; }
+    .tracker-kpi-value { color:var(--tracker-strong); font-size:22px; font-weight:900; line-height:1.05; }
+    .tracker-kpi-sub { color:var(--tracker-subtext); font-size:10px; font-weight:700; }
+    .tracker-analytics-card { border:1px solid var(--table-border); background:var(--panel); margin-top:8px; }
+    .tracker-analytics-card-head { display:flex; justify-content:space-between; padding:9px 12px; background:linear-gradient(90deg,var(--tracker-head-bg) 0%,#434b5a 100%); color:var(--tracker-head-text); font-size:11px; font-weight:900; letter-spacing:.6px; text-transform:uppercase; }
+    .tracker-analytics-card-body { padding:12px; }
+    .tracker-review-row { border:1px solid var(--table-border); background:var(--panel-soft); padding:10px 12px; margin-bottom:8px; }
+    .tracker-review-top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px; }
+    .tracker-review-area { font-size:11px; font-weight:900; text-transform:uppercase; }
+    .tracker-review-status { border:1px solid var(--table-border); background:var(--panel); color:var(--tracker-strong); padding:4px 7px; font-size:10px; font-weight:900; letter-spacing:.5px; text-transform:uppercase; white-space:nowrap; }
+    .tracker-review-status.confirmed { border-color:#17973f; color:#17973f; }
+    .tracker-review-status.candidate { border-color:#d98a00; color:#d98a00; }
+    .tracker-review-status.watching { border-color:#4b5568; color:#4b5568; }
+    .tracker-review-text { font-size:12px; font-weight:800; margin:4px 0; }
+    .tracker-review-action { font-size:10px; font-weight:700; color:var(--tracker-subtext); }
+    .tracker-empty-note { font-size:12px; font-weight:700; color:var(--tracker-subtext); line-height:1.45; }
+    .tracker-report-subtitle { font-size:11px; font-weight:700; color:var(--tracker-subtext); margin-bottom:10px; line-height:1.4; }
+    .tracker-analytics-card-title { font-size:11px; font-weight:900; letter-spacing:.6px; text-transform:uppercase; }
+    .tracker-analytics-card-meta { font-size:10px; font-weight:700; opacity:.85; }
+    .tracker-analytics-table { width:100%; border-collapse:collapse; font-size:11px; }
+    .tracker-analytics-table th, .tracker-analytics-table td { padding:7px 6px; border-bottom:1px solid var(--table-border); text-align:left; }
+    .tracker-analytics-table th.num, .tracker-analytics-table td.num, .tracker-analytics-table th.rate, .tracker-analytics-table td.rate { text-align:right; }
+    .tracker-analytics-table td.note { color:var(--tracker-subtext); font-weight:700; }
+    .tracker-analytics-grid.two { display:grid; grid-template-columns:1fr; gap:8px; }
+    .engine-battery-pct { min-width:26px; }
+    #fetchStatus { font-size: 10px; margin-top: 6px; min-height: 16px; font-weight: 700; }
+    #fetchStatus.ok { color:#2f8f4a; }
+    #fetchStatus.err { color:#d92d2a; }
+    #fetchStatus.loading { color:#d98a00; }
+    .context-line { font-size: 10px; color: var(--muted); margin: 4px 0 8px; font-weight: 700; }
+  </style>
+</head>
+<body>
+<script>(function(){try{if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.style.background='#0c0c0c';document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('dark-mode');});}}catch(e){}})();</script>
+
+<!-- SECTION 3 — html-pin-overlay -->
+<div id="engineLockOverlay">
+  <div class="engine-lock-card">
+    <div class="engine-lock-title">🔒 TheBetCeo ⚡</div>
+    <div class="engine-lock-sub">Enter PIN to unlock</div>
+    <input type="tel" inputmode="numeric" autocomplete="off" maxlength="6" id="engineLockInput" class="engine-lock-input" placeholder="••••" aria-label="Engine unlock PIN">
+    <button type="button" class="engine-lock-btn" id="engineLockBtn">Unlock</button>
+    <div class="engine-lock-error" id="engineLockError" aria-live="polite"></div>
+  </div>
+</div>
+<script>
+(function(){
+
+/* SECTION 4 — pin-lock */
+  var PIN_FNV = 4177456266; // FNV-1a of the unlock code — not stored in plaintext
+  var UNLOCK_FLAG = "f8feec8a";
+  var overlay = document.getElementById('engineLockOverlay');
+  if (localStorage.getItem('engineGate') === UNLOCK_FLAG) overlay.classList.add('hidden');
+  function fnv(s){
+    var h = 2166136261;
+    for (var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  var FAIL_LIMIT = 5, LOCKOUT_MS = 30000, failCount = 0, lockoutUntil = 0, lockoutTimer = null;
+  var inputEl = document.getElementById('engineLockInput');
+  var btnEl = document.getElementById('engineLockBtn');
+  var errEl = document.getElementById('engineLockError');
+  function remaining(){ return Math.max(0, Math.ceil((lockoutUntil - Date.now())/1000)); }
+  function setLocked(v){ inputEl.disabled = v; btnEl.disabled = v; }
+  function tick(){
+    var s = remaining();
+    if (s <= 0){ clearInterval(lockoutTimer); lockoutTimer=null; failCount=0; setLocked(false); errEl.textContent=''; inputEl.focus(); return; }
+    errEl.textContent = 'Too many attempts — try again in ' + s + 's';
+  }
+  function startLockout(){ lockoutUntil = Date.now()+LOCKOUT_MS; setLocked(true); tick(); if(lockoutTimer) clearInterval(lockoutTimer); lockoutTimer=setInterval(tick,500); }
+  function tryUnlock(){
+    if (Date.now() < lockoutUntil){ tick(); return; }
+    if (fnv(String(inputEl.value||"")) === PIN_FNV){
+      localStorage.setItem('engineGate', UNLOCK_FLAG); overlay.classList.add('hidden'); errEl.textContent=''; failCount=0;
+    } else {
+      failCount++; inputEl.value='';
+      if (failCount >= FAIL_LIMIT) startLockout();
+      else errEl.textContent = 'Wrong PIN (' + (FAIL_LIMIT-failCount) + ' attempt(s) left)';
+    }
+  }
+  btnEl.addEventListener('click', tryUnlock);
+  inputEl.addEventListener('keydown', function(e){ if(e.key==='Enter') tryUnlock(); });
+})();
+</script>
+
+<!-- SECTION 5 — html-app-shell -->
+<header class="app-header">
+  <span class="brand-name">TheBetCeo ⚡️</span>
+  <span class="header-center">
+    <button class="header-error-btn" type="button" id="headerErrorBtn" title="Show fetch/input issues">⚠️</button>
+  </span>
+  <span class="brand-right">
+    <button class="theme-toggle" type="button" id="trackerToggleBtn" title="Open tracked picks">📊</button>
+    <button class="theme-toggle" type="button" id="bbdbBtn" title="Auto-Fetch Debugger">🔬</button>
+    <button class="theme-toggle" type="button" id="engineRelockBtn" title="Lock the engine" onclick="localStorage.removeItem('engineGate'); location.reload();">PREDICTIONS</button>
+  </span>
+</header>
+<div class="wrapper">
+  <div class="section" id="leagueSection">
+    <h3>League Tier</h3>
+    <label>Select League</label>
+    <select id="leagueSelect" class="league-box" aria-label="Select League">
+      <option value="">- Select League -</option>
+      <optgroup label="── C ──────────────────">
+        <option value="caribbean-series">Caribbean Series</option>
+        <option value="college-baseball">USA - NCAA Baseball</option>
+      </optgroup>
+      <optgroup label="── D ──────────────────">
+        <option value="dominican-winter-league">Dominican Winter League</option>
+      </optgroup>
+      <optgroup label="── M ──────────────────">
+        <option value="mlb">USA - MLB, Regular Season</option>
+        <option value="mlb_pre">USA - MLB, Spring Training</option>
+        <option value="mlb_post">USA - MLB, Postseason</option>
+        <option value="mexican-winter-league">Mexico - Liga Mexicana (LMB)</option>
+      </optgroup>
+      <optgroup label="── O ──────────────────">
+        <option value="olympics-baseball">Olympics - Baseball</option>
+      </optgroup>
+      <optgroup label="── P ──────────────────">
+        <option value="puerto-rican-winter-league">Puerto Rico - Winter League</option>
+      </optgroup>
+      <optgroup label="── V ──────────────────">
+        <option value="venezuelan-winter-league">Venezuela - Winter League</option>
+      </optgroup>
+      <optgroup label="── W ──────────────────">
+        <option value="world-baseball-classic">World Baseball Classic</option>
+      </optgroup>
+    </select>
+    <label style="margin-top:8px;display:none;align-items:center;gap:8px;font-size:13px;">
+      <input type="checkbox" id="neutralSite" /> Neutral site (no home-field)
+    </label>
+  </div>
+
+  <div class="section" id="espnAutoSection">
+    <h3>⚡ ESPN Auto-Fetch <span style="font-size:11px;color:#aaa;">(MLB · NCAA · WBC · Winter leagues)</span></h3>
+    <div class="fixture-toolbar">
+      <button type="button" class="fixture-day active" id="dayToday">Today</button>
+      <button type="button" class="fixture-day" id="dayTomorrow">Tomorrow</button>
+    </div>
+    <label style="font-size:12px;">Select match</label>
+    <select id="fixtureSelect" class="league-box" aria-label="Select match">
+      <option value="">— Select match —</option>
+    </select>
+    <input id="fixtureKickoff" type="hidden" value="" />
+    <input id="fixtureEventId" type="hidden" value="" />
+    <input id="fixtureVenue" type="hidden" value="" />
+    <label style="font-size:12px;">Team A Name (Home)</label>
+    <input id="teamAName" placeholder="e.g. Chicago Cubs" autocomplete="off" aria-label="Team A Name (Home)" />
+    <input id="teamAId" type="hidden" value="" />
+    <label style="font-size:12px;margin-top:6px;">Team B Name (Away)</label>
+    <input id="teamBName" placeholder="e.g. Milwaukee Brewers" autocomplete="off" aria-label="Team B Name (Away)" />
+    <input id="teamBId" type="hidden" value="" />
+    <button class="fetch-btn" id="autoFetchBtn" type="button">📡 Fetch Stats</button>
+    <div id="fetchStatus"></div>
+    <div id="last10SeriesAlert" role="alert"></div>
+  </div>
+
+  <div class="section" id="marketSection">
+    <!-- DESIGN CHOICE: full-game markets only. No F5 line inputs. -->
+    <h3>Market Lines</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div>
+        <label>Total (incl. extra innings)</label>
+        <input id="ftMarket" placeholder="7.5 - 9.5" aria-label="Game total runs" />
+      </div>
+      <div>
+        <label>Handicap (Home, signed)</label>
+        <input id="spreadLine" placeholder="-1.5" aria-label="Handicap (Home, signed)" />
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+      <div>
+        <label>Team A Total (incl. extra innings)</label>
+        <input id="aTeamTotal" placeholder="3.5 - 5.5" aria-label="Home team total runs" />
+      </div>
+      <div>
+        <label>Team B Total (incl. extra innings)</label>
+        <input id="bTeamTotal" placeholder="3.5 - 5.5" aria-label="Away team total runs" />
+      </div>
+    </div>
+    <!-- Winner is model-only (no typed line). Pick comes from joint PMF. -->
+  </div>
+
+  <div class="section" id="teamASection">
+    <h3>Team A - Last 10 Overall <span class="autofill-indicator" id="aAutoTag">✅ Auto-filled</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+      <div>
+        <label>Runs Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
+        <input id="aFTScored" placeholder="e.g. 5,3,7,2,4" aria-label="Team A runs scored last 10" />
+      </div>
+      <div>
+        <label>Runs Allowed</label>
+        <input id="aFTAllowed" placeholder="e.g. 2,4,1,6,3" aria-label="Team A runs allowed last 10" />
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="teamBSection">
+    <h3>Team B - Last 10 Overall <span class="autofill-indicator" id="bAutoTag">✅ Auto-filled</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+      <div>
+        <label>Runs Scored <span style="font-size:10px;color:#888;">(recent → oldest, max 10)</span></label>
+        <input id="bFTScored" placeholder="e.g. 4,1,6,3,2" aria-label="Team B runs scored last 10" />
+      </div>
+      <div>
+        <label>Runs Allowed</label>
+        <input id="bFTAllowed" placeholder="e.g. 5,3,2,7,4" aria-label="Team B runs allowed last 10" />
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="h2hSection">
+    <h3>H2H (Last 10) <span class="autofill-indicator" id="h2hAutoTag">✅ Auto-filled</span></h3>
+    <label><input type="checkbox" id="useFTH2H" aria-label="Use Game H2H (min 2 games)" /> Use Game H2H (min 2 games)</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+      <input id="aFTH2H" placeholder="5,3,7,2,4,6,1,8,3,5" aria-label="Team A H2H runs last 10" />
+      <input id="bFTH2H" placeholder="4,1,6,3,2,5,7,2,4,3" aria-label="Team B H2H runs last 10" />
+    </div>
+  </div>
+</div>
+
+<div class="actions">
+  <button id="runBtn" type="button">Run</button>
+  <button id="clearBtn" type="button">Clear</button>
+  <button id="auditCopyBtn" type="button" title="Copy Audit" style="background:#d4af37!important;color:#111!important;box-shadow:0 2px 8px rgba(212,175,55,.35)!important;font-weight:700!important;border:none!important;padding:5px 14px!important;font-size:12px!important;">📋</button>
+  <button id="inputsCopyBtn" type="button" title="Copy Inputs &amp; Market Lines" style="background:#d4af37!important;color:#111!important;box-shadow:0 2px 8px rgba(212,175,55,.35)!important;font-weight:700!important;border:none!important;padding:5px 14px!important;font-size:12px!important;">🗒️</button>
+</div>
+<div class="context-line" id="fixtureContextStatus" style="display:none;text-align:center;"></div>
+<div class="table-wrap">
+  <table id="results" style="display:none;">
+    <tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>
+  </table>
+</div>
+
+
+<!-- SECTION 6 — html-tracker-modal -->
+<div id="trackerModal" class="tracker-modal" aria-hidden="true">
+  <div class="tracker-panel">
+    <div class="tracker-head">
+      <span id="trackerHeadTitle" style="cursor:pointer;" title="Tap to switch Tracked Picks / Engine Report">Tracked Picks</span>
+      <span id="trackerStatusLabel" style="position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;pointer-events:none;white-space:nowrap;"></span>
+      <div class="tracker-head-actions">
+        <button type="button" id="trackerMilitaryRaidBtn" class="tracker-insights-btn" title="Military Raid">🚨</button>
+        <button type="button" id="trackerCloseBtn" class="tracker-close" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div id="trackerDeleteConfirm" class="tracker-delete-confirm" aria-hidden="true">
+      <div class="tracker-delete-confirm-card" role="dialog" aria-modal="true">
+        <p id="trackerDeleteConfirmText"></p>
+        <div class="tracker-delete-confirm-actions">
+          <button type="button" id="trackerDeleteCancelBtn">Cancel</button>
+          <button type="button" id="trackerDeleteOkBtn" class="tracker-delete-ok">OK</button>
+        </div>
+      </div>
+    </div>
+    <div class="tracker-summary" id="trackerSummary">0 live/recent • 0 pending • 0 wins • 0 losses</div>
+    <div class="tracker-market-summary" id="trackerMarketSummary" style="display:none!important"></div>
+    <div class="tracker-body-scroll" id="trackedPicksWrap">
+      <div id="trackerAnalyticsPanel" class="tracker-analytics-panel"></div>
+      <div id="trackerEmpty" class="tracker-empty">No live/recent picks. Older picks moved to record.</div>
+      <div class="table-wrap tracker-table-wrap">
+        <table id="trackedPicksTable">
+          <thead><tr><th>Date</th><th>League</th><th>Match</th><th>Market</th><th>Line</th><th>Pick</th><th>Grade</th><th>Status</th></tr></thead>
+          <tbody id="trackedPicksBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SECTION 7 — html-debug-overlays -->
+<div id="manualSettleOverlay" class="manual-settle-overlay" aria-hidden="true">
+  <div class="manual-settle-card" role="dialog" aria-modal="true">
+    <p id="manualSettleTitle" class="manual-settle-title"></p>
+    <p id="manualSettleMatch" class="manual-settle-match"></p>
+    <p id="manualSettleMarket" class="manual-settle-market"></p>
+    <input id="manualSettleInput" type="text" autocomplete="off" />
+    <div class="manual-settle-actions">
+      <button type="button" id="manualSettleCancelBtn">Cancel</button>
+      <button type="button" id="manualSettleOkBtn">OK</button>
+    </div>
+  </div>
+</div>
+<div id="afdbOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.96);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
+  <div id="afdbPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
+</div>
+<div id="auditorOverlay" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.96);flex-direction:column;font-family:ui-monospace,Consolas,monospace;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);">
+  <div id="auditorPanel" style="width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+/* SECTION 8 — app-build */
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_livefix";
+  window.__APP_BUILD_VERSION = APP_BUILD;
+
+  /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
+     but they now live in one place so thresholds cannot drift independently. */
+
+/* SECTION 9 — engine-config */
+  const ENGINE_CONFIG = {
+    version: "baseball_v4.2_port",
+    thresholds: { ft: 0.42, team: 0.32, spread: 0.36, pWin: 0.538 },
+    grades: { A: 0.585, B: 0.555, C: 0.538 },
+    recencyWeights: [1.40, 1.22, 1.06, 0.92, 0.80, 0.68, 0.56, 0.46, 0.36, 0.28],
+    extras: {
+      // Regulation NBs miss walk-off / extras coupling. Rather than a flat
+      // coefficient * league-average bump, each team's added-runs term is now
+      // its OWN per-inning scoring rate (exp/9) plus a shared runner-on-second
+      // boost (the automatic extra-innings runner). runnerBoostRuns is a
+      // sabermetric estimate of that runner's expected run value, not a
+      // backtested figure — see Engine Report.
+      pTieTrigger: 0.02,
+      runnerBoostRuns: 0.50
+    },
+    hfa: { home: 0.12, away: -0.12 },
+    blend: {
+      seasonWMin: 0.32, seasonWMax: 0.84, seasonWDefault: 0.70,
+      formWFull: 0.26, formWMid: 0.18, formWThin: 0.12, formWTiny: 0.07,
+      dirtyFormScale: 0.55, dirtyH2HScale: 0.55
+    },
+    variance: { floorShare: 0.55, meanCoef: 1.28, meanAdd: 0.20, obsShrinkMax: 0.72, obsShrinkMin: 0.15, missingPitcherInflate: 1.15 },
+    clampExp: { lo: 1.55, hi: 11.50 },
+    pitching: { starterIP: 6, restIP: 3, eraLo: 0.80, eraHi: 8.5, noStarterStaffW: 0.50, restStaffW: 0.55, restLgW: 0.45, ipMin: 3.5, ipMax: 7.2, vsLhpMult: 0.96 },
+    h2h: { minGames: 2, wDenom: 16, wMin: 0.05, wMax: 0.12 },
+    softClamp: { nTinyCap: 6, madMultiplier: 3.5 }
+  };
+  window.__ENGINE_CONFIG = ENGINE_CONFIG;
+
+
+/* SECTION 10 — league-slug */
+  const LEAGUE_SLUG = {
+    mlb: "mlb", mlb_pre: "mlb", mlb_post: "mlb",
+    "college-baseball": "college-baseball",
+    "world-baseball-classic": "world-baseball-classic",
+    "olympics-baseball": "olympics-baseball",
+    "caribbean-series": "caribbean-series",
+    "dominican-winter-league": "dominican-winter-league",
+    "mexican-winter-league": "mexican-winter-league",
+    "puerto-rican-winter-league": "puerto-rican-winter-league",
+    "venezuelan-winter-league": "venezuelan-winter-league"
+  };
+  const LEAGUE_SEASON_TYPE = { mlb: 2, mlb_pre: 1, mlb_post: 3 };
+
+
+/* SECTION 11 — espn-endpoints */
+  const BB = {
+    SITE: function(slug){ return "https://site.api.espn.com/apis/site/v2/sports/baseball/" + encodeURIComponent(slug); },
+    WORKER: (function(){
+      const DEFAULT_WORKER = "https://thebetceo-engine.ridwantunde636.workers.dev/";
+      const ALLOW = [
+        "https://thebetceo-engine.ridwantunde636.workers.dev/",
+        "https://thebetceo-engine.ridwantunde636.workers.dev",
+        "https://corsproxy.io/",
+        "https://api.allorigins.win/"
+      ];
+      try {
+        const o = String(localStorage.getItem("AF_ENGINE_RELAY_OVERRIDE")||"").trim();
+        if (!o) return DEFAULT_WORKER;
+        const ok = ALLOW.some(function(a){ return o === a || o.indexOf(a) === 0; });
+        if (!ok){
+          try { console.warn("AF_ENGINE_RELAY_OVERRIDE ignored — not on allowlist", o); } catch(e2){}
+          return DEFAULT_WORKER;
+        }
+        return o;
+      } catch(e){ return DEFAULT_WORKER; }
+    })(),
+    relayOverrideActive: false,
+    requestCache: new Map(),
+    lastTrust: "ESPN direct"
+  };
+  try {
+    const ov = localStorage.getItem("AF_ENGINE_RELAY_OVERRIDE");
+    BB.relayOverrideActive = !!(ov && String(BB.WORKER).indexOf(String(ov).trim()) === 0);
+  } catch(e){ BB.relayOverrideActive = false; }
+
+
+/* SECTION 12 — esc */
+  function esc(s){
+    return String(s==null?"":s)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
+
+  const LOG = [];
+
+/* SECTION 13 — engine-log */
+  function log(level, section, msg, data){
+    const row = { ts: new Date().toLocaleTimeString([], {hour12:false}), level: level, section: section, msg: String(msg||""), data: data||null };
+    LOG.unshift(row);
+    if (LOG.length > 400) LOG.pop();
+    if (window.AFDB && AFDB.isOpen && typeof AFDB._render === "function") AFDB._render();
+  }
+  window.__bbLog = function(ctx, err){ try { log("WARN", ctx, err && err.message ? err.message : String(err)); } catch(e){} };
+
+
+/* SECTION 14 — afdb-debug */
+  const AFDB = (function(){
+    let _isOpen = false;
+    let _level = "ALL";
+    const LEVELS = { BOOT:"#7aa6ff", NET:"#4ea9ff", FETCH:"#49d45f", FILL:"#2aff9e", OK:"#49d45f", SUCCESS:"#49d45f", WARN:"#ffcf73", ERROR:"#ff5c61", INFO:"#aaa", ENGINE:"#d4af37", TRACKER:"#4ea9ff", SELF_TEST:"#49d45f" };
+    function visible(){
+      if (_level === "ALL") return LOG.slice();
+      if (_level === "ERROR") return LOG.filter(function(e){ return e.level==="ERROR"; });
+      if (_level === "WARN") return LOG.filter(function(e){ return e.level==="ERROR" || e.level==="WARN"; });
+      return LOG.slice();
+    }
+    function _render(){
+      const panel = document.getElementById("afdbPanel");
+      if (!panel) return;
+      const rows = visible().map(function(e){
+        const col = LEVELS[e.level] || "#aaa";
+        let extra = "";
+        if (e.data != null){
+          try { extra = '<pre style="color:#888;font-size:9px;margin:4px 0 0;padding:6px;background:#070707;border-left:2px solid #222;white-space:pre-wrap;word-break:break-all;">'+esc(typeof e.data==="object"?JSON.stringify(e.data,null,2):String(e.data)).slice(0,1600)+"</pre>"; } catch(x){}
+        }
+        return '<div style="padding:8px;border-bottom:1px solid #151515;"><div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;"><span style="color:#555;font-size:9px;min-width:65px;flex-shrink:0;">'+esc(e.ts)+'</span><span style="color:'+col+';font-size:10px;font-weight:900;min-width:75px;flex-shrink:0;">'+esc(e.level)+'</span><span style="color:#777;font-size:9px;min-width:80px;flex-shrink:0;">['+esc(e.section)+']</span><span style="color:'+col+';font-size:11px;font-weight:700;flex:1;white-space:pre-wrap;">'+esc(e.msg)+"</span></div>"+extra+"</div>";
+      }).join("");
+      const empty = _level==="ERROR" ? "No ERROR rows in this log. That is not a model backtest." : "No log entries yet. Run a fetch or prediction.";
+      const driftN = (window.g_driftErrors && window.g_driftErrors.length) || 0;
+      let rme = "—", rmeCol = "#555";
+      if (driftN){
+        const last = window.g_driftErrors.slice(-20);
+        const m = last.reduce(function(a,b){return a+b;},0)/last.length;
+        rme = m.toFixed(2)+" runs";
+        rmeCol = m>2.2?"#ff5c61":m>1.4?"#ffcf73":"#49d45f";
+      }
+      const btns =
+        '<button type="button" onclick="AFDB.copy(this)" style="background:#111;border:1px solid #333;color:#49d45f;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">📋 Copy Log</button>'+
+        '<button type="button" onclick="AFDB.clear()" style="background:#111;border:1px solid #333;color:#ff5c61;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🗑️ Clear</button>'+
+        '<button type="button" onclick="AFDB.runTestFetch()" style="background:#2a0608;border:1px solid #d91f26;color:#fff;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 0 8px rgba(217,31,38,.4);">🚨 MILITARY RAID</button>'+'<button type="button" onclick="AFDB.fullAudit()" style="background:#0a1f0a;border:1px solid #2f8f4a;color:#49ff7a;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 0 8px rgba(47,143,74,.4);">🩺 Full Audit</button>'+
+        '<button type="button" onclick="AFDB.openReport()" style="background:#111;border:1px solid #333;color:#d4af37;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">📊 Tracker Report</button>'+
+        '<button type="button" onclick="AFDB.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 12px;font-size:11px;font-weight:900;cursor:pointer;">✕ Close</button>';
+      panel.innerHTML =
+        '<div style="background:#080808;border-bottom:1px solid #222;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;flex-shrink:0;"><div style="color:#d4af37;font-size:14px;font-weight:900;letter-spacing:1px;">🔬 AUTO-FETCH DEBUG BRAIN (BB)</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+btns+"</div></div>"+
+        '<div style="padding:6px 12px;background:#0d0d0d;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0;"><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">📐 DRIFT TRACKER</span><span style="color:'+rmeCol+';font-size:12px;font-weight:900;">Rolling Mean Error (last 20): '+rme+'</span><span style="color:#555;font-size:10px;">'+driftN+' samples logged</span></div>'+
+        '<div style="display:flex;flex-direction:column;flex:1;overflow-y:auto;background:#0a0a0a;"><div style="padding:10px 12px;background:#111;color:#d4af37;font-size:11px;font-weight:900;text-transform:uppercase;position:sticky;top:0;z-index:10;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center;"><span>📡 FETCH & ENGINE LOGS</span><button type="button" onclick="AFDB.toggleFilter()" style="background:none;border:none;color:#4ea9ff;font-size:14px;font-weight:bold;cursor:pointer;">🎯 LEVEL: '+_level+"</button></div><div style='padding-bottom:15px;'>"+
+        (rows || ('<div style="color:#555;font-size:12px;text-align:center;padding:30px;font-weight:bold;">'+empty+"</div>"))+
+        "</div></div>";
+    }
+    function open(){ _isOpen = true; const ov=document.getElementById("afdbOverlay"); if(ov){ ov.style.display="flex"; _render(); } }
+    function close(){ _isOpen = false; const ov=document.getElementById("afdbOverlay"); if(ov) ov.style.display="none"; }
+    function clear(){ LOG.length=0; if(_isOpen) _render(); }
+    function copy(btn){
+      const text = visible().slice().reverse().map(function(e){ let line="["+e.ts+"] ["+e.level+"] ["+e.section+"] "+e.msg; if(e.data!=null){ try{ line+=" | "+JSON.stringify(e.data);}catch(x){} } return line; }).join("\n");
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ if(btn){ const o=btn.textContent; btn.textContent="✅ COPIED!"; setTimeout(function(){ btn.textContent=o; },1500);} });
+    }
+    function toggleFilter(){
+      const order=["ALL","ERROR","WARN"];
+      _level = order[(order.indexOf(_level)+1)%order.length];
+      if (_isOpen) _render();
+    }
+    function openReport(){
+      close();
+      const m=document.getElementById("trackerModal");
+      if(m){ m.classList.add("open"); document.body.classList.add("tracker-open"); }
+      if (typeof renderTracked==="function") renderTracked();
+      if (typeof setTrackerModalView==="function") setTrackerModalView("report");
+    }
+    function runTestFetch(){ if (typeof runSelfTest==="function") runSelfTest({ openDebug:false }); if(_isOpen) _render(); }
+    function fullAudit(){ if (window.EngineAuditor && EngineAuditor.open){ close(); EngineAuditor.open(); return; } if (typeof runFullAudit==="function") runFullAudit(); if(_isOpen) _render(); }
+    return { log:log, open:open, close:close, clear:clear, copy:copy, toggleFilter:toggleFilter, openReport:openReport, runTestFetch:runTestFetch, fullAudit:fullAudit, _render:_render, get isOpen(){ return _isOpen; } };
+  })();
+  window.AFDB = AFDB;
+  function renderLog(){ if (AFDB && AFDB.isOpen) AFDB._render(); }
+
+  window.g_driftErrors = window.g_driftErrors || [];
+
+
+/* SECTION 15 — clamp */
+  function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+/* SECTION 16 — finite */
+  function finite(x){ if (x===null || x===undefined || x==="") return false; return Number.isFinite(Number(x)); }
+
+/* SECTION 17 — avg */
+  function avg(arr){
+    const x = (arr||[]).map(Number).filter(finite);
+    return x.length ? x.reduce(function(a,b){return a+b;},0)/x.length : NaN;
+  }
+
+/* SECTION 18 — std-dev */
+  function stdDev(arr){
+    const x = (arr||[]).map(Number).filter(finite);
+    if (x.length < 2) return 0;
+    const m = avg(x);
+    return Math.sqrt(x.reduce(function(s,v){ return s+(v-m)*(v-m); },0)/x.length);
+  }
+
+/* SECTION 19 — parse-series */
+  function parseSeries(val){
+    return String(val||"").split(/[,\s]+/).map(function(t){ return parseFloat(t); }).filter(finite).slice(0,10);
+  }
+  function parseSeriesStrict(val){
+    const parts = String(val||"").split(/[,\s]+/).map(function(t){ return t.trim(); }).filter(Boolean);
+    const values = [];
+    const tok = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
+    for (let i=0;i<parts.length;i++){
+      if (!tok.test(parts[i])) return { ok:false, values:[], bad:parts[i] };
+      const n = parseFloat(parts[i]);
+      if (!finite(n)) return { ok:false, values:[], bad:parts[i] };
+      values.push(n);
+    }
+    return { ok:true, values:values.slice(0,10) };
+  }
+  function seriesKey(val){
+    return parseSeries(val).map(function(x){ return String(x); }).join(",");
+  }
+
+/* SECTION 20 — half-snap */
+  function half(n){ return Math.round(Number(n)*2)/2; }
+
+/* SECTION 21 — snap-run-total */
+  function snapRunTotal(n){
+    const x = Number(n);
+    if (!finite(x)) return NaN;
+    return Math.round(x * 2) / 2;
+  }
+
+/* SECTION 22 — parse-band */
+  function parseBand(val){
+    if (!val || !String(val).trim()) return null;
+    const raw = String(val).trim();
+    const m = raw.match(/^([+-]?\d+(?:\.\d+)?)\s*-\s*([+-]?\d+(?:\.\d+)?)$/);
+    if (m){
+      const a=snapRunTotal(m[1]), b=snapRunTotal(m[2]);
+      if (!finite(a)||!finite(b)) return null;
+      return { lo: Math.min(a,b), hi: Math.max(a,b), mid: Math.round(((a+b)/2)*2)/2, isRange: Math.abs(a-b)>0.01, raw:raw };
+    }
+    const n = snapRunTotal(raw);
+    if (!finite(n)) return null;
+    return { lo:n, hi:n, mid:n, isRange:false, raw:raw };
+  }
+
+/* SECTION 23 — parse-line */
+  function parseLine(val){
+    const b = parseBand(val);
+    return b ? b.mid : null;
+  }
+
+/* SECTION 24 — display-line */
+  function displayLine(v){
+    if (!finite(v)) return "—";
+    var x = snapRunTotal(v);
+    if (Math.abs(x - Math.round(x)) < 1e-9) x = x + (x >= 0 ? 0.5 : -0.5);
+    return String(x);
+  }
+  function bookHalfLine(v){
+    if (!finite(v)) return NaN;
+    var x = snapRunTotal(v);
+    if (Math.abs(x - Math.round(x)) < 1e-9) x = x + (x >= 0 ? 0.5 : -0.5);
+    return x;
+  }
+
+/* SECTION 25 — display-signed */
+  function displaySigned(v){ if (!finite(v)) return "—"; const x=Math.round(Number(v)*2)/2; return x>0?"+"+x:String(x); }
+
+/* SECTION 26 — weighted-recent */
+  function weightedRecent(arr){
+    const w = (ENGINE_CONFIG && ENGINE_CONFIG.recencyWeights) || [1.40,1.22,1.06,0.92,0.80,0.68,0.56,0.46,0.36,0.28];
+    const clean = (arr||[]).map(Number).filter(finite);
+    if (!clean.length) return NaN;
+    const n = Math.min(clean.length, w.length);
+    let s=0, tw=0;
+    for (let i=0;i<n;i++){ s += clean[i]*w[i]; tw += w[i]; }
+    return tw ? s/tw : avg(clean);
+  }
+
+/* SECTION 27 — trimmed-weighted */
+  function trimmedWeighted(arr){
+    const clean = (arr||[]).map(Number).filter(finite);
+    if (!clean.length) return NaN;
+    if (clean.length === 1) return clean[0];
+    // Continuous robust clamp: winsorize to median +/- k*MAD (median absolute
+    // deviation, 1.4826-scaled for normal-consistency) instead of a hard
+    // n<=3 vs n>3 branch. Small samples get a naturally wider effective
+    // clamp because MAD itself is noisier at low n -- no artificial cliff
+    // at the sample-size boundary.
+    const sorted = clean.slice().sort(function(a,b){ return a-b; });
+    const med = sorted[Math.floor(sorted.length/2)];
+    const absDevs = clean.map(function(v){ return Math.abs(v-med); }).sort(function(a,b){ return a-b; });
+    const madRaw = absDevs[Math.floor(absDevs.length/2)];
+    const cap = (ENGINE_CONFIG.softClamp && ENGINE_CONFIG.softClamp.nTinyCap) || 6;
+    const k = (ENGINE_CONFIG.softClamp && ENGINE_CONFIG.softClamp.madMultiplier) || 3.5;
+    const mad = madRaw > 0 ? madRaw*1.4826 : cap/k;
+    const wins = clean.map(function(v){ return clamp(v, med - k*mad, med + k*mad); });
+    return weightedRecent(wins);
+  }
+
+/* SECTION 28 — normal-cdf */
+  function normalCdf(x){
+    const t = 1/(1+0.2316419*Math.abs(x));
+    const d = 0.3989423*Math.exp(-x*x/2);
+    let p = d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
+    return x>0 ? 1-p : p;
+  }
+
+/* SECTION 29 — sample-tier */
+  function sampleTier(n){ if (n>=8) return "full"; if (n>=4) return "thin"; return "insufficient"; }
+
+  /* Park factors — run environment vs league average. Keys match ESPN venue names. */
+
+/* SECTION 30 — park-factor-table */
+  const PARK_FACTOR = {
+    "Coors Field": 1.28, "Fenway Park": 1.09, "Great American Ball Park": 1.14,
+    "Globe Life Field": 1.06, "Oriole Park at Camden Yards": 1.10,
+    "Yankee Stadium": 1.05, "Guaranteed Rate Field": 1.06, "Rate Field": 1.06,
+    "Citizens Bank Park": 1.07, "Truist Park": 1.04, "American Family Field": 1.03,
+    "Dodger Stadium": 0.96, "Oracle Park": 0.90, "T-Mobile Park": 0.92,
+    "Petco Park": 0.94, "loanDepot park": 0.93, "LoanDepot Park": 0.93,
+    "Citi Field": 0.96, "Progressive Field": 0.98, "PNC Park": 0.96,
+    "Comerica Park": 0.97, "Kauffman Stadium": 0.98, "Busch Stadium": 0.97,
+    "Wrigley Field": 1.03, "Target Field": 1.01, "Minute Maid Park": 1.00,
+    "Daikin Park": 1.00, "Chase Field": 1.04, "Angel Stadium": 0.98,
+    "Oakland Coliseum": 0.94, "Sutter Health Park": 1.02, "Rogers Centre": 1.02,
+    "Nationals Park": 1.01
+  };
+
+/* SECTION 31 — norm-venue */
+  function normVenue(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,""); }
+
+/* SECTION 32 — park-match-key */
+  function parkMatchKey(venue){
+    if (!venue) return null;
+    const nv = normVenue(venue);
+    if (!nv) return null;
+    const keys = Object.keys(PARK_FACTOR);
+    for (let i=0;i<keys.length;i++){ if (normVenue(keys[i]) === nv) return keys[i]; }
+    let best = null, bestLen = 0;
+    keys.forEach(function(k){
+      const nk = normVenue(k);
+      if (Math.min(nk.length, nv.length) < 5) return;
+      if (nv.indexOf(nk)>=0 || nk.indexOf(nv)>=0){
+        if (nk.length > bestLen){ best = k; bestLen = nk.length; }
+      }
+    });
+    return best;
+  }
+
+/* SECTION 33 — park-factor */
+  function parkFactor(venue){
+    const key = parkMatchKey(venue);
+    return key ? PARK_FACTOR[key] : 1;
+  }
+
+/* SECTION 34 — park-known */
+  function parkKnown(venue){ return !!parkMatchKey(venue); }
+
+
+/* SECTION 35 — league-base-table */
+  const LEAGUE_BASE = {
+    mlb: { team: 4.45, total: 8.90, sdTeam: 3.05, sdGame: 4.15 },
+    mlb_pre: { team: 5.10, total: 10.20, sdTeam: 3.40, sdGame: 4.60 },
+    mlb_post: { team: 3.95, total: 7.90, sdTeam: 2.80, sdGame: 3.80 },
+    "college-baseball": { team: 5.80, total: 11.60, sdTeam: 3.80, sdGame: 5.20 },
+    "world-baseball-classic": { team: 5.20, total: 10.40, sdTeam: 3.50, sdGame: 4.70 },
+    "olympics-baseball": { team: 4.80, total: 9.60, sdTeam: 3.20, sdGame: 4.40 },
+    "caribbean-series": { team: 4.70, total: 9.40, sdTeam: 3.20, sdGame: 4.30 },
+    "dominican-winter-league": { team: 4.60, total: 9.20, sdTeam: 3.20, sdGame: 4.30 },
+    "mexican-winter-league": { team: 5.10, total: 10.20, sdTeam: 3.40, sdGame: 4.60 },
+    "puerto-rican-winter-league": { team: 4.50, total: 9.00, sdTeam: 3.10, sdGame: 4.20 },
+    "venezuelan-winter-league": { team: 4.70, total: 9.40, sdTeam: 3.20, sdGame: 4.30 }
+  };
+
+/* SECTION 36 — league-base */
+  function leagueBase(key){ return LEAGUE_BASE[key] || LEAGUE_BASE.mlb; }
+
+
+/* SECTION 37 — weather-adj */
+  function weatherAdj(weather){
+    if (!weather) return 0;
+    const t = Number(weather.temperature);
+    const txt = String(weather.displayValue||"").toLowerCase();
+    let a = 0;
+    if (finite(t)){
+      if (t >= 88) a += 0.18;
+      else if (t >= 80) a += 0.08;
+      else if (t <= 50) a -= 0.16;
+      else if (t <= 60) a -= 0.08;
+    }
+    if (/thunder|storm|rain|shower/.test(txt)) a -= 0.12;
+    if (/dome|roof|indoor/.test(txt)) a = 0;
+    return clamp(a, -0.28, 0.28);
+  }
+
+
+/* SECTION 38 — nb-pmf */
+  function nbPmf(mu, variance, cap){
+    cap = cap || 24;
+    const out = new Array(cap+1).fill(0);
+    if (!finite(mu) || mu <= 0){ out[0]=1; return out; }
+    const v = Math.max(variance||0, mu*1.22);
+    const extra = Math.max(0.08, v - mu);
+    const r = (mu*mu) / extra;
+    const pSuccess = r / (r + mu); // P(stop)
+    // P(0) = p^r
+    let pk = Math.pow(pSuccess, r);
+    if (!isFinite(pk) || pk<=0){
+      // Poisson fallback
+      let p0 = Math.exp(-mu), s=0;
+      for (let k=0;k<=cap;k++){ out[k]=p0; s+=p0; p0 *= mu/(k+1); }
+      if (s>0) for (let k=0;k<=cap;k++) out[k]/=s;
+      return out;
+    }
+    const q = 1 - pSuccess; // mu/(mu+r)
+    let sum = 0;
+    for (let k=0;k<=cap;k++){
+      out[k] = pk;
+      sum += pk;
+      pk *= (k+r)/(k+1) * q;
+    }
+    if (sum>0) for (let k=0;k<=cap;k++) out[k]/=sum;
+    return out;
+  }
+
+/* SECTION 39 — conv-total */
+  function convTotal(pH, pA){
+    const n = pH.length, m = pA.length;
+    const tot = new Array(n+m-1).fill(0);
+    for (let i=0;i<n;i++) for (let j=0;j<m;j++) tot[i+j] += pH[i]*pA[j];
+    return tot;
+  }
+
+/* SECTION 40 — mass-over-under */
+  function massOverUnder(pmf, line){
+    let over=0, under=0, push=0;
+    for (let k=0;k<pmf.length;k++){
+      if (k > line + 1e-9) over += pmf[k];
+      else if (k < line - 1e-9) under += pmf[k];
+      else push += pmf[k];
+    }
+    return { over:over, under:under, push:push };
+  }
+
+/* SECTION 41 — cover-home */
+  function coverHome(pH, pA, homeLine){
+    let cover=0, fail=0, push=0;
+    for (let i=0;i<pH.length;i++){
+      for (let j=0;j<pA.length;j++){
+        const w = pH[i]*pA[j];
+        const adj = i + homeLine;
+        if (adj > j + 1e-9) cover += w;
+        else if (adj < j - 1e-9) fail += w;
+        else push += w;
+      }
+    }
+    return { cover:cover, fail:fail, push:push };
+  }
+
+  /**
+   * Baseball expected-runs engine v2
+   * Season RS/RA is the prior. Last-10 (de-parked) is a nudge.
+   * Opponent starter + bullpen is the pitching term.
+   * Today's park is applied once, after rates are park-neutral.
+   */
+
+/* SECTION 42 — blend-rate */
+  function blendRate(season, formN, lg, nForm, gp, dirtyForm){
+    const cfg = ENGINE_CONFIG.blend;
+    let seasonW = 0;
+    if (finite(season)){
+      seasonW = finite(gp) ? clamp(gp/40, cfg.seasonWMin, cfg.seasonWMax) : cfg.seasonWDefault;
+    }
+    const prior = finite(season) ? (seasonW*season + (1-seasonW)*lg) : lg;
+    let w = nForm>=8 ? cfg.formWFull : nForm>=5 ? cfg.formWMid : nForm>=3 ? cfg.formWThin : cfg.formWTiny;
+    if (dirtyForm) w *= cfg.dirtyFormScale;
+    const form = finite(formN) ? formN : prior;
+    return (1-w)*prior + w*form;
+  }
+
+/* SECTION 43 — infer-starter-ip */
+  function inferStarterIP(era, shortStart){
+    const cfg = ENGINE_CONFIG.pitching;
+    if (shortStart) return 5.0;
+    if (!finite(era)) return cfg.starterIP;
+    if (era >= 5.50) return 5.1;
+    if (era >= 4.50) return 5.5;
+    if (era <= 3.20) return 6.4;
+    return cfg.starterIP;
+  }
+
+/* SECTION 44 — pitching-allowed */
+  function pitchingAllowed(starterERA, teamRA, lg, teamERA, bullpenERA, starterIP, shortStart){
+    const cfg = ENGINE_CONFIG.pitching;
+    const staff = finite(teamERA) ? teamERA : (finite(teamRA) ? teamRA : lg);
+    const restRaw = finite(bullpenERA) && bullpenERA > 0 ? bullpenERA : staff;
+    const rest = finite(bullpenERA) && bullpenERA > 0
+      ? restRaw
+      : (cfg.restStaffW*staff + cfg.restLgW*lg);
+    if (finite(starterERA) && starterERA > 0){
+      const era = clamp(starterERA, cfg.eraLo, cfg.eraHi);
+      if (era !== starterERA) log("WARN","PITCH","Starter ERA clamped", {raw:starterERA, used:era});
+      const sip = clamp(finite(starterIP) ? starterIP : inferStarterIP(era, shortStart), cfg.ipMin, cfg.ipMax);
+      const rip = clamp(9 - sip, 1.8, 5.5);
+      return era*(sip/9) + rest*(rip/9);
+    }
+    return cfg.noStarterStaffW*staff + (1-cfg.noStarterStaffW)*lg;
+  }
+
+/* SECTION 45 — project-matchup */
+  function projectMatchup(input){
+    const base = leagueBase(input.leagueKey);
+    const lg = base.team;
+    const rawAS = input.aScoredN || input.aScored || [];
+    const rawAA = input.aAllowedN || input.aAllowed || [];
+    const rawBS = input.bScoredN || input.bScored || [];
+    const rawBA = input.bAllowedN || input.bAllowed || [];
+    const nA = Math.min(rawAS.length, rawAA.length);
+    const nB = Math.min(rawBS.length, rawBA.length);
+    const n = Math.min(nA, nB);
+    const pairAS = rawAS.slice(0, nA);
+    const pairAA = rawAA.slice(0, nA);
+    const pairBS = rawBS.slice(0, nB);
+    const pairBA = rawBA.slice(0, nB);
+    const offA_n = trimmedWeighted(pairAS);
+    const offB_n = trimmedWeighted(pairBS);
+    const defA_n = trimmedWeighted(pairAA);
+    const defB_n = trimmedWeighted(pairBA);
+    const seaA = input.seasonA || {};
+    const seaB = input.seasonB || {};
+
+    const dirty = !input.deparked;
+    const offA = blendRate(seaA.rs, offA_n, lg, nA, seaA.gp, dirty);
+    const offB = blendRate(seaB.rs, offB_n, lg, nB, seaB.gp, dirty);
+    const raA = blendRate(seaA.ra, defA_n, lg, nA, seaA.gp, dirty);
+    const raB = blendRate(seaB.ra, defB_n, lg, nB, seaB.gp, dirty);
+
+    const pitchVsA = pitchingAllowed(input.bEra, raB, lg, seaB.era, seaB.bullpenEra, input.bIp, input.shortStartB);
+    const pitchVsB = pitchingAllowed(input.aEra, raA, lg, seaA.era, seaA.bullpenEra, input.aIp, input.shortStartA);
+
+    let expA = (offA / Math.max(2.2, lg)) * pitchVsA;
+    let expB = (offB / Math.max(2.2, lg)) * pitchVsB;
+    const vsL = ENGINE_CONFIG.pitching.vsLhpMult || 0.96;
+    if (String(input.bHand||"").toUpperCase()==="L") expA *= vsL;
+    if (String(input.aHand||"").toUpperCase()==="L") expB *= vsL;
+
+    const pf = parkFactor(input.venue);
+    // Today's park is applied only when last-10 is already de-parked.
+    // Manual typed form still carries historical park noise — stacking pf on top
+    // contaminates the rate (E010). Leave pf=1.0 on that path.
+    if (!dirty){
+      expA *= pf;
+      expB *= pf;
+    }
+
+    const wx = weatherAdj(input.weather);
+    expA += wx*0.5;
+    expB += wx*0.5;
+
+    if (!input.neutral){
+      expA += ENGINE_CONFIG.hfa.home;
+      expB += ENGINE_CONFIG.hfa.away;
+    }
+
+    const h2a = (input.aH2HN && input.aH2HN.length>=2) ? input.aH2HN : input.aH2H;
+    const h2b = (input.bH2HN && input.bH2HN.length>=2) ? input.bH2HN : input.bH2H;
+    if (input.useH2H && h2a && h2a.length>=2 && h2b && h2b.length>=2){
+      let h2w = clamp(Math.min(h2a.length, h2b.length)/ENGINE_CONFIG.h2h.wDenom, ENGINE_CONFIG.h2h.wMin, ENGINE_CONFIG.h2h.wMax);
+      if (dirty) h2w *= ENGINE_CONFIG.blend.dirtyH2HScale;
+      expA = expA*(1-h2w) + trimmedWeighted(h2a)*h2w;
+      expB = expB*(1-h2w) + trimmedWeighted(h2b)*h2w;
+    }
+
+    expA = clamp(expA, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
+    expB = clamp(expB, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
+
+    if (input.venue && !parkKnown(input.venue)){
+      log("WARN","PARK","No park factor for venue, using 1.0", {venue:input.venue});
+    }
+
+    // Variance: shrink observed last-10 (or H2H) sample variance toward the
+    // mean-based prior so streaky and steady clubs are no longer identical.
+    // The prior itself widens when the specific starter facing this lineup is
+    // unknown, since the mean already fell back to a team/league blend that
+    // carries more inherent uncertainty than a real starter-specific estimate.
+
+/* SECTION 46 — prior-var */
+    function priorVar(exp, missingPitcher){
+      const vcfg = ENGINE_CONFIG.variance;
+      const p = Math.max(base.sdTeam*base.sdTeam*vcfg.floorShare, exp*vcfg.meanCoef + vcfg.meanAdd);
+      return missingPitcher ? p * vcfg.missingPitcherInflate : p;
+    }
+
+/* SECTION 47 — shrink-var */
+    function shrinkVar(obs, prior, nObs){
+      const vcfg = ENGINE_CONFIG.variance;
+      if (!finite(obs) || nObs < 2) return prior;
+      const w = clamp((nObs-1)/9, vcfg.obsShrinkMin, vcfg.obsShrinkMax);
+      return Math.max(prior * 0.55, w*obs + (1-w)*prior);
+    }
+    const formOffA = pairAS;
+    const formOffB = pairBS;
+    const sdA = stdDev(formOffA), sdB = stdDev(formOffB);
+    const obsVarA = sdA > 0 ? sdA*sdA : NaN;
+    const obsVarB = sdB > 0 ? sdB*sdB : NaN;
+    // expA's opponent pitcher is B's starter (input.bEra); expB's opponent
+    // pitcher is A's starter (input.aEra) -- see pitchVsA/pitchVsB above.
+    const missingPitcherForA = !finite(input.bEra);
+    const missingPitcherForB = !finite(input.aEra);
+    let varA = shrinkVar(obsVarA, priorVar(expA, missingPitcherForA), formOffA.length);
+    let varB = shrinkVar(obsVarB, priorVar(expB, missingPitcherForB), formOffB.length);
+    const capN = 24;
+    const homeReg = expA, awayReg = expB;
+    let pHome = nbPmf(expA, varA, capN);
+    let pAway = nbPmf(expB, varB, capN);
+    let pTie = 0;
+    for (let k=0;k<=capN;k++) pTie += pHome[k]*pAway[k];
+    const ex = ENGINE_CONFIG.extras;
+    if (pTie > ex.pTieTrigger){
+      // Per-team extras bump: each team's own per-inning scoring rate plus the
+      // shared runner-on-second boost, instead of a flat global coefficient.
+      const extraRateA = (expA/9) + ex.runnerBoostRuns;
+      const extraRateB = (expB/9) + ex.runnerBoostRuns;
+      expA += pTie * extraRateA;
+      expB += pTie * extraRateB;
+      expA = clamp(expA, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
+      expB = clamp(expB, ENGINE_CONFIG.clampExp.lo, ENGINE_CONFIG.clampExp.hi);
+      varA = shrinkVar(obsVarA, priorVar(expA, missingPitcherForA), formOffA.length);
+      varB = shrinkVar(obsVarB, priorVar(expB, missingPitcherForB), formOffB.length);
+      pHome = nbPmf(expA, varA, capN);
+      pAway = nbPmf(expB, varB, capN);
+      pTie = 0;
+      for (let k=0;k<=capN;k++) pTie += pHome[k]*pAway[k];
+    }
+
+    return {
+      home: expA, away: expB, total: expA+expB,
+      homeReg: homeReg, awayReg: awayReg,
+      varHome: varA, varAway: varB, varTotal: varA+varB,
+      pHome: pHome, pAway: pAway, pTie: pTie,
+      park: dirty ? 1 : pf, weather: wx, sample: n, tier: sampleTier(n),
+      volRatio: Math.sqrt(varA+varB) / Math.max(3.2, base.sdGame),
+      hasSeason: !!(finite(seaA.rs) && finite(seaA.ra) && finite(seaB.rs) && finite(seaB.ra)),
+      hasPitcher: finite(input.aEra) && finite(input.bEra),
+      missingStarterA: !finite(input.aEra),
+      missingStarterB: !finite(input.bEra),
+      deparked: !!input.deparked,
+      usedBullpenA: finite(seaA.bullpenEra),
+      usedBullpenB: finite(seaB.bullpenEra)
+    };
+  }
+
+
+/* SECTION 48 — prob-over-joint */
+  function probOverJoint(proj, line){
+    const tot = convTotal(proj.pHome, proj.pAway);
+    return massOverUnder(tot, line);
+  }
+
+/* SECTION 49 — step-down-grade */
+  function stepDown(g){
+    return g==="A"?"B":g==="B"?"C":g==="C"?"D":g;
+  }
+
+/* SECTION 50 — grade-from-prob */
+  function gradeFromProb(pWin, tier, hasPitcher, hasSeason){
+    if (!finite(pWin)) return "NaN";
+    const gcfg = ENGINE_CONFIG.grades;
+    let g = "D";
+    if (pWin >= gcfg.A) g = "A";
+    else if (pWin >= gcfg.B) g = "B";
+    else if (pWin >= gcfg.C) g = "C";
+    if (tier === "insufficient") return "";
+    if (tier === "thin") g = stepDown(g);
+    if (!hasPitcher) g = stepDown(g);
+    if (!hasSeason) g = stepDown(g);
+    return g;
+  }
+
+  window.__bbThresholds = ENGINE_CONFIG.thresholds;
+
+  /* ===================== FETCH ===================== */
+
+/* SECTION 51 — fetch-json */
+  async function fetchJSON(url, timeoutMs, opts){
+    timeoutMs = timeoutMs || 14000;
+    opts = opts || {};
+    const allowPublic = opts.allowPublicRelay !== false ? !!opts.allowPublicRelay : false;
+    // Money-relevant fetches default to ESPN direct + private worker only.
+    // Public CORS relays are opt-in (fixture listing can request them).
+    const liveUrl = /\/summary\?|\/scoreboard/.test(url);
+    const cached = BB.requestCache.get(url);
+    if (!liveUrl && cached && Date.now()-cached.ts < 20*60*1000) return cached.data;
+    function bad(data){ return !data || typeof data!=="object" || data.error || (Number(data.code)>=400); }
+    async function one(req, label){
+      const ctrl = new AbortController();
+      const t = setTimeout(function(){ ctrl.abort(); }, timeoutMs);
+      try {
+        const res = await fetch(req, { method:"GET", headers:{Accept:"application/json"}, signal:ctrl.signal, cache:"no-store" });
+        if (!res.ok) throw new Error(label+" HTTP "+res.status);
+        const parsed = JSON.parse(await res.text());
+        if (bad(parsed)) throw new Error(label+" error payload");
+        return parsed;
+      } catch(e){
+        if (e && e.name==="AbortError") throw new Error(label+" timeout");
+        throw e;
+      } finally { clearTimeout(t); }
+    }
+    const attempts = [
+      [url, "ESPN direct"],
+      [BB.WORKER+"?url="+encodeURIComponent(url), "relay"]
+    ];
+    if (allowPublic){
+      attempts.push(["https://corsproxy.io/?url="+encodeURIComponent(url), "corsproxy"]);
+      attempts.push(["https://api.allorigins.win/raw?url="+encodeURIComponent(url), "allorigins"]);
+    }
+    let last = null;
+    for (let i=0;i<attempts.length;i++){
+      try {
+        const data = await one(attempts[i][0], attempts[i][1]);
+        BB.lastTrust = attempts[i][1];
+        if (attempts[i][1]==="corsproxy" || attempts[i][1]==="allorigins") BB.usedPublicRelay = true;
+        if (!liveUrl) BB.requestCache.set(url, { data:data, ts:Date.now() });
+        if (attempts[i][1]==="corsproxy" || attempts[i][1]==="allorigins") log("WARN","TRUST","Public CORS relay used — stats not auto-trusted", {source:attempts[i][1]});
+        return data;
+      } catch(e){ last=e; log("WARN","NET", attempts[i][1]+" failed", {error:e.message}); }
+    }
+    throw last || new Error("ESPN fetch failed");
+  }
+
+
+/* SECTION 52 — local-date-key */
+  function localDateKey(offset){
+    const base = Date.now() + (Number(offset)||0)*86400000;
+    try {
+      return scoreboardDateKeyFromTs(base);
+    } catch(e){}
+    const d = new Date(base);
+    // ESPN baseball scoreboard dates are America/New_York calendar days
+    try {
+      const fmt = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" });
+      const p = fmt.formatToParts(new Date(Date.now()+(offset||0)*86400000));
+      const y = p.find(function(x){return x.type==="year";}).value;
+      const m = p.find(function(x){return x.type==="month";}).value;
+      const da = p.find(function(x){return x.type==="day";}).value;
+      return y+m+da;
+    } catch(e){
+      return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+    }
+  }
+
+/* SECTION 53 — score-val */
+  function scoreVal(s){
+    if (s==null) return null;
+    if (typeof s === "object") return finite(s.value) ? Number(s.value) : parseFloat(s.displayValue);
+    const n = parseFloat(s);
+    return finite(n) ? n : null;
+  }
+
+/* SECTION 54 — extract-pitcher */
+  function extractPitcher(comp){
+    const list = (comp && comp.probables) || [];
+    const p = list.find(function(x){ return /probableStartingPitcher|starter/i.test(String(x.name||x.abbreviation||"")); }) || list[0];
+    if (!p) return { name:"", era:NaN, record:"", hand:"", ip:NaN };
+    let era = NaN, ip = NaN;
+    (p.statistics||[]).forEach(function(st){
+      const nm = String(st.name||st.abbreviation||"").toUpperCase();
+      const val = parseFloat(st.displayValue||st.value);
+      if (nm==="ERA") era = val;
+      if (nm==="IP" || nm==="INNINGSPITCHED" || nm==="AVGINNINGS" || nm==="IP/G" || nm==="IPG"){
+        if (finite(val) && val > 2 && val < 9.5) ip = val;
+      }
+    });
+    if (!finite(era) && p.record){
+      const m = String(p.record).match(/(\d+\.\d+)/);
+      if (m) era = parseFloat(m[1]);
+    }
+    let hand = "";
+    const ath = p.athlete || {};
+    const hv = ath.hand || ath.handedness || ath.throws || "";
+    if (typeof hv === "string") hand = hv;
+    else if (hv && typeof hv === "object") hand = hv.displayValue || hv.abbreviation || hv.type || "";
+    const hs = String(hand).toUpperCase();
+    if (hs.indexOf("L")===0) hand = "L";
+    else if (hs.indexOf("R")===0) hand = "R";
+    else hand = "";
+    return {
+      name: ath.displayName || ath.fullName || "",
+      era: era, record: p.record||"", hand: hand, ip: ip
+    };
+  }
+
+/* SECTION 55 — extract-odds */
+  function extractOdds(comp){
+    const raw = (comp && comp.odds && comp.odds[0]) || null;
+    if (!raw) return { total:null, spread:null, homeMl:null, awayMl:null };
+    let total = finite(raw.overUnder) ? Number(raw.overUnder) : null;
+    let spread = finite(raw.spread) ? Number(raw.spread) : null;
+    // ESPN spread is often the favorite magnitude; prefer pointSpread.home.close.line
+    let spreadSrc = finite(spread) ? "raw.spread" : "none";
+    try {
+      const hs = raw.pointSpread && raw.pointSpread.home && raw.pointSpread.home.close && raw.pointSpread.home.close.line;
+      if (hs!=null){ spread = parseFloat(hs); spreadSrc = "pointSpread.home.close"; }
+      else if (finite(spread)) log("WARN","ODDS","pointSpread.home.close missing; using raw.spread", {spread:spread});
+      const tot = raw.total && raw.total.over && raw.total.over.close && raw.total.over.close.line;
+      if (tot){ const n = parseFloat(String(tot).replace(/[ou]/i,"")); if (finite(n)) total = n; }
+    } catch(e){ log("WARN","ODDS","close-line parse failed", {error:String(e&&e.message||e)}); }
+    return { total:total, spread:spread, raw:raw, spreadSrc:spreadSrc };
+  }
+
+  let fixtureOffset = 0;
+  let fixtureCache = [];
+  window.__bbAuto = { A:{}, B:{}, weather:null, venue:"", pitchers:{}, odds:{}, season:{}, formN:{}, h2hN:{}, deparked:false };
+
+
+/* SECTION 56 — set-status */
+  function setStatus(txt, kind){
+    const el = document.getElementById("fetchStatus");
+    if (!el) return;
+    el.textContent = txt||"";
+    el.className = kind==="ok"?"ok":kind==="err"?"err":kind==="loading"?"loading":"";
+    const warn = document.getElementById("headerErrorBtn");
+    if (warn){
+      warn.classList.toggle("active", kind==="err");
+    }
+  }
+
+/* SECTION 57 — current-slug */
+  function currentSlug(){
+    const key = document.getElementById("leagueSelect").value;
+    return LEAGUE_SLUG[key] || "";
+  }
+
+/* SECTION 58 — current-league-key */
+  function currentLeagueKey(){ return document.getElementById("leagueSelect").value || "mlb"; }
+
+
+/* SECTION 59 — normalize-event */
+  function normalizeEvent(ev, slug){
+    const c = (ev.competitions||[])[0];
+    if (!c) return null;
+    const home = (c.competitors||[]).find(function(x){ return x.homeAway==="home"; });
+    const away = (c.competitors||[]).find(function(x){ return x.homeAway==="away"; });
+    if (!home || !away) return null;
+    const st = (c.status && c.status.type) || (ev.status && ev.status.type) || {};
+    return {
+      id: String(ev.id||c.id||""),
+      date: ev.date || c.date || "",
+      slug: slug,
+      name: ev.name || ev.shortName || "",
+      shortName: ev.shortName || ev.name || "",
+      venue: (c.venue && (c.venue.fullName||c.venue.displayName)) || "",
+      weather: ev.weather || c.weather || null,
+      completed: !!(st.completed || st.state==="post"),
+      state: st.state || "",
+      detail: st.shortDetail || st.detail || "",
+      period: Number((c.status&&c.status.period) || (ev.status&&ev.status.period) || 0),
+      homeName: home.team && (home.team.displayName||home.team.name) || "",
+      awayName: away.team && (away.team.displayName||away.team.name) || "",
+      homeId: String((home.team&&home.team.id) || home.id || ""),
+      awayId: String((away.team&&away.team.id) || away.id || ""),
+      homeScore: scoreVal(home.score),
+      awayScore: scoreVal(away.score),
+      homePitcher: extractPitcher(home),
+      awayPitcher: extractPitcher(away),
+      odds: extractOdds(c),
+      isDH: /doubleheader|game\s*[12]|gm\s*[12]/i.test(String(ev.name||"")+" "+String(ev.shortName||"")+" "+String((c.notes||[]).map(function(n){return n.headline||n.text||"";}).join(" "))),
+      raw: ev
+    };
+  }
+
+
+/* SECTION 60 — load-fixtures */
+  async function loadFixtures(){
+    const slug = currentSlug();
+    const sel = document.getElementById("fixtureSelect");
+    sel.innerHTML = '<option value="">— Select match —</option>';
+    fixtureCache = [];
+    if (!slug){ setStatus("Select a league first."); return; }
+    const dateKey = localDateKey(fixtureOffset);
+    setStatus("Loading "+dateKey+" fixtures…");
+    try {
+      let url = BB.SITE(slug)+"/scoreboard?dates="+dateKey+"&limit=200";
+      const st = LEAGUE_SEASON_TYPE[currentLeagueKey()];
+      if (st) url += "&seasontype="+st;
+      const data = await fetchJSON(url, 15000, { allowPublicRelay:true });
+      const events = (data.events||[]).map(function(e){ return normalizeEvent(e, slug); }).filter(Boolean);
+      const open = events.filter(function(fx){ return !fx.completed; });
+      const done = events.filter(function(fx){ return fx.completed; });
+      fixtureCache = open.concat(done);
+      fixtureCache.forEach(function(fx, i){
+        const opt = document.createElement("option");
+        opt.value = String(i);
+        const tipoff = formatFixtureTime(fx.date);
+        const names = (fx.homeName||"Home") + " vs " + (fx.awayName||"Away");
+        if (fx.completed){
+          opt.textContent = "FINAL — " + names;
+          opt.disabled = true;
+        } else {
+          opt.textContent = tipoff + " — " + names;
+        }
+        opt.dataset.home = fx.homeName||"";
+        opt.dataset.away = fx.awayName||"";
+        opt.dataset.homeId = fx.homeId||"";
+        opt.dataset.awayId = fx.awayId||"";
+        opt.dataset.eventDate = fx.date||"";
+        sel.appendChild(opt);
+      });
+      const trust = BB.lastTrust + (BB.usedPublicRelay ? " · PUBLIC RELAY" : "");
+      setStatus(open.length+" match(es) · "+trust, BB.usedPublicRelay?"err":"ok");
+      log("OK","FETCH","Fixtures loaded", {slug:slug, n:events.length, date:dateKey});
+    } catch(e){
+      setStatus("Fixture load failed: "+(e.message||e));
+      log("ERROR","FETCH","fixture load", {error:String(e)});
+    }
+  }
+
+
+/* SECTION 61 — apply-fixture */
+  function applyFixture(fx){
+    document.getElementById("teamAName").value = fx.homeName||"";
+    document.getElementById("teamBName").value = fx.awayName||"";
+    document.getElementById("teamAId").value = fx.homeId||"";
+    document.getElementById("teamBId").value = fx.awayId||"";
+    document.getElementById("fixtureKickoff").value = fx.date||"";
+    document.getElementById("fixtureEventId").value = fx.id||"";
+    document.getElementById("fixtureVenue").value = fx.venue||"";
+    window.__bbAuto.venue = fx.venue||"";
+    window.__bbAuto.weather = fx.weather||null;
+    window.__bbAuto.pitchers = { home: fx.homePitcher, away: fx.awayPitcher };
+    window.__bbAuto.odds = fx.odds || {};
+    window.__bbAuto.isDH = !!fx.isDH;
+    const ctx = document.getElementById("fixtureContextStatus");
+    if (ctx){
+      const bits = [];
+      const od = fx.odds || {};
+      if (finite(od.total)) bits.push("Listed total "+od.total);
+      if (finite(od.spread)) bits.push("Listed home spread "+od.spread);
+      const hp = fx.homePitcher || {};
+      const ap = fx.awayPitcher || {};
+      if (hp.name) bits.push("A SP "+hp.name+(finite(hp.era)?" ERA "+Number(hp.era).toFixed(2):" (no ERA)"));
+      else bits.push("A SP unavailable");
+      if (ap.name) bits.push("B SP "+ap.name+(finite(ap.era)?" ERA "+Number(ap.era).toFixed(2):" (no ERA)"));
+      else bits.push("B SP unavailable");
+      if (BB.relayOverrideActive) bits.push("Relay override ON");
+      ctx.textContent = bits.join(" · ");
+    }
+  }
+
+
+/* SECTION 62 — last-completed-form */
+  function lastCompletedForm(events, teamId){
+    const id = String(teamId);
+    const rows = [];
+    (events||[]).forEach(function(ev){
+      const fx = ev._norm || ev;
+      if (!fx.completed) return;
+      if (!finite(fx.homeScore) || !finite(fx.awayScore)) return;
+      const inn = fx.period || 9;
+      // Official games stand at 5 innings (MLB 7.01). Drop only <5.
+      if (inn && inn < 5) return;
+      let scored, allowed, oppId;
+      if (String(fx.homeId)===id){ scored=fx.homeScore; allowed=fx.awayScore; oppId=fx.awayId; }
+      else if (String(fx.awayId)===id){ scored=fx.awayScore; allowed=fx.homeScore; oppId=fx.homeId; }
+      else return;
+      const rawPf = parkFactor(fx.venue||"");
+      const pf = finite(rawPf) && rawPf>0 ? rawPf : 1;
+      rows.push({ date:fx.date, scored:scored, allowed:allowed, scoredN: scored/pf, allowedN: allowed/pf, venue:fx.venue||"", inn:inn||9, oppId:String(oppId||""), eventId:fx.id });
+    });
+    rows.sort(function(a,b){ return Date.parse(b.date||0)-Date.parse(a.date||0); });
+    const cap = arguments.length>=3 ? arguments[2] : 10;
+    return cap ? rows.slice(0, cap) : rows;
+  }
+
+
+/* SECTION 63 — format-fixture-time */
+  function formatFixtureTime(dateStr){
+    if (!dateStr) return "--:--";
+    try { return new Date(dateStr).toLocaleTimeString([], { hour:"numeric", minute:"2-digit", hour12:true }); }
+    catch(e){ return "--:--"; }
+  }
+
+/* SECTION 64 — norm-name */
+  function normName(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
+
+/* SECTION 65 — resolve-team-id */
+  async function resolveTeamId(slug, name){
+    const n = normName(name);
+    if (!n) return "";
+    const data = await fetchJSON(BB.SITE(slug)+"/teams?limit=400", 14000);
+    let teams = [];
+    try {
+      const leagues = ((data.sports||[])[0] && (data.sports||[])[0].leagues) || data.leagues || [];
+      leagues.forEach(function(lg){ (lg.teams||[]).forEach(function(row){ teams.push(row.team||row); }); });
+    } catch(e){}
+    if (!teams.length && Array.isArray(data.sports)) {
+      /* already handled */
+    }
+    const hits = [];
+    teams.forEach(function(tm){
+      const id = String(tm.id||"");
+      if (!id) return;
+      const names = [tm.displayName, tm.name, tm.shortDisplayName, tm.abbreviation, tm.nickname, tm.location].map(normName);
+      let sc = 0;
+      names.forEach(function(nm){
+        if (!nm) return;
+        if (nm === n) sc = Math.max(sc, 100);
+        else if (nm.indexOf(n)>=0 || n.indexOf(nm)>=0) sc = Math.max(sc, 80);
+      });
+      if (sc) hits.push({ id:id, score:sc, name:tm.displayName||tm.name||id });
+    });
+    hits.sort(function(a,b){ return b.score-a.score; });
+    if (!hits.length) return "";
+    const top = hits.filter(function(h){ return h.score === hits[0].score; });
+    if (top.length > 1 && hits[0].score < 100){
+      log("WARN","FETCH","Ambiguous team name, not auto-resolved", {name:name, candidates:top});
+      return "";
+    }
+    return hits[0].id;
+  }
+
+/* SECTION 66 — is-winter-league */
+  function isWinterLeague(key){
+    return /winter-league|caribbean-series/.test(String(key||""));
+  }
+
+/* SECTION 67 — schedule-season-year */
+  function scheduleSeasonYear(key){
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    // Winter ball runs Oct–Feb across the year boundary. Jan–Apr lookups
+    // belong to the season that opened the previous calendar year.
+    if (isWinterLeague(key) && m <= 3) return y - 1;
+    return y;
+  }
+
+/* SECTION 68 — fetch-team-schedule */
+  async function fetchTeamSchedule(slug, teamId){
+    const leagueKey = currentLeagueKey();
+    const year = scheduleSeasonYear(leagueKey);
+    const altYear = year === new Date().getFullYear() ? year - 1 : new Date().getFullYear();
+    const st = LEAGUE_SEASON_TYPE[leagueKey] || 2;
+    const urls = [
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?season="+year+"&seasontype="+st+"&limit=200",
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?season="+altYear+"&seasontype="+st+"&limit=200",
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?seasontype="+st+"&limit=200",
+      BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/schedule?limit=200"
+    ];
+    let events = [];
+    let lastErr = null;
+    for (let i=0;i<urls.length;i++){
+      try {
+        const data = await fetchJSON(urls[i], 16000);
+        events = (data.events||[]).map(function(e){ const n=normalizeEvent(e, slug); if(n) n._norm=n; return n; }).filter(Boolean);
+        if (events.length) break;
+      } catch(e){ lastErr = e; }
+    }
+    if (events.length) return events;
+    // Fallback: walk recent scoreboards so last-10 still fills
+    log("WARN","FETCH","Schedule empty, walking recent scoreboards", {teamId:teamId, error: lastErr && lastErr.message});
+    const seen = {};
+    for (let d=0; d<=21; d++){
+      try {
+        const key = localDateKey(-d);
+        const data = await fetchJSON(BB.SITE(slug)+"/scoreboard?dates="+key+"&limit=200", 12000);
+        (data.events||[]).forEach(function(e){
+          const n = normalizeEvent(e, slug);
+          if (!n || seen[n.id]) return;
+          if (String(n.homeId)!==String(teamId) && String(n.awayId)!==String(teamId)) return;
+          n._norm = n;
+          seen[n.id] = 1;
+          events.push(n);
+        });
+      } catch(e){}
+    }
+    return events;
+  }
+
+
+/* SECTION 69 — fetch-h2h-games */
+  async function fetchH2HGames(slug, aId, bId, seasonsBack){
+    const leagueKey = currentLeagueKey();
+    const st = LEAGUE_SEASON_TYPE[leagueKey] || 2;
+    const curYear = scheduleSeasonYear(leagueKey);
+    const n = seasonsBack || 3;
+    const years = [];
+    for (let i=0;i<n;i++) years.push(curYear-i);
+    const jobs = [];
+    years.forEach(function(y){
+      [aId, bId].forEach(function(tid){
+        jobs.push(fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(tid)+"/schedule?season="+y+"&seasontype="+st+"&limit=200", 16000).catch(function(e){
+          log("WARN","FETCH","H2H season fetch failed", {season:y, team:tid, error:String(e&&e.message||e)});
+          return null;
+        }));
+      });
+    });
+    const results = await Promise.all(jobs);
+    const seen = {};
+    const events = [];
+    results.forEach(function(data){
+      if (!data) return;
+      (data.events||[]).forEach(function(e){
+        const nrm = normalizeEvent(e, slug);
+        if (!nrm || seen[nrm.id]) return;
+        seen[nrm.id] = 1;
+        nrm._norm = nrm;
+        events.push(nrm);
+      });
+    });
+    return lastCompletedForm(events, aId, 500).filter(function(g){ return g.oppId===String(bId); }).slice(0,10);
+  }
+
+
+/* SECTION 70 — fill-series-input */
+  function fillSeriesInput(id, arr){
+    const el = document.getElementById(id);
+    if (el) el.value = arr.join(",");
+  }
+
+/* SECTION 71 — mark-auto */
+  function markAuto(id, on){
+    const el = document.getElementById(id);
+    if (el) el.style.display = on ? "inline" : "none";
+  }
+
+
+/* SECTION 72 — fetch-season-rates */
+  async function fetchSeasonRates(slug, teamId){
+    const out = { rs:NaN, ra:NaN, gp:NaN, era:NaN, bullpenEra:NaN };
+    try {
+      const data = await fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId), 14000);
+      const items = (((data.team||{}).record)||{}).items || [];
+      const total = items.find(function(it){ return String(it.type||"").toLowerCase()==="total"; }) || items[0];
+      const names = [];
+      (total && total.stats || []).forEach(function(s){
+        names.push(s.name);
+        const nm = String(s.name||"");
+        const ab = String(s.abbreviation||"").toUpperCase();
+        if (nm==="avgPointsFor" || nm==="avgRuns" || nm==="runsPerGame" || ab==="RS" || ab==="RPG") out.rs = Number(s.value);
+        if (nm==="avgPointsAgainst" || nm==="avgRunsAgainst" || nm==="runsAllowedPerGame" || ab==="RA") out.ra = Number(s.value);
+        if (nm==="gamesPlayed" || ab==="GP") out.gp = Number(s.value);
+      });
+      if (!finite(out.rs) || !finite(out.ra)){
+        log("WARN","FETCH","Season RS/RA missing after parse", {teamId:teamId, keys:names.slice(0,20), rs:out.rs, ra:out.ra});
+      }
+    } catch(e){ log("WARN","FETCH","season record failed", {teamId:teamId, error:String(e&&e.message||e)}); }
+    try {
+      const st = await fetchJSON(BB.SITE(slug)+"/teams/"+encodeURIComponent(teamId)+"/statistics", 14000);
+      const cats = (((st.results||{}).stats)||{}).categories || [];
+      cats.forEach(function(c){
+        if (String(c.name||"").toLowerCase()!=="pitching") return;
+        (c.stats||[]).forEach(function(s){
+          const nm = String(s.name||"").toLowerCase();
+          const ab = String(s.abbreviation||"").toUpperCase();
+          if (nm==="era" || ab==="ERA") out.era = Number(s.value);
+          if (/bullpen|reliever|relief/.test(nm) && /era/.test(nm)) out.bullpenEra = Number(s.value);
+        });
+      });
+      // Some ESPN payloads nest relief pitching as its own category.
+      cats.forEach(function(c){
+        if (!/bullpen|relie/.test(String(c.name||"").toLowerCase())) return;
+        (c.stats||[]).forEach(function(s){
+          const nm = String(s.name||"").toLowerCase();
+          const ab = String(s.abbreviation||"").toUpperCase();
+          if (nm==="era" || ab==="ERA") out.bullpenEra = Number(s.value);
+        });
+      });
+    } catch(e){}
+    return out;
+  }
+
+/* SECTION 73 — auto-fetch */
+  async function autoFetch(){
+    const slug = currentSlug();
+    if (!slug){ setStatus("Select a league first."); return; }
+    BB.usedPublicRelay = false;
+    let aId = document.getElementById("teamAId").value.trim();
+    let bId = document.getElementById("teamBId").value.trim();
+    const nameA = document.getElementById("teamAName").value.trim();
+    const nameB = document.getElementById("teamBName").value.trim();
+    setStatus("Fetching last-10 + H2H…", "loading");
+    try {
+      if (!aId && nameA){ aId = await resolveTeamId(slug, nameA); document.getElementById("teamAId").value = aId; log("INFO","FETCH","Resolved home id", {name:nameA,id:aId}); }
+      if (!bId && nameB){ bId = await resolveTeamId(slug, nameB); document.getElementById("teamBId").value = bId; log("INFO","FETCH","Resolved away id", {name:nameB,id:bId}); }
+      if (!aId || !bId){ setStatus("Pick a match, or type both team names.", "err"); return; }
+      const pair = await Promise.all([fetchTeamSchedule(slug, aId), fetchTeamSchedule(slug, bId), fetchSeasonRates(slug, aId), fetchSeasonRates(slug, bId)]);
+      const formA = lastCompletedForm(pair[0], aId);
+      const formB = lastCompletedForm(pair[1], bId);
+      // E014: public-relay data must be explicitly confirmed before it is allowed
+      // to populate money-relevant fields. Declining aborts the fill entirely
+      // rather than silently trusting an unverified third-party relay.
+      if (BB.usedPublicRelay){
+        const proceed = window.confirm(
+          "Stats for this fetch came through a public CORS relay (" + (BB.lastTrust||"unknown source") + "), " +
+          "not directly from ESPN. This data is unverified and could be stale or altered.\n\n" +
+          "Use it anyway?"
+        );
+        if (!proceed){
+          setStatus("Fetch cancelled — public relay data was not applied.", "err");
+          log("WARN","TRUST","User declined public relay data", {source:BB.lastTrust});
+          return;
+        }
+        log("WARN","TRUST","User confirmed use of public relay data", {source:BB.lastTrust});
+      }
+      window.__bbAuto.season = { A: pair[2]||{}, B: pair[3]||{} };
+      window.__bbAuto.formN = {
+        A: { scoredN: formA.map(function(x){return x.scoredN;}), allowedN: formA.map(function(x){return x.allowedN;}) },
+        B: { scoredN: formB.map(function(x){return x.scoredN;}), allowedN: formB.map(function(x){return x.allowedN;}) }
+      };
+      fillSeriesInput("aFTScored", formA.map(function(x){return x.scored;}));
+      fillSeriesInput("aFTAllowed", formA.map(function(x){return x.allowed;}));
+      fillSeriesInput("bFTScored", formB.map(function(x){return x.scored;}));
+      fillSeriesInput("bFTAllowed", formB.map(function(x){return x.allowed;}));
+      window.__bbAuto.formRaw = {
+        aFTScored: document.getElementById("aFTScored").value,
+        aFTAllowed: document.getElementById("aFTAllowed").value,
+        bFTScored: document.getElementById("bFTScored").value,
+        bFTAllowed: document.getElementById("bFTAllowed").value
+      };
+      markAuto("aAutoTag", formA.length>0);
+      markAuto("bAutoTag", formB.length>0);
+
+      const h = await fetchH2HGames(slug, aId, bId, 3);
+      window.__bbAuto.h2hN = {
+        A: h.map(function(x){ return x.scoredN; }),
+        B: h.map(function(x){ return x.allowedN; })
+      };
+      window.__bbAuto.deparked = true;
+      if (h.length){
+        fillSeriesInput("aFTH2H", h.map(function(x){return x.scored;}));
+        fillSeriesInput("bFTH2H", h.map(function(x){return x.allowed;}));
+        document.getElementById("useFTH2H").checked = h.length>=2;
+        markAuto("h2hAutoTag", true);
+      }
+      window.__bbAuto.h2hRaw = {
+        aFTH2H: document.getElementById("aFTH2H").value,
+        bFTH2H: document.getElementById("bFTH2H").value
+      };
+
+      applyLast10Alert();
+      const noteA = document.getElementById("teamAName").value || "Team A";
+      const noteB = document.getElementById("teamBName").value || "Team B";
+      const notes = [];
+      const seaA = (window.__bbAuto.season && window.__bbAuto.season.A) || {};
+      const seaB = (window.__bbAuto.season && window.__bbAuto.season.B) || {};
+      notes.push(noteA+": "+formA.length+" games "+(formA.length>=5?"✅":"❌")+(finite(seaA.rs)?" · season "+seaA.rs.toFixed(2)+" RS / "+(finite(seaA.ra)?seaA.ra.toFixed(2):"—")+" RA":" · season stats unavailable"));
+      notes.push(noteB+": "+formB.length+" games "+(formB.length>=5?"✅":"❌")+(finite(seaB.rs)?" · season "+seaB.rs.toFixed(2)+" RS / "+(finite(seaB.ra)?seaB.ra.toFixed(2):"—")+" RA":" · season stats unavailable"));
+      if (h.length>=2) notes.push("H2H: "+h.length+" games ✅");
+      else if (h.length===1) notes.push("H2H: 1 game found (min 2 to auto-enable)");
+      else notes.push("H2H: no games found");
+      const allGood = formA.length>=4 && formB.length>=4;
+      if (!allGood){
+        notes.push("⚠️ FETCH INCOMPLETE: full model wants 4+ games each. Click Fetch Stats again if data looks wrong.");
+      }
+      if (BB.usedPublicRelay){
+        notes.push("⚠️ PUBLIC RELAY used — treat stats as unverified until a direct ESPN fetch works.");
+      }
+      const el = document.getElementById("fetchStatus");
+      if (el){
+        el.className = allGood ? "ok" : "err";
+        el.innerHTML = '<div style="font-weight:bold;">'+notes.map(function(n){return esc(n);}).join("<br>")+"</div>";
+      }
+      log(allGood?"OK":"WARN","FILL","auto-fetch complete", {a:formA.length,b:formB.length,h2h:h.length,aId:aId,bId:bId});
+    } catch(e){
+      setStatus("Fetch failed: "+(e.message||e), "err");
+      log("ERROR","FILL", String(e));
+    }
+  }
+
+
+/* SECTION 74 — apply-last10-alert */
+  function applyLast10Alert(){
+    const ids = ["aFTScored","aFTAllowed","bFTScored","bFTAllowed"];
+    const short = [];
+    ids.forEach(function(id){
+      const el = document.getElementById(id);
+      if (!el) return;
+      const n = parseSeries(el.value).length;
+      el.classList.toggle("last10-short-field", n>0 && n<10);
+      if (n>0 && n<10) short.push(id);
+    });
+    const banner = document.getElementById("last10SeriesAlert");
+    document.body.classList.toggle("bb-last10-alert", short.length>0);
+    if (banner){
+      banner.classList.toggle("visible", short.length>0);
+      banner.textContent = short.length ? ("Last-10 incomplete: "+short.length+" field(s) have fewer than 10 games.") : "";
+    }
+    return short;
+  }
+
+  /* ===================== ENGINE RUN ===================== */
+
+/* SECTION 75 — collect-input */
+  function collectInput(){
+    const aEra = window.__bbAuto.pitchers && window.__bbAuto.pitchers.home ? window.__bbAuto.pitchers.home.era : NaN;
+    const bEra = window.__bbAuto.pitchers && window.__bbAuto.pitchers.away ? window.__bbAuto.pitchers.away.era : NaN;
+    const nA = window.__bbAuto.formN && window.__bbAuto.formN.A;
+    const nB = window.__bbAuto.formN && window.__bbAuto.formN.B;
+    return {
+      leagueKey: currentLeagueKey(),
+      venue: document.getElementById("fixtureVenue").value || window.__bbAuto.venue || "",
+      weather: window.__bbAuto.weather || null,
+      aScored: parseSeries(document.getElementById("aFTScored").value),
+      aAllowed: parseSeries(document.getElementById("aFTAllowed").value),
+      bScored: parseSeries(document.getElementById("bFTScored").value),
+      bAllowed: parseSeries(document.getElementById("bFTAllowed").value),
+      aScoredN: (nA && nA.scoredN && seriesKey((window.__bbAuto.formRaw||{}).aFTScored)===seriesKey(document.getElementById("aFTScored").value)) ? nA.scoredN : null,
+      aAllowedN: (nA && nA.allowedN && seriesKey((window.__bbAuto.formRaw||{}).aFTAllowed)===seriesKey(document.getElementById("aFTAllowed").value)) ? nA.allowedN : null,
+      bScoredN: (nB && nB.scoredN && seriesKey((window.__bbAuto.formRaw||{}).bFTScored)===seriesKey(document.getElementById("bFTScored").value)) ? nB.scoredN : null,
+      bAllowedN: (nB && nB.allowedN && seriesKey((window.__bbAuto.formRaw||{}).bFTAllowed)===seriesKey(document.getElementById("bFTAllowed").value)) ? nB.allowedN : null,
+      aH2H: parseSeries(document.getElementById("aFTH2H").value),
+      bH2H: parseSeries(document.getElementById("bFTH2H").value),
+      aH2HN: (window.__bbAuto.h2hN && window.__bbAuto.h2hN.A && seriesKey((window.__bbAuto.h2hRaw||{}).aFTH2H)===seriesKey(document.getElementById("aFTH2H").value)) ? window.__bbAuto.h2hN.A : null,
+      bH2HN: (window.__bbAuto.h2hN && window.__bbAuto.h2hN.B && seriesKey((window.__bbAuto.h2hRaw||{}).bFTH2H)===seriesKey(document.getElementById("bFTH2H").value)) ? window.__bbAuto.h2hN.B : null,
+      useH2H: document.getElementById("useFTH2H").checked,
+      aEra: aEra,
+      bEra: bEra,
+      aIp: window.__bbAuto.pitchers && window.__bbAuto.pitchers.home ? window.__bbAuto.pitchers.home.ip : NaN,
+      bIp: window.__bbAuto.pitchers && window.__bbAuto.pitchers.away ? window.__bbAuto.pitchers.away.ip : NaN,
+      aHand: window.__bbAuto.pitchers && window.__bbAuto.pitchers.home ? window.__bbAuto.pitchers.home.hand : "",
+      bHand: window.__bbAuto.pitchers && window.__bbAuto.pitchers.away ? window.__bbAuto.pitchers.away.hand : "",
+      shortStartA: !!(window.__bbAuto && window.__bbAuto.isDH),
+      shortStartB: !!(window.__bbAuto && window.__bbAuto.isDH),
+      seasonA: (window.__bbAuto.season && window.__bbAuto.season.A) || {},
+      seasonB: (window.__bbAuto.season && window.__bbAuto.season.B) || {},
+      deparked: !!(window.__bbAuto.deparked
+        && nA && nB
+        && seriesKey((window.__bbAuto.formRaw||{}).aFTScored)===seriesKey(document.getElementById("aFTScored").value)
+        && seriesKey((window.__bbAuto.formRaw||{}).aFTAllowed)===seriesKey(document.getElementById("aFTAllowed").value)
+        && seriesKey((window.__bbAuto.formRaw||{}).bFTScored)===seriesKey(document.getElementById("bFTScored").value)
+        && seriesKey((window.__bbAuto.formRaw||{}).bFTAllowed)===seriesKey(document.getElementById("bFTAllowed").value)),
+      neutral: !!(document.getElementById("neutralSite") && document.getElementById("neutralSite").checked)
+    };
+  }
+
+
+/* SECTION 76 — run-engine */
+  function runEngine(){
+    applyLast10Alert();
+    const data = collectInput();
+    const seriesFields = ["aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H"];
+    for (let i=0;i<seriesFields.length;i++){
+      const el = document.getElementById(seriesFields[i]);
+      if (!el || !String(el.value||"").trim()) continue;
+      const chk = parseSeriesStrict(el.value);
+      if (!chk.ok){
+        setStatus("Bad last-10 token '"+chk.bad+"' in "+seriesFields[i]+". Fix it before Run.", "err");
+        return;
+      }
+    }
+    if (Math.min(data.aScored.length, data.aAllowed.length)<4 || Math.min(data.bScored.length, data.bAllowed.length)<4){
+      alert("Need at least 4 paired scored/allowed games for both teams. Fetch stats or type last-10 runs.");
+      return;
+    }
+    if (!data.deparked){
+      log("WARN","INPUT","Manual last-10 is not park-adjusted; form weight was cut");
+    }
+    const proj = projectMatchup(data);
+    const th = window.__bbThresholds;
+    const hasH = data.useH2H && data.aH2H.length>=2;
+
+    const ftBand = parseBand(document.getElementById("ftMarket").value);
+    const aBand = parseBand(document.getElementById("aTeamTotal").value);
+    const bBand = parseBand(document.getElementById("bTeamTotal").value);
+    const sprBand = parseBand(document.getElementById("spreadLine").value);
+
+    const rows = [];
+
+/* SECTION 77 — add-total */
+    function addTotal(key, name, mu, band, family){
+      if (!band){
+        rows.push({ marketKey:key, name:name, projection:mu, line:null, edge:null, prob:null, pick:"NO PLAY", side:"", grade:"", family:family, noLine:true });
+        return;
+      }
+      const thresh = family==="team" ? th.team : th.ft;
+      // Decide vs mid (single line or band mid). If the box
+      // is a range, smart-line then stresses the unfavourable end.
+      const awaySide = key==="tt_away" || key==="f5_away";
+      const massMid = family==="team"
+        ? massOverUnder(awaySide ? proj.pAway : proj.pHome, band.mid)
+        : probOverJoint(proj, band.mid);
+      const overEdge = mu - band.mid;
+      const underEdge = band.mid - mu;
+      const pOver = massMid.over / Math.max(1e-9, massMid.over+massMid.under);
+      const pUnder = massMid.under / Math.max(1e-9, massMid.over+massMid.under);
+      let pick="NO PLAY", side="", showEdge=mu-band.mid, used=band.mid, pWin=0.5;
+      const overOk = overEdge >= thresh && pOver >= th.pWin;
+      const underOk = underEdge >= thresh && pUnder >= th.pWin;
+      if (overOk && (!underOk || overEdge >= underEdge)){
+        pick = "OVER "+displayLine(band.mid); side="over"; showEdge=overEdge; used=band.mid; pWin=pOver;
+      } else if (underOk){
+        pick = "UNDER "+displayLine(band.mid); side="under"; showEdge=underEdge; used=band.mid; pWin=pUnder;
+      }
+      if (pick!=="NO PLAY" && band.isRange){
+        const halfWidth = (band.hi - band.lo) / 2;
+        const widthCap = Math.max(thresh * 2, 2.5);
+        if (halfWidth > widthCap){
+          pick="NO PLAY"; side=""; pWin=null; showEdge=null;
+        }
+      }
+      if (pick!=="NO PLAY"){
+        used = bookHalfLine(band.mid);
+        showEdge = side==="over" ? (mu - used) : (used - mu);
+        pick = (side==="over"?"OVER ":"UNDER ") + displayLine(used);
+        const massUsed = family==="team"
+          ? massOverUnder(awaySide ? proj.pAway : proj.pHome, used)
+          : probOverJoint(proj, used);
+        const pO = massUsed.over / Math.max(1e-9, massUsed.over+massUsed.under);
+        const pU = massUsed.under / Math.max(1e-9, massUsed.over+massUsed.under);
+        pWin = side==="over" ? pO : pU;
+      } else {
+        used = null; showEdge = null; pWin = null;
+      }
+      const g = pick==="NO PLAY" ? "" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
+      rows.push({ marketKey:key, name:name, projection:mu, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:family, noLine:pick==="NO PLAY" });
+    }
+
+/* SECTION 78 — add-spread */
+    function addSpread(key, name, muMargin, band){
+      if (!band){
+        rows.push({ marketKey:key, name:name, projection:muMargin, line:null, edge:null, prob:null, pick:"NO PLAY", side:"", grade:"", family:"spread", noLine:true });
+        return;
+      }
+      // Unfavourable home line: if we want HOME, use the smaller (more demanding) home line = band.lo
+      // HOME +1.5 is easier than HOME +0.5. So unfavourable for HOME is the more negative / smaller line = lo.
+      // Unfavourable for AWAY is the larger home line (hi).
+      const cLo = coverHome(proj.pHome, proj.pAway, band.lo);
+      const cHi = coverHome(proj.pHome, proj.pAway, band.hi);
+      const pHomeLo = cLo.cover / Math.max(1e-9, cLo.cover+cLo.fail);
+      const pAwayHi = cHi.fail / Math.max(1e-9, cHi.cover+cHi.fail);
+      const homeEdge = muMargin + band.lo; // cover margin at demanding home number
+      const awayEdge = -(muMargin + band.hi);
+      let pick="NO PLAY", side="", showEdge=muMargin+band.mid, used=band.mid, pWin=0.5;
+      const homeOk = homeEdge >= th.spread && pHomeLo >= th.pWin;
+      const awayOk = awayEdge >= th.spread && pAwayHi >= th.pWin;
+      if (homeOk && (!awayOk || homeEdge >= awayEdge)){
+        pick = "HOME "+displaySigned(band.lo); side="home"; showEdge=homeEdge; used=band.lo; pWin=pHomeLo;
+      } else if (awayOk){
+        pick = "AWAY "+displaySigned(-band.hi); side="away"; showEdge=awayEdge; used=band.hi; pWin=pAwayHi;
+      }
+      let g = pick==="NO PLAY" ? "" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
+      const plusDog = (side==="home" && used >= 1.0) || (side==="away" && used <= -1.0);
+      const strongMargin = Math.abs(muMargin) >= 1.2;
+      if (pick!=="NO PLAY" && plusDog && !strongMargin){
+        if (g==="A") g = "B";
+        rows.push({ marketKey:key, name:name, projection:muMargin, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:"spread", noLine:false, plusDog:true, review:false });
+        return;
+      }
+      rows.push({ marketKey:key, name:name, projection:muMargin, line:used, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:"spread", noLine:false, plusDog:!!plusDog, review:false });
+    }
+
+    // DESIGN CHOICE (2026-09-19): F5 markets are intentionally omitted.
+    // First-five total / team / handicap are not produced, inputted, or tracked
+    // from Run. Settlement may still recognize legacy f5_* tickets if they exist.
+    addTotal("ft_total", "Game Total", proj.total, ftBand, "ft");
+    addTotal("tt_home", "Team A Total", proj.home, aBand, "team");
+    addTotal("tt_away", "Team B Total", proj.away, bBand, "team");
+    addSpread("rl_home", "Handicap", proj.home-proj.away, sprBand);
+
+    (function addWinner(){
+      let home=0, away=0, tie=0;
+      for (let i=0;i<(proj.pHome||[]).length;i++){
+        for (let j=0;j<(proj.pAway||[]).length;j++){
+          const w = proj.pHome[i]*proj.pAway[j];
+          if (i>j) home += w; else if (i<j) away += w; else tie += w;
+        }
+      }
+      const denom = Math.max(1e-9, home+away);
+      const pHomeW = home/denom, pAwayW = away/denom;
+      let pick="NO PLAY", side="", pWin=null, showEdge=proj.home-proj.away;
+      if (pHomeW >= th.pWin && pHomeW >= pAwayW){ pick="HOME"; side="home"; pWin=pHomeW; showEdge=proj.home-proj.away; }
+      else if (pAwayW >= th.pWin){ pick="AWAY"; side="away"; pWin=pAwayW; showEdge=proj.away-proj.home; }
+      const g = pick==="NO PLAY" ? "" : gradeFromProb(pWin, proj.tier, proj.hasPitcher, proj.hasSeason);
+      rows.push({ marketKey:"winner", name:"Winner", projection:proj.home-proj.away, line:null, edge:showEdge, prob:pWin, pick:pick, side:side, grade:g, family:"winner", noLine:false });
+    })();
+
+    if (proj.tier === "insufficient"){
+      rows.forEach(function(r){
+        r.pick = "NO PLAY";
+        r.side = "";
+        r.grade = "";
+        r.prob = null;
+        r.track = false;
+      });
+    }
+    if (!proj.hasPitcher){
+      rows.forEach(function(r){
+        if (r.family==="ft" || r.family==="spread" || r.family==="winner"){
+          r.pick = "NO PLAY";
+          r.side = "";
+          r.grade = "";
+          r.prob = null;
+        }
+      });
+    }
+    const listedSpread = window.__bbAuto && window.__bbAuto.odds && finite(window.__bbAuto.odds.spread)
+      ? Number(window.__bbAuto.odds.spread) : NaN;
+    rows.forEach(function(r){
+      if (r.family!=="spread" || r.pick==="NO PLAY") return;
+      const margin = proj.home - proj.away;
+      if (finite(listedSpread) && listedSpread >= 1.0 && margin >= 1.0){
+        r.review = true;
+        if (r.grade==="A") r.grade = "B";
+      }
+      if (finite(listedSpread) && listedSpread <= -1.0 && margin <= -1.0){
+        r.review = true;
+        if (r.grade==="A") r.grade = "B";
+      }
+    });
+    rows.forEach(function(r){
+      r.track = !!(r.pick && r.pick!=="NO PLAY" && !r.plusDog && !r.review);
+    });
+    const live = rows.filter(function(r){ return r.track; });
+    const chosen = live[0] || null;
+
+    renderRows(rows, proj, data);
+    trackRows(rows, proj, data);
+    const st = document.getElementById("fixtureContextStatus");
+    if (st){ st.textContent = ""; st.style.display = "none"; }
+    window.__lastRun = { proj:proj, rows:rows, at:new Date().toISOString() };
+    log("OK","ENGINE","run complete", {proj:proj, rows:rows.map(function(r){return r.pick;})});
+  }
+
+
+/* SECTION 79 — format-projection-whole */
+  function formatProjectionWhole(val){
+    if (!finite(val)) return "NaN";
+    return String(Math.round(Number(val)));
+  }
+
+/* SECTION 80 — format-edge */
+  function formatEdge(edge){
+    if (!finite(edge)) return "NaN";
+    const e = Math.round(edge*10)/10;
+    return (e>0?"+":"")+e.toFixed(1);
+  }
+
+/* SECTION 81 — render-rows */
+  function renderRows(rows, proj){
+    const table = document.getElementById("results");
+    table.style.display = "table";
+    table.innerHTML = "<tr><th>Pick</th><th>Projection</th><th>Edge</th><th>Model Grade</th><th>Prediction</th></tr>";
+    let best = -1, bestScore = -1e9;
+    rows.forEach(function(p, idx){
+      const tr = document.createElement("tr");
+      const c1=document.createElement("td"), c2=document.createElement("td"), c3=document.createElement("td"), c4=document.createElement("td"), c5=document.createElement("td");
+      c1.textContent = p.name;
+      const dead = p.pick==="NO PLAY" || (p.family!=="winner" && (p.noLine || !finite(p.line)));
+      c2.textContent = p.family==="winner"
+        ? (finite(p.projection) ? displaySigned(p.projection) : "—")
+        : (finite(p.projection) ? formatProjectionWhole(p.projection) : "NaN");
+      c3.textContent = finite(p.edge) ? formatEdge(p.edge) : "—";
+      c4.textContent = dead ? "—" : (p.grade || "—");
+      c4.className = p.pick==="NO PLAY"?"conf-none":p.grade==="A"?"conf-a":p.grade==="B"?"conf-b":p.grade==="C"?"conf-c":p.grade==="D"?"conf-d":"conf-none";
+      c5.className = p.pick==="NO PLAY"?"pred-noplay":String(p.pick).indexOf("UNDER")>=0?"pred-under":String(p.pick).indexOf("AWAY")>=0?"pred-away":String(p.pick).indexOf("HOME")>=0?"pred-home":"pred-over";
+      c5.style.whiteSpace = "nowrap";
+      c5.style.fontSize = "11px";
+      const predSpan = document.createElement("span");
+      predSpan.textContent = p.pick;
+      c5.appendChild(predSpan);
+      tr.append(c1,c2,c3,c4,c5);
+      table.appendChild(tr);
+      const rank = {A:4,B:3,C:2,D:1}[p.grade]||0;
+      const score = rank*1000 + Math.abs(p.edge||0)*20;
+      if (p.pick!=="NO PLAY" && p.track && !p.plusDog && !p.review && rank>=3 && score>bestScore){ bestScore=score; best=idx; }
+    });
+    if (best>=0){
+      rows[best].isLock = true;
+      const cell = table.rows[best+1].cells[4];
+      const lock = document.createElement("span");
+      lock.className = "lock";
+      lock.textContent = "🔒";
+      cell.appendChild(document.createTextNode(" "));
+      cell.appendChild(lock);
+    }
+    let dash = document.getElementById("syndicateDashboard");
+    if (!dash){
+      dash = document.createElement("div");
+      dash.id = "syndicateDashboard";
+      table.parentNode.insertBefore(dash, table);
+    }
+    const netA = finite(proj && proj.home) ? proj.home : NaN;
+    const netB = finite(proj && proj.away) ? proj.away : NaN;
+    dash.innerHTML = '<div style="background:#333;color:#ffd700;padding:8px 10px;font-weight:800;font-size:11px;display:flex;justify-content:space-between;"><span>SYNDICATE INSIGHT</span><span style="color:#4CAF50">🟢 FULL MODEL</span></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:12px;text-align:center;">'+
+      '<div><div style="font-size:9px;color:var(--muted)">HOME EXP</div><div style="font-size:18px;font-weight:900">'+(finite(netA)?netA.toFixed(1):"—")+'</div></div>'+
+      '<div><div style="font-size:9px;color:var(--muted)">TOTAL</div><div style="font-size:18px;font-weight:900">'+(proj && finite(proj.total)?proj.total.toFixed(1):"—")+'</div></div>'+
+      '<div><div style="font-size:9px;color:var(--muted)">AWAY EXP</div><div style="font-size:18px;font-weight:900">'+(finite(netB)?netB.toFixed(1):"—")+'</div></div></div>';
+    document.querySelectorAll(".why-pick-body").forEach(function(n){ n.remove(); });
+    document.querySelectorAll(".section").forEach(function(s){
+      if (s.id==="leagueSection") return;
+      s.classList.add("collapsed");
+    });
+    setTimeout(function(){
+      const wrap = dash || table.closest(".table-wrap") || table;
+      const rect = wrap.getBoundingClientRect();
+      const vis = rect.top >= 0 && rect.bottom <= (window.innerHeight||800);
+      if (!vis) wrap.scrollIntoView({ behavior:"smooth", block:"start" });
+    }, 300);
+  }
+
+  /* ===================== TRACKER ===================== */
+  const TK = "BASEBALL_TRACKER_STATE_V1";
+  var g_trackerState = window.g_trackerState = (function(){
+    try {
+      const x = JSON.parse(localStorage.getItem(TK)||"null");
+      if (x && Array.isArray(x.activePicks) && Array.isArray(x.archivedPicks)){
+        function ghost(p){
+          const line = Number(p && p.line);
+          const txt = String((p && p.predictionText) || "");
+          if (p && p.family==="winner") return false;
+          return !isFinite(line) || Math.abs(line)<1e-9 || /OVER 0|UNDER 0/.test(txt);
+        }
+        x.activePicks = x.activePicks.filter(function(p){ return !ghost(p); });
+        x.archivedPicks = x.archivedPicks.filter(function(p){ return !ghost(p); });
+        return x;
+      }
+    } catch(e){}
+    return { activePicks:[], archivedPicks:[], stats:{settled:0,wins:0,losses:0,pushes:0}, updatedAt:new Date().toISOString() };
+  })();
+
+/* SECTION 82 — tracker-save */
+  function tkSave(){
+    g_trackerState.updatedAt = new Date().toISOString();
+    try { localStorage.setItem(TK, JSON.stringify(g_trackerState)); } catch(e){ window.__bbLog("tkSave", e); }
+    updateBattery();
+  }
+  const LIVE_MS = 10 * 60 * 60 * 1000;
+
+/* SECTION 83 — pick-ref-ts */
+  function pickRefTs(p){
+    const s = Date.parse(p && (p.settledAt || p.eventDate || p.createdAt) || 0);
+    return finite(s) ? s : 0;
+  }
+
+/* SECTION 84 — is-live-tracked */
+  function isLiveTracked(p){
+    if (!p) return false;
+    if (String(p.resultStatus||"pending")==="pending") return true;
+    const ts = pickRefTs(p);
+    if (!ts) return true;
+    return (Date.now() - ts) < LIVE_MS;
+  }
+
+/* SECTION 85 — archive-expired-tracked-picks */
+  function archiveExpiredTrackedPicks(){
+    const keep=[], move=[];
+    (g_trackerState.activePicks||[]).forEach(function(p){
+      if (isLiveTracked(p)) keep.push(p);
+      else move.push(p);
+    });
+    if (!move.length) return;
+    const seen = {};
+    (g_trackerState.archivedPicks||[]).forEach(function(p){ if(p.signature) seen[p.signature]=1; });
+    move.forEach(function(p){ if (!p.signature || !seen[p.signature]) g_trackerState.archivedPicks.unshift(p); });
+    g_trackerState.activePicks = keep;
+    tkSave();
+  }
+
+/* SECTION 86 — tracker-recount */
+  function tkRecount(){
+    archiveExpiredTrackedPicks();
+    const all = g_trackerState.activePicks.concat(g_trackerState.archivedPicks);
+    const s = all.filter(function(p){ return /^(win|loss|push)$/.test(p.resultStatus); });
+    g_trackerState.stats = { settled:s.length, wins:s.filter(function(p){return p.resultStatus==="win";}).length, losses:s.filter(function(p){return p.resultStatus==="loss";}).length, pushes:s.filter(function(p){return p.resultStatus==="push";}).length };
+  }
+
+/* SECTION 87 — update-battery */
+  function updateBattery(){
+    const lg = currentLeagueKey();
+    const all = (g_trackerState.activePicks||[]).concat(g_trackerState.archivedPicks||[]);
+    const decided = all.filter(function(p){
+      return /^(win|loss)$/.test(String(p.resultStatus||"")) && (!lg || String(p.league||"")===lg);
+    });
+    const n = decided.length;
+    const wins = decided.filter(function(p){ return p.resultStatus==="win"; }).length;
+    const pct = n ? Math.round(100*wins/n) : 0;
+    const fill = document.getElementById("enginePerfFill");
+    const lab = document.getElementById("enginePerfPct");
+    if (fill){ fill.style.width = (n?pct:0)+"%"; fill.style.background = pct>=55?"#49d45f":pct>=48?"#d98a00":"#c91920"; }
+    if (lab) lab.textContent = n ? pct+"%" : "—";
+  }
+
+/* SECTION 88 — track-rows */
+  function trackRows(rows){
+
+/* SECTION 89 — stable-manual-id */
+    function stableManualId(){
+      const a = normName(document.getElementById("teamAName").value);
+      const b = normName(document.getElementById("teamBName").value);
+      const kick = String(document.getElementById("fixtureKickoff").value||"").trim();
+      const venue = normName(document.getElementById("fixtureVenue").value||"");
+      // Full kickoff timestamp (not calendar day) so doubleheaders / same-day
+      // rematches cannot collide. Venue is a secondary discriminator.
+      const d = kick || "no-kickoff";
+      const s = a+"|"+b+"|"+d+"|"+venue;
+      var h = 2166136261;
+      for (var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h,16777619); }
+      return "manual_bb_"+(h>>>0).toString(16);
+    }
+    const eventId = document.getElementById("fixtureEventId").value || stableManualId();
+    const payloads = rows.filter(function(p){
+      if (!(p.track && p.pick && p.pick!=="NO PLAY")) return false;
+      if (p.family==="winner") return true;
+      return !p.noLine && finite(p.line) && Math.abs(Number(p.line))>1e-9;
+    }).map(function(p){
+      return {
+        eventId: eventId,
+        eventDate: document.getElementById("fixtureKickoff").value || new Date().toISOString(),
+        homeTeam: document.getElementById("teamAName").value || "Home",
+        awayTeam: document.getElementById("teamBName").value || "Away",
+        league: currentLeagueKey(),
+        marketKey: p.marketKey, marketName: p.name, line: p.line,
+        projection: p.projection, predictionText: p.pick, side: p.side,
+        confidenceGrade: p.grade, family: p.family, isLock: !!p.isLock,
+        resultStatus: "pending",
+        signature: eventId+"|"+p.marketKey+"|"+p.side+"|"+String(p.line==null?"":p.line),
+        createdAt: new Date().toISOString()
+      };
+    });
+    payloads.forEach(function(p){
+      g_trackerState.activePicks = g_trackerState.activePicks.filter(function(ex){
+        return !(String(ex.resultStatus||"pending")==="pending" && String(ex.eventId)===String(p.eventId) && ex.marketKey===p.marketKey);
+      });
+    });
+    const seen = new Set(g_trackerState.activePicks.concat(g_trackerState.archivedPicks).map(function(p){ return p.signature; }));
+    payloads.forEach(function(p){ if (!seen.has(p.signature)){ g_trackerState.activePicks.push(p); seen.add(p.signature); } });
+    if (g_trackerState.activePicks.length>400) g_trackerState.activePicks = g_trackerState.activePicks.slice(-400);
+    tkRecount(); tkSave(); renderTracked();
+  }
+
+  function f5ScoresFromCompetitors(cs){
+    const home = (cs||[]).find(function(x){return x.homeAway==="home";}) || (cs||[])[0];
+    const away = (cs||[]).find(function(x){return x.homeAway==="away";}) || (cs||[])[1];
+    const lh = (home && home.linescores) || [];
+    const la = (away && away.linescores) || [];
+    if (lh.length<5 || la.length<5) return { home:NaN, away:NaN };
+    let h=0,a=0;
+    for (let i=0;i<5;i++){
+      h += Number(lh[i] && (lh[i].value!=null?lh[i].value:lh[i].displayValue))||0;
+      a += Number(la[i] && (la[i].value!=null?la[i].value:la[i].displayValue))||0;
+    }
+    return { home:h, away:a };
+  }
+
+/* SECTION 90 — settle-math */
+  function settleMath(pick, home, away, extra){
+    extra = extra || {};
+    if (!pick) return "pending";
+    const line = Number(pick.line);
+    const mk = String(pick.marketKey||"");
+    const fam = pick.family || (mk.indexOf("rl")===0 || mk.indexOf("spread")>=0 || mk==="f5_rl" ? "spread" : mk.indexOf("tt")===0 || mk==="f5_home" || mk==="f5_away" ? "team" : mk==="winner" ? "winner" : "ft");
+    if (!finite(home) || !finite(away)) return "pending";
+    if (String(pick.marketKey||"").indexOf("f5")===0){
+      if (!finite(extra.f5Home) || !finite(extra.f5Away)) return "pending";
+      home = extra.f5Home;
+      away = extra.f5Away;
+    }
+    if (fam==="winner"){
+      if (home===away) return "push";
+      const homeWon = home>away;
+      if (pick.side==="away") return homeWon ? "loss" : "win";
+      return homeWon ? "win" : "loss";
+    }
+    if (fam==="ft"){
+      const tot = home+away;
+      if (!finite(line)) return "pending";
+      if (Math.abs(tot-line)<1e-9) return "push";
+      const over = tot>line;
+      return (pick.side==="under") ? (over?"loss":"win") : (over?"win":"loss");
+    }
+    if (fam==="team"){
+      const actual = (pick.marketKey==="tt_away" || pick.marketKey==="f5_away") ? away : home;
+      if (!finite(line)) return "pending";
+      if (Math.abs(actual-line)<1e-9) return "push";
+      const over = actual>line;
+      return (pick.side==="under") ? (over?"loss":"win") : (over?"win":"loss");
+    }
+    if (fam==="spread"){
+      if (!finite(line)) return "pending";
+      const homeAdj = home + line;
+      if (Math.abs(homeAdj-away)<1e-9) return "push";
+      const homeCovers = homeAdj > away;
+      if (pick.side==="away") return homeCovers ? "loss" : "win";
+      return homeCovers ? "win" : "loss";
+    }
+    return "pending";
+  }
+
+/* SECTION 91 — apply-manual-settle */
+  function promptManualSettleValue(pick, status){
+    return new Promise(function(resolve){
+      const overlay = document.getElementById("manualSettleOverlay");
+      const titleEl = document.getElementById("manualSettleTitle");
+      const matchEl = document.getElementById("manualSettleMatch");
+      const marketEl = document.getElementById("manualSettleMarket");
+      const inputEl = document.getElementById("manualSettleInput");
+      const okBtn = document.getElementById("manualSettleOkBtn");
+      const cancelBtn = document.getElementById("manualSettleCancelBtn");
+      if (!overlay || !inputEl){ resolve(""); return; }
+      const winner = String(pick.family||pick.marketKey||"")==="winner" || String(pick.marketKey)==="winner";
+      const home = pick.homeTeam||"A", away = pick.awayTeam||"B";
+      if (titleEl) titleEl.textContent = String(status||"SETTLE").toUpperCase() + (winner ? " — Enter winner" : " — Enter final score");
+      if (matchEl) matchEl.textContent = home+" vs "+away;
+      if (marketEl) marketEl.textContent = String(pick.marketName||pick.marketKey||"Pick") + (pick.predictionText ? " · "+pick.predictionText : "");
+      inputEl.value = "";
+      inputEl.placeholder = winner ? "HOME/AWAY" : (String(pick.marketKey||"").indexOf("f5")===0 ? "3-2" : "8-7");
+      overlay.classList.add("open");
+      overlay.setAttribute("aria-hidden","false");
+      setTimeout(function(){ try{ inputEl.focus(); }catch(e){} }, 30);
+      function cleanup(){
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden","true");
+        okBtn && okBtn.removeEventListener("click", onOk);
+        cancelBtn && cancelBtn.removeEventListener("click", onCancel);
+        overlay.removeEventListener("click", onBack);
+        inputEl.removeEventListener("keydown", onKey);
+      }
+      function onCancel(){ cleanup(); resolve(null); }
+      function onOk(){
+        let v = String(inputEl.value||"").trim();
+        if (winner){
+          const u = v.toUpperCase().replace(/\s+/g,"");
+          if (u==="H"||u==="HOME") v="HOME";
+          else if (u==="A"||u==="AWAY") v="AWAY";
+          else { inputEl.value=""; inputEl.placeholder="HOME/AWAY"; return; }
+        }
+        cleanup();
+        resolve(v);
+      }
+      function onBack(e){ if (e.target===overlay) onCancel(); }
+      function onKey(e){ if (e.key==="Enter") onOk(); if (e.key==="Escape") onCancel(); }
+      okBtn && okBtn.addEventListener("click", onOk);
+      cancelBtn && cancelBtn.addEventListener("click", onCancel);
+      overlay.addEventListener("click", onBack);
+      inputEl.addEventListener("keydown", onKey);
+    });
+  }
+  async function applyManual(sig, status){
+    let found=null;
+    g_trackerState.activePicks.concat(g_trackerState.archivedPicks).forEach(function(p){ if(p.signature===sig) found=p; });
+    if (!found) return;
+    const scored = await promptManualSettleValue(found, status==="custom" ? "SETTLE" : status);
+    if (scored===null) return;
+    if (String(scored).trim()) found.actualScore = String(scored).trim();
+    if (status==="custom"){
+      const winner = String(found.family||found.marketKey||"")==="winner" || String(found.marketKey)==="winner";
+      const raw = String(scored||"").trim();
+      if (winner){
+        const u = raw.toUpperCase();
+        const homeWon = u==="HOME" || u==="H";
+        const awayWon = u==="AWAY" || u==="A";
+        if (homeWon) status = found.side==="away" ? "loss" : "win";
+        else if (awayWon) status = found.side==="away" ? "win" : "loss";
+        else { return; }
+      } else {
+        const m = raw.match(/(-?\d+(?:\.\d+)?)\s*[-:,]\s*(-?\d+(?:\.\d+)?)/);
+        if (!m) return;
+        const hs = Number(m[1]), as = Number(m[2]);
+        const isF5 = String(found.marketKey||"").indexOf("f5")===0;
+        const st = settleMath(found, hs, as, isF5 ? { f5Home:hs, f5Away:as } : {});
+        if (!st || st==="pending") return;
+        status = st;
+      }
+    }
+    found.resultStatus = status;
+    found.settledAt = status==="pending" ? null : new Date().toISOString();
+    found.manualSettlement = true;
+    if (status==="pending" && g_trackerState.archivedPicks.indexOf(found)>=0){
+      g_trackerState.archivedPicks = g_trackerState.archivedPicks.filter(function(p){return p!==found;});
+      g_trackerState.activePicks.push(found);
+    }
+    tkRecount(); tkSave(); renderTracked();
+  }
+
+/* SECTION 92 — tracker-delete-confirm */
+  function showTrackerDeleteConfirm(pickLabel, matchLabel){
+    return new Promise(function(resolve){
+      const overlay = document.getElementById("trackerDeleteConfirm");
+      const textEl = document.getElementById("trackerDeleteConfirmText");
+      const okBtn = document.getElementById("trackerDeleteOkBtn");
+      const cancelBtn = document.getElementById("trackerDeleteCancelBtn");
+      if (!overlay || !textEl || !okBtn || !cancelBtn){
+        resolve(window.confirm("Delete this pick permanently?\n\n"+(pickLabel||"")));
+        return;
+      }
+      textEl.textContent = "Delete this pick permanently?\n\n"+(pickLabel||"This pick")+(matchLabel?"\n"+matchLabel:"")+"\n\nThis cannot be undone.";
+      overlay.classList.add("open");
+      overlay.setAttribute("aria-hidden","false");
+      const finish = function(ok){
+        overlay.classList.remove("open");
+        overlay.setAttribute("aria-hidden","true");
+        okBtn.removeEventListener("click", onOk);
+        cancelBtn.removeEventListener("click", onCancel);
+        overlay.removeEventListener("click", onOverlay);
+        resolve(!!ok);
+      };
+      const onOk = function(){ finish(true); };
+      const onCancel = function(){ finish(false); };
+      const onOverlay = function(e){ if (e.target===overlay) finish(false); };
+      okBtn.addEventListener("click", onOk);
+      cancelBtn.addEventListener("click", onCancel);
+      overlay.addEventListener("click", onOverlay);
+    });
+  }
+
+/* SECTION 93 — delete-pick */
+  function deletePick(sig){
+    const p = g_trackerState.activePicks.concat(g_trackerState.archivedPicks).find(function(x){return x.signature===sig;});
+    if (!p) return;
+    const label = p.predictionText || "pick";
+    const match = (p.homeTeam||"A")+" vs "+(p.awayTeam||"B");
+    showTrackerDeleteConfirm(label, match).then(function(ok){
+      if (!ok) return;
+      g_trackerState.activePicks = g_trackerState.activePicks.filter(function(x){return x.signature!==sig;});
+      g_trackerState.archivedPicks = g_trackerState.archivedPicks.filter(function(x){return x.signature!==sig;});
+      tkRecount(); tkSave(); renderTracked();
+    });
+  }
+  var __trackerView = "picks";
+
+/* SECTION 94 — tracker-modal-view */
+  function setTrackerModalView(view){
+    __trackerView = (view === "report") ? "report" : "picks";
+    const isReport = __trackerView === "report";
+    const panel = document.querySelector(".tracker-panel");
+    if (panel) panel.classList.toggle("analytics-view", isReport);
+    const title = document.getElementById("trackerHeadTitle");
+    if (title) title.textContent = isReport ? "Engine Report" : "Tracked Picks";
+    const analytics = document.getElementById("trackerAnalyticsPanel");
+    if (analytics && isReport){
+      const all = (g_trackerState.activePicks||[]).concat(g_trackerState.archivedPicks||[]);
+      const settled = all.filter(function(p){ return /^(win|loss|push)$/.test(String(p.resultStatus||"")); });
+      const wins = settled.filter(function(p){ return p.resultStatus==="win"; }).length;
+      const losses = settled.filter(function(p){ return p.resultStatus==="loss"; }).length;
+      const pushes = settled.filter(function(p){ return p.resultStatus==="push"; }).length;
+      const n = settled.length;
+      const wr = n ? (wins/n*100) : null;
+      const trackerMin = 30;
+      const checkpointStatus = n>=trackerMin ? "Review ready" : "Watching";
+      function formatPct(v){ return finite(v) ? (Number(v).toFixed(1)+"%") : "—"; }
+      function statusClass(status){
+        const key = String(status||"").toLowerCase();
+        if (key.indexOf("confirmed")>=0) return "confirmed";
+        if (key.indexOf("candidate")>=0) return "candidate";
+        return "watching";
+      }
+      function marketLabel(key){
+        const map = { ft_total:"Game Total", tt_home:"Team A Total", tt_away:"Team B Total", rl_home:"Handicap", ft:"Game Total" };
+        return map[String(key||"")] || String(key||"Other");
+      }
+      const byM = {};
+      const byTeam = {};
+      const byGrade = { A:{w:0,l:0,p:0}, B:{w:0,l:0,p:0}, C:{w:0,l:0,p:0}, D:{w:0,l:0,p:0} };
+      let lockW=0, lockL=0, lockP=0;
+      settled.forEach(function(p){
+        const mk = marketLabel(p.marketKey || p.marketName || "other");
+        byM[mk] = byM[mk] || {w:0,l:0,p:0};
+        if (p.resultStatus==="win") byM[mk].w++;
+        else if (p.resultStatus==="loss") byM[mk].l++;
+        else byM[mk].p++;
+        const rawMk = String(p.marketKey||"");
+        const teams = (rawMk==="tt_home"||rawMk==="f5_home") ? [p.homeTeam] : (rawMk==="tt_away"||rawMk==="f5_away") ? [p.awayTeam] : [p.homeTeam, p.awayTeam];
+        teams.forEach(function(tm){
+          if (!tm) return;
+          byTeam[tm] = byTeam[tm] || {w:0,l:0,p:0};
+          if (p.resultStatus==="win") byTeam[tm].w++;
+          else if (p.resultStatus==="loss") byTeam[tm].l++;
+          else byTeam[tm].p++;
+        });
+        const g = String(p.confidenceGrade||p.grade||"").toUpperCase();
+        if (byGrade[g]){
+          if (p.resultStatus==="win") byGrade[g].w++;
+          else if (p.resultStatus==="loss") byGrade[g].l++;
+          else byGrade[g].p++;
+        }
+        if (p.isLock){
+          if (p.resultStatus==="win") lockW++;
+          else if (p.resultStatus==="loss") lockL++;
+          else lockP++;
+        }
+      });
+      function rec(d){ const s=d.w+d.l+d.p, dec=d.w+d.l; return { settled:s, wins:d.w, losses:d.l, pushes:d.p, winPct: dec? (d.w/dec*100):NaN }; }
+      const marketRows = Object.keys(byM).map(function(k){ return Object.assign({ label:k }, rec(byM[k])); }).sort(function(a,b){ return (b.winPct||0)-(a.winPct||0); });
+      const teamRows = Object.keys(byTeam).map(function(k){ return Object.assign({ label:k }, rec(byTeam[k])); }).sort(function(a,b){ return (b.winPct||0)-(a.winPct||0); });
+      const bestMarket = marketRows.filter(function(r){ return r.settled>=4 && r.winPct>=70; })[0];
+      const weakMarket = marketRows.slice().reverse().filter(function(r){ return r.settled>=4 && r.winPct<=45; })[0];
+      const strongTeam = teamRows.filter(function(r){ return r.settled>=2 && r.winPct>=70; })[0];
+      const weakTeam = teamRows.slice().reverse().filter(function(r){ return r.settled>=2 && r.winPct<=45; })[0];
+      const lockSettled = lockW+lockL+lockP;
+      const lockPct = (lockW+lockL) ? (lockW/(lockW+lockL)*100) : NaN;
+      const reviews = [];
+      if (n < trackerMin){
+        reviews.push({ area:"Checkpoint", decision:"COLLECT MORE", status:"Watching", review:n+"/"+trackerMin+" settled picks collected so far.", action:(trackerMin-n)+" more settled picks are needed before the tracker can give a full review." });
+      } else {
+        reviews.push({ area:"Checkpoint", decision:"KEEP", status:"Review ready", review:n+"/"+trackerMin+" settled picks collected.", action:"Continue collecting evidence." });
+        if (bestMarket) reviews.push({ area:"Best market", decision:"KEEP", status: bestMarket.settled>=6?"Confirmed strength":"Candidate strength", review:bestMarket.label+" is leading at "+formatPct(bestMarket.winPct)+" with "+bestMarket.wins+" wins and "+bestMarket.losses+" losses.", action:"Keep this market logic as it is. Do not weaken it from one bad day." });
+        if (weakMarket && (!bestMarket || weakMarket.label!==bestMarket.label)) reviews.push({ area:"Weak market", decision:"REVIEW", status: weakMarket.settled>=6?"Candidate review":"Watching", review:weakMarket.label+" is the weakest market so far at "+formatPct(weakMarket.winPct)+" with "+weakMarket.losses+" losses.", action:"Do not edit yet from this checkpoint alone. Keep it on review and only change if it repeats." });
+        if (lockSettled>=5){
+          let dec="NO CHANGE", st="Watching", act="Lock performance is acceptable. Keep monitoring instead of forcing a lock edit now.";
+          if (lockPct<=50){ dec="REVIEW"; st="Candidate review"; act="Lock performance is weak. Watch the next checkpoint before touching lock logic."; }
+          else if (lockPct>=65){ dec="KEEP"; st="Confirmed strength"; act="Lock performance is healthy. Keep the current lock behavior unless a later checkpoint says otherwise."; }
+          reviews.push({ area:"Lock icon", decision:dec, status:st, review:"Locks are "+lockW+" wins, "+lockL+" losses, "+lockP+" pushes for "+formatPct(lockPct)+" win rate.", action:act });
+        }
+        if (strongTeam) reviews.push({ area:"Strong team signal", decision:"KEEP", status:"Watching", review:strongTeam.label+" is trending strong at "+formatPct(strongTeam.winPct)+" across "+strongTeam.settled+" settled picks.", action:"Treat this as a positive team note. Keep collecting more team-by-team evidence." });
+        if (weakTeam && (!strongTeam || weakTeam.label!==strongTeam.label)) reviews.push({ area:"Weak team signal", decision:"WATCH", status: weakTeam.settled>=4?"Candidate review":"Watching", review:weakTeam.label+" is underperforming at "+formatPct(weakTeam.winPct)+" across "+weakTeam.settled+" settled picks.", action:"Keep this team on watch. Do not apply a global engine edit from one team alone." });
+      }
+      function tableRows(rows, empty){
+        if (!rows.length) return '<tr><td colspan="6" class="note">'+empty+'</td></tr>';
+        return rows.map(function(r){
+          return '<tr><td>'+esc(r.label)+'</td><td class="num">'+r.settled+'</td><td class="num">'+r.wins+'</td><td class="num">'+r.losses+'</td><td class="num">'+r.pushes+'</td><td class="rate">'+formatPct(r.winPct)+'</td></tr>';
+        }).join("");
+      }
+      const gradeRows = ["A","B","C","D"].map(function(g){ return Object.assign({ label:g }, rec(byGrade[g])); }).filter(function(r){ return r.settled>0; });
+      const shadowRows = [
+        { label:"All tracked picks", settled:n, wins:wins, losses:losses, pushes:pushes, winPct:wr },
+        { label:"Locks only", settled:lockSettled, wins:lockW, losses:lockL, pushes:lockP, winPct:lockPct }
+      ];
+      const oosNote = n>=trackerMin
+        ? "Win rate on the most recent 30% of settled picks will appear here once createdAt coverage is complete for this league."
+        : "No out-of-sample check yet for this league. This runs automatically once enough settled picks exist (needs 30+ settled picks with a valid createdAt) and refreshes periodically during the retraining pipeline.";
+      analytics.innerHTML =
+        '<div class="tracker-analytics-topbar" style="margin-bottom:10px"><div style="font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)">ENGINE REPORT</div>'+
+        '<div style="font-size:15px;font-weight:900">Tracked results and learning</div>'+
+        '<div style="font-size:10px;color:var(--tracker-subtext);font-weight:700">Pick record, feedback, and post-checkpoint suggestions live here.</div></div>'+
+        '<div class="tracker-kpi-grid">'+
+        '<div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall</div><div class="tracker-kpi-value">'+wins+'W</div><div class="tracker-kpi-sub">Losses '+losses+' • Pushes '+pushes+' • Win rate '+formatPct(wr)+'</div></div>'+
+        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">'+(g_trackerState.activePicks||[]).length+'</div><div class="tracker-kpi-sub">Current model baseball_v4</div></div>'+
+        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks</div><div class="tracker-kpi-value">'+n+'</div><div class="tracker-kpi-sub">Checkpoint target '+trackerMin+'</div></div>'+
+        '<div class="tracker-kpi-card"><div class="tracker-kpi-label">Review status</div><div class="tracker-kpi-value">'+esc(checkpointStatus)+'</div><div class="tracker-kpi-sub">Current version only</div></div>'+
+        '</div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Out-of-sample validation</div><div class="tracker-analytics-card-meta">Not yet available</div></div><div class="tracker-analytics-card-body"><div class="tracker-empty-note">'+esc(oosNote)+'</div></div></div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Checkpoint review</div><div class="tracker-analytics-card-meta">'+esc(checkpointStatus)+'</div></div><div class="tracker-analytics-card-body"><div class="tracker-review-list">'+
+        reviews.map(function(r){
+          return '<div class="tracker-review-row"><div class="tracker-review-top"><div class="tracker-review-area">'+esc(r.area)+'</div><div class="tracker-review-status '+statusClass(r.status)+'">'+esc(r.status)+'</div></div><div class="tracker-review-text"><strong>'+esc(r.decision)+'</strong> — '+esc(r.review)+'</div><div class="tracker-review-action">'+esc(r.action)+'</div></div>';
+        }).join("")+
+        '</div></div></div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Measurement lab</div><div class="tracker-analytics-card-meta">Tracked-pick evidence only</div></div><div class="tracker-analytics-card-body"><div class="tracker-report-subtitle">This layer measures what the engine actually saved to tracker.</div><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Experiment</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(shadowRows, "Need settled tracked picks before the shadow test can say anything useful.")+
+        '</tbody></table></div></div></div>'+
+        '<div class="tracker-analytics-grid two">'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Confidence performance</div><div class="tracker-analytics-card-meta">Do higher grades actually win more?</div></div><div class="tracker-analytics-card-body"><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Grade</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(gradeRows, "No graded settled picks yet.")+
+        '</tbody></table></div></div></div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Market performance</div><div class="tracker-analytics-card-meta">Tracked-pick evidence only</div></div><div class="tracker-analytics-card-body"><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Market</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(marketRows, "No settled market rows yet.")+
+        '</tbody></table></div></div></div>'+
+        '</div>'+
+        '<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">Team signals</div><div class="tracker-analytics-card-meta">Home and away names from saved picks</div></div><div class="tracker-analytics-card-body"><div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr><th>Team</th><th class="num">Settled</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead><tbody>'+
+        tableRows(teamRows.slice(0,8), "No team sample yet.")+
+        '</tbody></table></div></div></div>';
+    }
+  }
+  window.setTrackerModalView = setTrackerModalView;
+
+/* SECTION 95 — run-self-test */
+  function runSelfTest(opts){
+    opts = opts || {};
+    if (opts.openDebug && window.AFDB) AFDB.open();
+    let suspects=0;
+    BB.requestCache.clear();
+    ["aFTScored","bFTScored","aFTAllowed","bFTAllowed","ftMarket","aTeamTotal","bTeamTotal","spreadLine"].forEach(function(id){
+      const el=document.getElementById(id); const val=el?el.value.trim():"";
+      if (val && /[^0-9,.\s+-]/.test(val)){ suspects++; log("ERROR","UI INPUT","Invalid characters in "+id, {val:val}); }
+    });
+    const active = (g_trackerState && g_trackerState.activePicks) || [];
+    if (active.length > 490){ suspects++; log("ERROR","STORAGE","Active picks array is critically full (Limit: 500)."); }
+    if (typeof window.runEngine!=="function"){ suspects++; log("ERROR","EXPORTS","runEngine missing"); }
+    if (typeof window.settleMath!=="function"){ suspects++; log("ERROR","EXPORTS","settleMath missing"); }
+    const s=g_trackerState.stats||{};
+    const decided = (s.wins||0)+(s.losses||0);
+    if (decided>=20){
+      const wr=((s.wins||0)/decided)*100;
+      if (wr<52.4) { suspects++; log("ERROR","MODEL BIAS","Win rate below vig breakeven 52.4% ("+wr.toFixed(1)+"%)"); }
+      else log("OK","MODEL BIAS","Win rate OK at "+wr.toFixed(1)+"% vs 52.4% breakeven");
+    } else log("INFO","MODEL BIAS","Need 20+ decided picks (have "+decided+")");
+    log("INFO","RAID","Hitting ESPN MLB scoreboard + schedule…");
+    return (async function(){
+      try {
+        const board = await fetchJSON(BB.SITE("mlb")+"/scoreboard?limit=50", 12000);
+        const n = (board.events||[]).length;
+        log(n?"OK":"WARN","RAID","Scoreboard reachable", {events:n, trust:BB.lastTrust, publicRelay:!!BB.usedPublicRelay});
+        const ev = (board.events||[])[0];
+        const fx = ev ? normalizeEvent(ev, "mlb") : null;
+        if (fx && fx.homeId){
+          const sched = await fetchTeamSchedule("mlb", fx.homeId);
+          const form = lastCompletedForm(sched, fx.homeId);
+          const liveLeak = form.some(function(g){ return g && g.completed===false; });
+          if (liveLeak){ suspects++; log("ERROR","RAID","Live game leaked into last-10"); }
+          log(form.length?"OK":"ERROR","RAID","Schedule last-10 probe", {team:fx.homeName, id:fx.homeId, games:form.length, raw:sched.length});
+          if (!form.length) suspects++;
+        }
+      } catch(e){
+        suspects++;
+        log("ERROR","RAID","Live ESPN probe failed", {error:String(e&&e.message||e)});
+      }
+      log(suspects?"ERROR":"OK","SELF_TEST", suspects?("Military raid finished. "+suspects+" suspect(s) arrested."):"Military raid complete. No suspects arrested. The code is clean.");
+      return suspects;
+    })();
+  }
+  window.runSelfTest = runSelfTest;
+
+/* SECTION 96 — run-full-audit */
+  function runFullAudit(){
+    if (window.AFDB) AFDB.open();
+    let issues=0;
+    function fail(msg, data){ issues++; log("ERROR","AUDIT", msg, data||null); }
+    function ok(msg, data){ log("OK","AUDIT", msg, data||null); }
+    try {
+      if (typeof runEngine !== "function") fail("runEngine missing");
+      if (typeof settleMath !== "function") fail("settleMath missing");
+      if (typeof autoFetch !== "function") fail("autoFetch missing");
+      if (typeof loadFixtures !== "function") fail("loadFixtures missing");
+      if (typeof projectMatchup !== "function") fail("projectMatchup missing");
+      const mu = projectMatchup({
+        leagueKey:"mlb",
+        aScored:[5,4,6,3,7,2,5,4,6,3], aAllowed:[3,4,5,2,4,3,5,4,3,4],
+        bScored:[4,3,5,4,6,3,4,5,3,4], bAllowed:[5,4,6,3,5,4,6,5,4,5],
+        aH2H:[], bH2H:[], useH2H:false, venue:"", weather:null, aEra:NaN, bEra:NaN, neutral:false, deparked:true,
+        seasonA:{rs:4.6,ra:4.2,gp:140}, seasonB:{rs:4.4,ra:4.5,gp:140}
+      });
+      if (!mu || !finite(mu.home) || !finite(mu.away) || !finite(mu.total)) fail("Projection produced non-finite totals", mu);
+      else if (mu.total < 5 || mu.total > 14) fail("Toy last-10 projection outside MLB band", mu);
+      else ok("Projection sanity OK", {home:+mu.home.toFixed(2), away:+mu.away.toFixed(2), total:+mu.total.toFixed(2)});
+
+      const pm = nbPmf(4.45, 4.45*1.28+0.20, 20);
+      const pmSum = pm.reduce(function(a,b){return a+b;},0);
+      if (Math.abs(pmSum-1)>1e-6) fail("NB PMF does not sum to 1", {sum:pmSum});
+      else ok("NB PMF normalized", {sum:+pmSum.toFixed(8)});
+
+      const emptyLine = parseLine("");
+      if (emptyLine !== null) fail("Empty line must parse to null, got "+emptyLine);
+      else ok("Empty line parses to null / NO PLAY");
+      const band = parseBand("7.5 - 9.5");
+      if (!band || band.lo!==7.5 || band.hi!==9.5) fail("Range band 7.5-9.5 broken", band);
+      else ok("Range band hi/lo OK", band);
+      const single = parseLine("-1.5");
+      if (single !== -1.5) fail("Signed handicap parse failed", {got:single});
+      else ok("Signed handicap parse OK");
+
+      const cases = [
+        {pick:{family:"ft", side:"over", line:8.5}, home:5, away:5, want:"win"},
+        {pick:{family:"ft", side:"under", line:8.5}, home:3, away:3, want:"win"},
+        {pick:{family:"ft", side:"over", line:9.5}, home:4, away:4, want:"loss"},
+        {pick:{family:"team", marketKey:"tt_home", side:"over", line:3.5}, home:5, away:2, want:"win"},
+        {pick:{family:"team", marketKey:"tt_away", side:"under", line:4.5}, home:5, away:3, want:"win"},
+        {pick:{family:"spread", side:"home", line:-1.5}, home:5, away:3, want:"win"},
+        {pick:{family:"spread", side:"away", line:-1.5}, home:5, away:3, want:"loss"},
+        {pick:{family:"spread", side:"home", line:1.5}, home:3, away:3, want:"win"}
+      ];
+      cases.forEach(function(c){
+        const got = settleMath(c.pick, c.home, c.away);
+        if (got !== c.want) fail("settleMath mismatch", {want:c.want, got:got, pick:c.pick, home:c.home, away:c.away});
+      });
+      if (issues===0) ok("Settlement matrix passed");
+
+      // CLV sign check
+      function clv(side, line, close){
+        if (side==="over") return close - line;
+        if (side==="under") return line - close;
+        if (side==="home") return line - close;
+        if (side==="away") return close - line;
+        return null;
+      }
+      if (clv("over",8.5,9.5)!==1 || clv("under",8.5,9.5)!==-1 || clv("home",-1.5,-2.0)!==0.5 || clv("away",-1.5,-2.0)!==-0.5){
+        fail("CLV sign helper regression");
+      } else ok("CLV sign convention OK");
+      if (parkMatchKey("Field") || parkMatchKey("Park") || parkMatchKey("Stadium")) fail("Short venue tokens must not map to a park");
+      else ok("Park matcher rejects Field/Park/Stadium");
+      if (parkMatchKey("Coors Field") !== "Coors Field") fail("Coors Field exact match failed", {got:parkMatchKey("Coors Field")});
+      else ok("Park matcher hits Coors Field");
+      const eraHi = pitchingAllowed(9.5, 4.4, 4.45, 4.2);
+      const eraNone = pitchingAllowed(NaN, 4.4, 4.45, 4.2);
+      if (!(eraHi > eraNone)) fail("High ERA should still move the pitching term", {eraHi:eraHi, eraNone:eraNone});
+      else ok("Extreme ERA is clamped, not discarded");
+    } catch(e){
+      fail("Full audit threw", {error:String(e&&e.message||e)});
+    }
+    log(issues?"ERROR":"OK","AUDIT", issues?("Unit checks found "+issues+" issue(s)."):"Unit checks passed (PMF, settle, CLV, park, ERA). Not a historical backtest.");
+    return issues;
+  }
+  window.runFullAudit = runFullAudit;
+
+/* SECTION 97 — engine-auditor */
+  const EngineAuditor = (function(){
+    const SEV_COLOR = { CRITICAL:"#ff5c61", HIGH:"#ff9d4d", MEDIUM:"#ffcf73", LOW:"#8fd3ff", INFO:"#4ea9ff" };
+    let _findings = [], _open=false, _ms=0, _view="severity";
+    function add(sev, area, title, what, why, fix){
+      _findings.push({ severity:sev, area:area, title:title, what:what, why:why, fix:fix });
+    }
+    function health(){
+      let s = 100;
+      _findings.forEach(function(f){
+        if (f.severity==="CRITICAL") s -= 20;
+        else if (f.severity==="HIGH") s -= 12;
+        else if (f.severity==="MEDIUM") s -= 6;
+        else if (f.severity==="LOW") s -= 2;
+      });
+      s = Math.max(0, s);
+      const label = s>=90?"HEALTHY":s>=75?"WATCH":s>=55?"LAYERS INCOMPLETE":"BROKEN";
+      const color = s>=90?"#49d45f":s>=75?"#ffcf73":"#ff9d4d";
+      return { score:s, label:label, color:color };
+    }
+    function run(){
+      const t0 = Date.now();
+      _findings = [];
+      if (typeof runFullAudit==="function"){
+        const n = runFullAudit();
+        if (Number(n)>0){
+          add("HIGH","AUDIT","runFullAudit reported "+n+" failed check(s)",
+            "Unit checks logged "+n+" issue(s).",
+            "Engine Auditor health previously ignored the full-audit counter.",
+            "Inspect AFDB AUDIT rows and fix the failing unit check.");
+        }
+      }
+      const src = document.documentElement ? (document.documentElement.innerHTML||"") : "";
+      const lines = src.split(/\n/).length;
+      const fns = (src.match(/function\s+\w+/g)||[]).length;
+      window.__bbAuditMeta = { lines:lines, fns:fns };
+
+      const all = ((g_trackerState.activePicks||[]).concat(g_trackerState.archivedPicks||[])).filter(function(p){ return /^(win|loss)$/.test(p.resultStatus); });
+      const byG = {A:{w:0,l:0},B:{w:0,l:0},C:{w:0,l:0},D:{w:0,l:0}};
+      all.forEach(function(p){
+        const g = String(p.confidenceGrade||p.grade||"").toUpperCase();
+        if (byG[g]){ if (p.resultStatus==="win") byG[g].w++; else byG[g].l++; }
+      });
+      const order = ["A","B","C","D"].map(function(g){
+        const n=byG[g].w+byG[g].l; return n? (byG[g].w/n) : null;
+      });
+      const labeled = ["A","B","C","D"].map(function(g,i){
+        const n=byG[g].w+byG[g].l;
+        return n? (g+": "+(order[i]*100).toFixed(1)+"%") : (g+": —");
+      }).join(" → ");
+      const usable = order.filter(function(x){ return x!=null; });
+      if (usable.length>=2){
+        let inverted=false;
+        for (let i=1;i<usable.length;i++){ if (usable[i] > usable[i-1]+0.02) inverted=true; }
+        if (inverted && all.length>=12){
+          add("MEDIUM","FORENSIC_CORE","Confidence grade empirical calibration weak",
+            "Win rates by grade (A→D): "+labeled,
+            "Higher letter grades should correspond to higher empirical win rates.",
+            "Recalibrate grade thresholds or feature model.");
+        } else {
+          add("INFO","FORENSIC_CORE","Confidence grade sample", labeled, "Need more settled picks before treating grades as calibrated.", "Keep collecting.");
+        }
+      } else {
+        add("INFO","FORENSIC_CORE","Confidence grade sample too small", "Not enough settled A–D picks to test calibration.", "Empirical order cannot be proven yet.", "Collect 12+ decided picks.");
+      }
+
+      if (typeof parkMatchKey==="function"){
+        if (parkMatchKey("Field") || parkMatchKey("Park") || parkMatchKey("Stadium")){
+          add("HIGH","PARK","Short venue tokens map to a park", "Field/Park/Stadium matched a stadium.", "Ambiguous venue text can apply Coors-level inflation.", "Require longest exact-normalized match.");
+        } else add("INFO","PARK","Park matcher rejects short tokens", "Field/Park/Stadium do not resolve.", "Regression protected.", "Keep.");
+      }
+      const neu = document.getElementById("neutralSite");
+      add("INFO","HFA","Neutral-site control present", neu?"checkbox wired":"missing", "Tournament games should not get MLB home-field.", "Auto-check winter/WBC/Olympics.");
+      _ms = Date.now()-t0;
+      render();
+    }
+    function render(){
+      const panel = document.getElementById("auditorPanel");
+      if (!panel) return;
+      const counts = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0,INFO:0};
+      _findings.forEach(function(f){ counts[f.severity]=(counts[f.severity]||0)+1; });
+      const h = health();
+      const meta = window.__bbAuditMeta || { lines:0, fns:0 };
+      const vis = _findings.filter(function(f){ return _view==="info" ? f.severity==="INFO" : f.severity!=="INFO"; });
+      const roadmap = vis.filter(function(f){ return f.severity==="CRITICAL"||f.severity==="HIGH"||f.severity==="MEDIUM"; });
+      let html = '<div style="padding:12px;background:#080808;border-bottom:1px solid #222;flex-shrink:0;">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
+      html += '<div style="color:#d4af37;font-size:14px;font-weight:900;letter-spacing:1px;">🩺 ENGINE SELF-AUDIT</div>';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+      html += '<button type="button" onclick="EngineAuditor.run()" style="background:#0a1f0a;border:1px solid #2f8f4a;color:#49ff7a;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">↻ Re-run All</button>';
+      html += '<button type="button" onclick="EngineAuditor.close()" style="background:#111;border:1px solid #555;color:#ccc;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;border-radius:4px;">✕ Close</button>';
+      html += '</div></div>';
+      html += '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Forensic coverage</span><br/><span style="color:#d4af37;font-size:13px;font-weight:900;">'+meta.lines+'/'+meta.lines+' lines · '+meta.fns+' fn · seal UNSEALED</span></div>';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Engine health</span><br/><span style="color:'+h.color+';font-size:13px;font-weight:900;">'+h.score+'/100 — '+h.label+'</span></div>';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Findings</span><br/><span style="font-size:12px;font-weight:700;"><span style="color:#ff5c61;">'+counts.CRITICAL+' CRIT</span> · <span style="color:#ff9d4d;">'+counts.HIGH+' HIGH</span> · <span style="color:#ffcf73;">'+counts.MEDIUM+' MED</span> · <span style="color:#8fd3ff;">'+counts.LOW+' LOW</span> · <span style="color:#4ea9ff;">'+counts.INFO+' INFO</span></span></div>';
+      html += '<div><span style="color:#555;font-size:10px;font-weight:700;text-transform:uppercase;">Run time</span><br/><span style="color:#aaa;font-size:12px;">'+_ms+' ms</span></div>';
+      html += '</div>';
+      html += '<div style="display:flex;gap:6px;">';
+      html += '<button type="button" onclick="EngineAuditor.setViewMode(\'severity\')" style="flex:1;background:'+(_view==="severity"?"#1a1a1a":"#0a0a0a")+';border:1px solid '+(_view==="severity"?"#d4af37":"#333")+';color:'+(_view==="severity"?"#d4af37":"#888")+';padding:6px;font-size:10px;font-weight:900;cursor:pointer;border-radius:4px;">GROUP BY SEVERITY</button>';
+      html += '<button type="button" onclick="EngineAuditor.setViewMode(\'info\')" style="flex:1;background:'+(_view==="info"?"#1a1a1a":"#0a0a0a")+';border:1px solid '+(_view==="info"?"#d4af37":"#333")+';color:'+(_view==="info"?"#d4af37":"#888")+';padding:6px;font-size:10px;font-weight:900;cursor:pointer;border-radius:4px;">INFO ('+counts.INFO+')</button>';
+      html += '</div></div>';
+      html += '<div style="flex:1;overflow:auto;padding:12px;">';
+      if (roadmap.length){
+        html += '<div style="background:#1a1206;border:1px solid #5a3b00;padding:10px;margin-bottom:12px;"><div style="color:#ffd75e;font-size:11px;font-weight:900;letter-spacing:.6px;">PRIORITIZED REMEDIATION ROADMAP</div>';
+        roadmap.forEach(function(f,i){
+          html += '<div style="margin-top:8px;color:#ccc;font-size:12px;"><strong style="color:'+SEV_COLOR[f.severity]+';">['+f.severity+']</strong> '+esc(f.title)+'<div style="color:#888;font-size:11px;margin-top:4px;">'+esc(f.what)+'</div></div>';
+        });
+        html += '</div>';
+      }
+      vis.forEach(function(f){
+        html += '<div style="border:1px solid #222;background:#0d0d0d;padding:10px;margin-bottom:8px;">';
+        html += '<div style="color:'+SEV_COLOR[f.severity]+';font-size:10px;font-weight:900;">'+f.severity+' · '+esc(f.area)+'</div>';
+        html += '<div style="color:#fff;font-size:13px;font-weight:800;margin:4px 0;">'+esc(f.title)+'</div>';
+        html += '<div style="color:#aaa;font-size:11px;"><strong>WHAT:</strong> '+esc(f.what)+'</div>';
+        html += '<div style="color:#aaa;font-size:11px;"><strong>WHY:</strong> '+esc(f.why)+'</div>';
+        html += '<div style="color:#8fd3ff;font-size:11px;"><strong>FIX:</strong> '+esc(f.fix)+'</div>';
+        html += '</div>';
+      });
+      if (!vis.length) html += '<div style="color:#555;text-align:center;padding:30px;">No findings in this view.</div>';
+      html += '</div>';
+      panel.innerHTML = html;
+    }
+    function open(){
+      _open = true;
+      const ov = document.getElementById("auditorOverlay");
+      if (ov) ov.style.display = "flex";
+      run();
+    }
+    function close(){
+      _open = false;
+      const ov = document.getElementById("auditorOverlay");
+      if (ov) ov.style.display = "none";
+    }
+    function setViewMode(m){ _view = m==="info"?"info":"severity"; render(); }
+    return { open:open, close:close, run:run, setViewMode:setViewMode };
+  })();
+  window.EngineAuditor = EngineAuditor;
+
+
+
+  function inningOrdinal(n){
+    n = Number(n);
+    if (!finite(n) || n<=0) return "";
+    const v = n % 100;
+    if (v>=11 && v<=13) return n+"th";
+    const d = n % 10;
+    return n + (d===1?"st":d===2?"nd":d===3?"rd":"th");
+  }
+  function liveInningText(live){
+    if (!live) return "";
+    const n = Number(live.period);
+    const ord = inningOrdinal(n);
+    if (ord) return ord + " inning";
+    const d = String(live.detail||"");
+    const m = d.match(/(\d+)(?:st|nd|rd|th)?/i);
+    if (m){
+      const o = inningOrdinal(m[1]);
+      if (o) return o + " inning";
+    }
+    return d.replace(/^(Top|Bot|Bottom|Mid|End)\s+/i,"").replace(/\b(\d+)(st|nd|rd|th)?\b/i, function(_, num){
+      const o = inningOrdinal(num);
+      return o ? o + " inning" : _;
+    }) || d;
+  }
+
+/* SECTION 98 — render-tracked */
+    function renderTracked(){
+    archiveExpiredTrackedPicks();
+    const body = document.getElementById("trackedPicksBody");
+    const empty = document.getElementById("trackerEmpty");
+    const summary = document.getElementById("trackerSummary");
+    if (!body) return;
+    const vis = (g_trackerState.activePicks||[]).slice().sort(function(a,b){
+      const ap = a.resultStatus==="pending", bp = b.resultStatus==="pending";
+      if (ap&&!bp) return -1; if (!ap&&bp) return 1;
+      return Date.parse(b.createdAt||0)-Date.parse(a.createdAt||0);
+    });
+    const stats = g_trackerState.stats||{};
+    const pending = vis.filter(function(p){return p.resultStatus==="pending";}).length;
+    body.innerHTML = vis.map(function(p){
+      const st = String(p.resultStatus||"pending").toLowerCase();
+      const cls = st==="win"?"track-win":st==="loss"?"track-loss":st==="push"?"track-push":"track-pending";
+      const sig = encodeURIComponent(p.signature||"");
+      const when = p.eventDate ? new Date(p.eventDate).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "—";
+      let status = st.toUpperCase();
+      const live = (window.g_liveBaseball||{})[p.eventId];
+      if (st==="pending" && live && live.live){
+        status = '<div class="tracker-live-stack tracker-disp-toggle" data-sig="'+sig+'"><div class="tracker-live-tag">LIVE</div><div>'+esc(String(live.home||"0"))+' : '+esc(String(live.away||"0"))+'</div><div>'+esc(liveInningText(live))+'</div></div>'+
+          '<div class="tracker-manual-settle act" data-box="'+sig+'" style="display:none">'+
+          '<div style="font-size:8px;font-weight:900;opacity:.6;margin-bottom:1px">SETTLE</div>'+
+          '<button class="tracker-manual-btn" data-settle="win" data-sig="'+sig+'">W</button>'+
+          '<button class="tracker-manual-btn" data-settle="loss" data-sig="'+sig+'">L</button>'+
+          '<button class="tracker-manual-btn" data-settle="push" data-sig="'+sig+'">P</button>'+
+          '<div class="tracker-custom-settle-btn" data-settle="custom" data-sig="'+sig+'" style="font-size:8px;text-decoration:underline;cursor:pointer;margin-top:2px;font-weight:800;opacity:.7">CUSTOM</div></div>';
+      } else if (st==="pending"){
+        status = '<div class="tracker-disp-toggle" data-sig="'+sig+'" style="cursor:pointer;text-decoration:underline">PENDING</div>'+
+          '<div class="tracker-manual-settle act" data-box="'+sig+'" style="display:none">'+
+          '<div style="font-size:8px;font-weight:900;opacity:.6;margin-bottom:1px">SETTLE</div>'+
+          '<button class="tracker-manual-btn" data-settle="win" data-sig="'+sig+'">W</button>'+
+          '<button class="tracker-manual-btn" data-settle="loss" data-sig="'+sig+'">L</button>'+
+          '<button class="tracker-manual-btn" data-settle="push" data-sig="'+sig+'">P</button>'+
+          '<div class="tracker-custom-settle-btn" data-settle="custom" data-sig="'+sig+'" style="font-size:8px;text-decoration:underline;cursor:pointer;margin-top:2px;font-weight:800;opacity:.7">CUSTOM</div></div>';
+      } else if (p.actualScore){
+        status = st.toUpperCase()+'<div class="tracker-status-score">'+esc(p.actualScore)+'</div>';
+      }
+      return "<tr><td>"+esc(when)+"</td><td>"+esc(String(p.league||"").toUpperCase())+"</td><td>"+esc((p.homeTeam||"A")+" vs "+(p.awayTeam||"B"))+
+        "</td><td style='font-weight:800'>"+esc(p.marketName||p.marketKey)+"</td><td>"+esc(finite(p.line)?displayLine(p.line):"—")+"</td><td style='white-space:nowrap;font-size:11px'><span class='del' data-sig='"+sig+"' style='cursor:pointer'>"+esc((function(){ var txt=String(p.predictionText||""); if(p.family==="winner") return txt; var ln=finite(p.line)?displayLine(p.line):""; if(ln&&/OVER|UNDER/.test(txt)) return txt.replace(/OVER\s+[-\d.]+/,"OVER "+ln).replace(/UNDER\s+[-\d.]+/,"UNDER "+ln); return txt; })())+"</span>"+(p.isLock?" <span class='lock'>🔒</span>":"")+
+        "</td><td class='conf-none'>"+esc(p.confidenceGrade||"—")+"</td><td class='"+cls+"'><div class='tracker-status-stack'>"+status+"</div></td></tr>";
+    }).join("");
+    if (empty) empty.style.display = vis.length ? "none" : "block";
+    const liveN = vis.filter(function(p){
+      const st = String(p.resultStatus||"pending").toLowerCase();
+      const live = (window.g_liveBaseball||{})[p.eventId];
+      return st==="pending" && live && live.live;
+    }).length;
+    if (summary) summary.textContent = liveN+" live • "+(stats.wins||0)+" wins • "+(stats.losses||0)+" losses";
+    const ms = document.getElementById("trackerMarketSummary");
+    if (ms){
+      const pendingBy = {};
+      vis.forEach(function(p){
+        if (String(p.resultStatus||"pending")!=="pending") return;
+        const k = p.marketName || p.marketKey || "other";
+        pendingBy[k] = (pendingBy[k]||0)+1;
+      });
+      const chips = Object.keys(pendingBy).map(function(k){ return '<div class="tracker-market-chip">'+esc(String(k).toUpperCase())+" "+pendingBy[k]+"</div>"; });
+      ms.innerHTML = "";
+      ms.style.display = "none";
+    }
+  }
+
+
+/* SECTION 99 — scoreboard-date-key */
+  function scoreboardDateKeyFromTs(ts){
+    try {
+      const fmt = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" });
+      const p = fmt.formatToParts(new Date(ts));
+      const y = p.find(function(x){return x.type==="year";}).value;
+      const m = p.find(function(x){return x.type==="month";}).value;
+      const da = p.find(function(x){return x.type==="day";}).value;
+      return y+m+da;
+    } catch(e){
+      const d = new Date(ts);
+      return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+    }
+  }
+
+/* SECTION 100 — find-completed-manual-game */
+  async function findCompletedManualGame(league, sample){
+    const keys = [];
+    const seenKey = {};
+    function pushKey(k){ if (k && !seenKey[k]){ seenKey[k]=1; keys.push(k); } }
+    const base = Date.parse(sample && sample.eventDate || 0);
+    if (finite(base)){
+      for (let d=-3; d<=4; d++) pushKey(scoreboardDateKeyFromTs(base + d*86400000));
+    }
+    for (let d=0; d<=14; d++) pushKey(localDateKey(-d));
+    const wantHome = normName(sample.homeTeam);
+    const wantAway = normName(sample.awayTeam);
+    const candidates = [];
+    for (let i=0;i<keys.length;i++){
+      try {
+        const data = await fetchJSON(BB.SITE(league)+"/scoreboard?dates="+keys[i]+"&limit=200", 12000);
+        (data.events||[]).forEach(function(e){
+          const fx = normalizeEvent(e, league);
+          if (!fx || !fx.completed) return;
+          if (normName(fx.homeName)!==wantHome || normName(fx.awayName)!==wantAway) return;
+          if (!finite(fx.homeScore) || !finite(fx.awayScore)) return;
+          candidates.push(fx);
+        });
+      } catch(e){}
+    }
+    if (!candidates.length) return null;
+    if (candidates.length === 1 || !finite(base)) return candidates[0];
+    // Doubleheader: pick the completed game whose start is closest to the tracked kickoff.
+    candidates.sort(function(a,b){
+      return Math.abs(Date.parse(a.date||0)-base) - Math.abs(Date.parse(b.date||0)-base);
+    });
+    return candidates[0];
+  }
+
+/* SECTION 101 — auto-settle */
+  async function autoSettle(){
+    const pending = (g_trackerState.activePicks||[]).filter(function(p){ return p.resultStatus==="pending" && p.eventId; });
+    const byEvent = {};
+    pending.forEach(function(p){ (byEvent[p.eventId]=byEvent[p.eventId]||[]).push(p); });
+    for (const eid of Object.keys(byEvent)){
+      const league = LEAGUE_SLUG[byEvent[eid][0].league] || byEvent[eid][0].league || "mlb";
+      try {
+        if (String(eid).indexOf("manual_")==0){
+          const sample = byEvent[eid][0];
+          const hit = await findCompletedManualGame(league, sample);
+          if (!hit || !finite(hit.homeScore) || !finite(hit.awayScore)) continue;
+          let f5 = { home:NaN, away:NaN };
+          try {
+            const box = await fetchJSON(BB.SITE(league)+"/summary?event="+encodeURIComponent(hit.id), 12000);
+            const cc = (box.header && box.header.competitions && box.header.competitions[0]) || {};
+            f5 = f5ScoresFromCompetitors(cc.competitors||[]);
+          } catch(e){}
+          byEvent[eid].forEach(function(p){
+            const st = settleMath(p, hit.homeScore, hit.awayScore, { f5Home:f5.home, f5Away:f5.away });
+            if (st==="pending") return;
+            p.resultStatus = st;
+            p.settledAt = new Date().toISOString();
+            p.actualHome = hit.homeScore; p.actualAway = hit.awayScore;
+            p.actualScore = String(p.marketKey||"").indexOf("f5")===0 && finite(f5.home) ? (f5.home+"-"+f5.away+" F5") : (hit.homeScore+"-"+hit.awayScore);
+            p.settledEventId = hit.id;
+          });
+          continue;
+        }
+        const data = await fetchJSON(BB.SITE(league)+"/summary?event="+encodeURIComponent(eid), 12000);
+        const c = (data.header && data.header.competitions && data.header.competitions[0]) || {};
+        const done = c.status && c.status.type && (c.status.type.completed || c.status.type.state==="post");
+        const cs = c.competitors||[];
+        const home = cs.find(function(x){return x.homeAway==="home";}) || cs[0];
+        const away = cs.find(function(x){return x.homeAway==="away";}) || cs[1];
+        const hs = scoreVal(home && home.score), as = scoreVal(away && away.score);
+        const f5 = f5ScoresFromCompetitors(cs);
+        const period = Number(c.status && c.status.period);
+        const detail = String((c.status && c.status.type && (c.status.type.shortDetail||c.status.type.detail||c.status.type.description))||"");
+        window.g_liveBaseball = window.g_liveBaseball || {};
+        window.g_liveBaseball[eid] = {
+          live: !done && String(c.status && c.status.type && c.status.type.state||"")!=="pre",
+          period: period,
+          detail: detail,
+          home: hs,
+          away: as
+        };
+        if (!done){
+          const canF5 = finite(f5.home) && finite(f5.away);
+          if (!canF5) continue;
+          byEvent[eid].forEach(function(p){
+            if (String(p.marketKey||"").indexOf("f5")!==0) return;
+            const st = settleMath(p, hs, as, { f5Home:f5.home, f5Away:f5.away });
+            if (st && st!=="pending"){
+              p.resultStatus = st;
+              p.actualScore = f5.home+"-"+f5.away+" F5";
+              p.settledAt = new Date().toISOString();
+            }
+          });
+          continue;
+        }
+        const closeOdds = extractOdds(c);
+        byEvent[eid].forEach(function(p){
+          if (p.family==="spread" || String(p.marketKey).indexOf("rl")===0){
+            if (finite(closeOdds.spread)) p.closeLine = Number(closeOdds.spread);
+          } else if (finite(closeOdds.total) && p.family!=="team"){
+            p.closeLine = Number(closeOdds.total);
+          }
+          if (finite(p.closeLine) && finite(p.line)){
+            if (p.side==="over") p.clv = p.closeLine - p.line;
+            else if (p.side==="under") p.clv = p.line - p.closeLine;
+            else if (p.side==="home") p.clv = p.line - p.closeLine;
+            else if (p.side==="away") p.clv = p.closeLine - p.line;
+            if (finite(p.clv)) window.g_driftErrors.push(Math.abs(p.clv));
+          }
+          const st = settleMath(p, hs, as, { f5Home:f5.home, f5Away:f5.away });
+          if (st && st!=="pending"){
+            p.resultStatus = st;
+            p.actualHomePoints = hs; p.actualAwayPoints = as;
+            p.actualScore = String(p.marketKey||"").indexOf("f5")===0 && finite(f5.home) ? (f5.home+"-"+f5.away+" F5") : (hs+"-"+as);
+            p.settledAt = new Date().toISOString();
+          }
+        });
+      } catch(e){ window.__bbLog("autoSettle", e); }
+    }
+    tkRecount(); tkSave(); renderTracked();
+  }
+
+  /* ===================== UI ===================== */
+
+/* SECTION 102 — make-sections-collapsible */
+  function makeSectionsCollapsible(){
+    document.querySelectorAll(".section").forEach(function(section){
+      if (section.querySelector(".section-toggle")) return;
+      const heading = section.querySelector("h3");
+      if (!heading) return;
+      const body = document.createElement("div");
+      body.className = "section-body";
+      const nodes = Array.prototype.slice.call(section.childNodes);
+      nodes.forEach(function(node){ if (node !== heading) body.appendChild(node); });
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "section-toggle";
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "toggle-title";
+      titleSpan.innerHTML = heading.innerHTML;
+      const iconSpan = document.createElement("span");
+      iconSpan.className = "toggle-icon";
+      iconSpan.innerHTML = "▾";
+      btn.appendChild(titleSpan);
+      btn.appendChild(iconSpan);
+      btn.addEventListener("click", function(){ section.classList.toggle("collapsed"); });
+      section.innerHTML = "";
+      section.appendChild(btn);
+      section.appendChild(body);
+      section.classList.add("collapsed");
+    });
+    const league = document.getElementById("leagueSection");
+    if (league) league.classList.remove("collapsed");
+  }
+
+/* SECTION 103 — clear-all */
+  function clearAll(preserveLeague){
+    ["teamAName","teamAId","teamBName","teamBId","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal","fixtureKickoff","fixtureEventId","fixtureVenue"].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=""; });
+    const u = document.getElementById("useFTH2H"); if (u) u.checked=false;
+    document.querySelectorAll(".autofill-indicator").forEach(function(el){ el.style.display="none"; });
+    document.querySelectorAll(".last10-short-field").forEach(function(el){ el.classList.remove("last10-short-field"); });
+    document.body.classList.remove("bb-last10-alert");
+    const banner = document.getElementById("last10SeriesAlert"); if (banner){ banner.classList.remove("visible"); banner.textContent=""; }
+    const r = document.getElementById("results"); if (r){ r.style.display="none"; r.innerHTML="<tr><th>Market</th><th>Projection</th><th>Edge</th><th>Grade</th><th>Prediction</th></tr>"; }
+    document.getElementById("fixtureSelect").innerHTML = '<option value="">— Select match —</option>';
+    fixtureCache = [];
+    fixtureOffset = 0;
+    const dToday = document.getElementById("dayToday"); if (dToday) dToday.classList.add("active");
+    const dTom = document.getElementById("dayTomorrow"); if (dTom) dTom.classList.remove("active");
+    if (!preserveLeague) document.getElementById("leagueSelect").value = "";
+    const neu = document.getElementById("neutralSite"); if (neu) neu.checked = false;
+    document.querySelectorAll(".section").forEach(function(s){ s.classList.add("collapsed"); s.classList.remove("locked"); });
+    const lg = document.getElementById("leagueSection"); if (lg) lg.classList.remove("collapsed");
+    window.__bbAuto = { A:{}, B:{}, weather:null, venue:"", pitchers:{}, odds:{}, season:{}, formN:{}, h2hN:{}, formRaw:{}, h2hRaw:{}, deparked:false };
+    setStatus("");
+    document.getElementById("fixtureContextStatus").textContent = "";
+  }
+
+
+/* SECTION 104 — boot-listeners */
+  document.addEventListener("DOMContentLoaded", function(){
+        makeSectionsCollapsible();
+
+    document.getElementById("leagueSelect").addEventListener("change", function(){
+      clearAll(true);
+      const espn = document.getElementById("espnAutoSection");
+      if (espn) espn.classList.remove("collapsed");
+      const neu = document.getElementById("neutralSite");
+      const key = this.value || "";
+      if (neu){
+        neu.checked = /world-baseball-classic|olympics-baseball|caribbean-series|winter-league/.test(key);
+      }
+      loadFixtures();
+    });
+    document.getElementById("dayToday").addEventListener("click", function(){
+      fixtureOffset=0; this.classList.add("active"); document.getElementById("dayTomorrow").classList.remove("active"); loadFixtures();
+    });
+    document.getElementById("dayTomorrow").addEventListener("click", function(){
+      fixtureOffset=1; this.classList.add("active"); document.getElementById("dayToday").classList.remove("active"); loadFixtures();
+    });
+    document.getElementById("fixtureSelect").addEventListener("change", function(){
+      const fx = fixtureCache[Number(this.value)];
+      if (!fx) return;
+      applyFixture(fx);
+      autoFetch();
+    });
+    document.getElementById("autoFetchBtn").addEventListener("click", autoFetch);
+    document.getElementById("runBtn").addEventListener("click", runEngine);
+    document.getElementById("clearBtn").addEventListener("click", clearAll);
+    ["aFTScored","aFTAllowed","bFTScored","bFTAllowed","ftMarket","spreadLine","aTeamTotal","bTeamTotal"].forEach(function(id){
+      const el=document.getElementById(id); if(el) el.addEventListener("blur", applyLast10Alert);
+    });
+
+    document.getElementById("trackerToggleBtn").addEventListener("click", function(){
+      const m=document.getElementById("trackerModal"); m.classList.add("open"); m.setAttribute("aria-hidden","false");
+      document.body.classList.add("tracker-open"); renderTracked(); setTrackerModalView("picks"); autoSettle();
+    });
+    document.getElementById("trackerCloseBtn").addEventListener("click", function(){
+      const m=document.getElementById("trackerModal"); m.classList.remove("open"); document.body.classList.remove("tracker-open");
+    });
+    document.getElementById("trackerModal").addEventListener("click", function(e){ if(e.target===this){ this.classList.remove("open"); document.body.classList.remove("tracker-open"); } });
+    document.getElementById("trackedPicksBody").addEventListener("click", function(e){
+      const tog = e.target.closest(".tracker-disp-toggle");
+      if (tog){ const box=document.querySelector('.act[data-box="'+tog.getAttribute("data-sig")+'"]'); if(box) box.style.display="flex"; tog.style.display="none"; }
+      const btn = e.target.closest("[data-settle]");
+      if (btn) applyManual(decodeURIComponent(btn.getAttribute("data-sig")), btn.getAttribute("data-settle"));
+      const del = e.target.closest(".del");
+      if (del) deletePick(decodeURIComponent(del.getAttribute("data-sig")));
+    });
+
+    const headTitle = document.getElementById("trackerHeadTitle");
+    if (headTitle) headTitle.addEventListener("click", function(){
+      setTrackerModalView(__trackerView==="report" ? "picks" : "report");
+    });
+    const raidBtn = document.getElementById("trackerMilitaryRaidBtn");
+    if (raidBtn) raidBtn.addEventListener("click", function(){
+      const statusEl = document.getElementById("trackerStatusLabel");
+      if (statusEl){ statusEl.textContent = "Triggered ⚡️"; statusEl.style.color = "#ff6b6b"; }
+      const p = (typeof runSelfTest==="function") ? runSelfTest({ openDebug:false }) : Promise.resolve(0);
+      Promise.resolve(p).then(function(n){
+        n = Number(n)||0;
+        if (statusEl){
+          statusEl.textContent = n ? ("Raid: "+n+" issue(s)") : "Completed ⚡️";
+          statusEl.style.color = n ? "#ff5c61" : "#4ade80";
+          setTimeout(function(){ statusEl.textContent = ""; statusEl.style.color = ""; }, 2200);
+        }
+      });
+    });
+    const healthBtn = document.getElementById("trackerHealthBtn");
+    if (healthBtn) healthBtn.addEventListener("click", function(){ if (window.EngineAuditor && EngineAuditor.open) EngineAuditor.open(); });
+    const cfgBtn = document.getElementById("trackerConfigBtn");
+    if (cfgBtn) cfgBtn.addEventListener("click", function(){ if (window.AFDB) AFDB.open(); });
+    const copyBtn = document.getElementById("trackerCopyDataBtn");
+    if (copyBtn) copyBtn.addEventListener("click", function(){
+      const text = (g_trackerState.activePicks||[]).concat(g_trackerState.archivedPicks||[]).map(function(p){
+        return [p.eventDate,p.league,p.homeTeam,p.awayTeam,p.marketName,p.line,p.predictionText,p.confidenceGrade,p.resultStatus,p.actualScore||""].join("\t");
+      }).join("\n");
+      if (navigator.clipboard) navigator.clipboard.writeText(text);
+    });
+    const copyJson = document.getElementById("trackerCopyDataJsonBtn");
+    if (copyJson) copyJson.addEventListener("click", function(){
+      if (navigator.clipboard) navigator.clipboard.writeText(JSON.stringify(g_trackerState,null,2));
+    });
+    document.addEventListener("visibilitychange", function(){
+      if (document.visibilityState==="visible") { try{ autoSettle(); }catch(e){} }
+    });
+    const afdbBtn = document.getElementById("bbdbBtn");
+    if (afdbBtn) afdbBtn.addEventListener("click", function(){ if (window.AFDB) AFDB.open(); });
+    const errBtn = document.getElementById("headerErrorBtn");
+    if (errBtn) errBtn.addEventListener("click", function(){ if (window.AFDB) AFDB.open(); });
+
+    document.getElementById("auditCopyBtn").addEventListener("click", function(){
+      const text = JSON.stringify({ build:APP_BUILD, at:new Date().toISOString(), tracker:g_trackerState }, null, 2);
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(()=>{ this.textContent="✅"; const b=this; setTimeout(function(){ b.textContent="📋"; },1200); });
+    });
+    document.getElementById("inputsCopyBtn").addEventListener("click", function(){
+      const ids=["teamAName","teamBName","aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H","ftMarket","spreadLine","aTeamTotal","bTeamTotal"];
+      const data={}; ids.forEach(function(id){ const e=document.getElementById(id); if(e&&e.value) data[id]=e.value; });
+      if (navigator.clipboard) navigator.clipboard.writeText(JSON.stringify(data,null,2));
+    });
+
+    tkRecount(); updateBattery(); renderTracked();
+    try { autoSettle(); } catch(e){}
+    setInterval(function(){
+      if (document.visibilityState==="hidden") return;
+      autoSettle();
+    }, 20*1000);
+    if (BB.relayOverrideActive) log("WARN","TRUST","Relay override active", {worker:BB.WORKER});
+    log("OK","BOOT","Baseball engine ready", { build:APP_BUILD, config:ENGINE_CONFIG.version, relayOverride:!!BB.relayOverrideActive });
+  });
+
+  window.runEngine = runEngine;
+  window.clearAll = clearAll;
+  window.projectMatchup = projectMatchup;
+  window.settleMath = settleMath;
+})();
+</script>
+</body>
+</html>
