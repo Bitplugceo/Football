@@ -157,9 +157,7 @@
     .manual-settle-actions { display:flex; justify-content:flex-end; gap:8px; }
     .manual-settle-actions button { margin:0; min-width:72px; }
     .tracker-live-stack { display:grid; gap:2px; justify-items:center; font-size:9px; line-height:1.2; }
-    .tracker-live-tag { color:var(--muted); font-weight:900; letter-spacing:.3px; font-size:8px; }
-    .tracker-live-score { color:var(--tracker-strong); font-weight:900; font-size:12px; line-height:1.2; }
-    .tracker-live-period { color:var(--muted); font-weight:800; font-size:9px; }
+    .tracker-live-tag { color:#c91920; font-weight:900; letter-spacing:.4px; }
     .tracker-status-score { font-size:9px; font-weight:800; opacity:.85; }
     .why-pick-body { margin-top:4px; padding:6px 8px; background:var(--panel-soft); border:1px solid var(--table-border); text-align:left; font-size:10px; }
     #syndicateDashboard { background:var(--panel); border:1px solid var(--panel-border); margin:10px 0; padding:0; box-shadow:var(--shadow); }
@@ -499,7 +497,7 @@
   'use strict';
 
 /* SECTION 8 — app-build */
-  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_livecolor";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_livefix";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
@@ -2870,7 +2868,7 @@
       let status = st.toUpperCase();
       const live = (window.g_liveBaseball||{})[p.eventId];
       if (st==="pending" && live && live.live){
-        status = '<div class="tracker-live-stack tracker-disp-toggle" data-sig="'+sig+'"><div class="tracker-live-tag">LIVE</div><div class="tracker-live-score">'+esc(String(live.home||"0"))+' : '+esc(String(live.away||"0"))+'</div><div class="tracker-live-period">'+esc(liveInningText(live))+'</div></div>'+
+        status = '<div class="tracker-live-stack tracker-disp-toggle" data-sig="'+sig+'"><div class="tracker-live-tag">LIVE</div><div>'+esc(String(live.home||"0"))+' : '+esc(String(live.away||"0"))+'</div><div>'+esc(liveInningText(live))+'</div></div>'+
           '<div class="tracker-manual-settle act" data-box="'+sig+'" style="display:none">'+
           '<div style="font-size:8px;font-weight:900;opacity:.6;margin-bottom:1px">SETTLE</div>'+
           '<button class="tracker-manual-btn" data-settle="win" data-sig="'+sig+'">W</button>'+
