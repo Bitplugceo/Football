@@ -1,4 +1,3 @@
-S
 <!-- SECTION 1 — html-document -->
 <!DOCTYPE html>
 <html lang="en">
@@ -506,7 +505,7 @@ S
   'use strict';
 
 /* SECTION 8 — app-build */
-  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_cols";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_fix7";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
@@ -846,8 +845,8 @@ S
     let best = null, bestLen = 0;
     keys.forEach(function(k){
       const nk = normVenue(k);
-      if (Math.min(nk.length, nv.length) < 5) return;
-      if (nv.indexOf(nk)>=0 || nk.indexOf(nv)>=0){
+      if (nk.length < 8) return;
+      if (nv.indexOf(nk)>=0 && nv.length >= Math.ceil(nk.length * 0.6)){
         if (nk.length > bestLen){ best = k; bestLen = nk.length; }
       }
     });
@@ -1424,7 +1423,28 @@ S
 
 
 /* SECTION 61 — apply-fixture */
+  function clearMatchupSeries(){
+    ["aFTScored","aFTAllowed","bFTScored","bFTAllowed","aFTH2H","bFTH2H"].forEach(function(id){
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    const use = document.getElementById("useFTH2H");
+    if (use) use.checked = false;
+    ["aAutoTag","bAutoTag","h2hAutoTag"].forEach(function(id){
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+    if (!window.__bbAuto) window.__bbAuto = {};
+    window.__bbAuto.season = {};
+    window.__bbAuto.formN = {};
+    window.__bbAuto.formRaw = {};
+    window.__bbAuto.h2hN = {};
+    window.__bbAuto.h2hRaw = {};
+    window.__bbAuto.deparked = false;
+  }
+
   function applyFixture(fx){
+    clearMatchupSeries();
     document.getElementById("teamAName").value = fx.homeName||"";
     document.getElementById("teamBName").value = fx.awayName||"";
     document.getElementById("teamAId").value = fx.homeId||"";
@@ -1681,6 +1701,7 @@ S
   async function autoFetch(){
     const slug = currentSlug();
     if (!slug){ setStatus("Select a league first."); return; }
+    clearMatchupSeries();
     BB.usedPublicRelay = false;
     let aId = document.getElementById("teamAId").value.trim();
     let bId = document.getElementById("teamBId").value.trim();
@@ -1739,6 +1760,11 @@ S
         fillSeriesInput("bFTH2H", h.map(function(x){return x.allowed;}));
         document.getElementById("useFTH2H").checked = h.length>=2;
         markAuto("h2hAutoTag", true);
+      } else {
+        fillSeriesInput("aFTH2H", []);
+        fillSeriesInput("bFTH2H", []);
+        document.getElementById("useFTH2H").checked = false;
+        markAuto("h2hAutoTag", false);
       }
       window.__bbAuto.h2hRaw = {
         aFTH2H: document.getElementById("aFTH2H").value,
@@ -1895,9 +1921,9 @@ S
       const overOk = overEdge >= thresh && pOver >= th.pWin;
       const underOk = underEdge >= thresh && pUnder >= th.pWin;
       if (overOk && (!underOk || overEdge >= underEdge)){
-        pick = "OVER "+displayLine(band.mid); side="over"; showEdge=overEdge; used=band.mid; pWin=pOver;
+        pick = "OVER "+String(band.mid); side="over"; showEdge=overEdge; used=band.mid; pWin=pOver;
       } else if (underOk){
-        pick = "UNDER "+displayLine(band.mid); side="under"; showEdge=underEdge; used=band.mid; pWin=pUnder;
+        pick = "UNDER "+String(band.mid); side="under"; showEdge=underEdge; used=band.mid; pWin=pUnder;
       }
       if (pick!=="NO PLAY" && band.isRange){
         const halfWidth = (band.hi - band.lo) / 2;
@@ -1907,15 +1933,17 @@ S
         }
       }
       if (pick!=="NO PLAY"){
-        used = bookHalfLine(band.mid);
+        used = snapRunTotal(band.mid);
         showEdge = side==="over" ? (mu - used) : (used - mu);
-        pick = (side==="over"?"OVER ":"UNDER ") + displayLine(used);
+        pick = (side==="over"?"OVER ":"UNDER ") + String(used);
         const massUsed = family==="team"
           ? massOverUnder(awaySide ? proj.pAway : proj.pHome, used)
           : probOverJoint(proj, used);
         const pO = massUsed.over / Math.max(1e-9, massUsed.over+massUsed.under);
         const pU = massUsed.under / Math.max(1e-9, massUsed.over+massUsed.under);
         pWin = side==="over" ? pO : pU;
+        const stillOk = showEdge >= thresh && pWin >= th.pWin;
+        if (!stillOk){ pick="NO PLAY"; side=""; used=null; showEdge=null; pWin=null; }
       } else {
         used = null; showEdge = null; pWin = null;
       }
@@ -2016,7 +2044,7 @@ S
       }
     });
     rows.forEach(function(r){
-      r.track = !!(r.pick && r.pick!=="NO PLAY" && !r.plusDog && !r.review);
+      r.track = !!(r.pick && r.pick!=="NO PLAY");
     });
     const live = rows.filter(function(r){ return r.track; });
     const chosen = live[0] || null;
@@ -2116,8 +2144,10 @@ S
         function ghost(p){
           const line = Number(p && p.line);
           const txt = String((p && p.predictionText) || "");
-          if (p && p.family==="winner") return false;
-          return !isFinite(line) || Math.abs(line)<1e-9 || /OVER 0|UNDER 0/.test(txt);
+          const fam = String((p && p.family) || "");
+          if (fam==="winner") return false;
+          if (fam==="spread") return !isFinite(line);
+          return !isFinite(line) || Math.abs(line)<1e-9 || /(OVER|UNDER) 0(\.0+)?$/.test(txt);
         }
         x.activePicks = x.activePicks.filter(function(p){ return !ghost(p); });
         x.archivedPicks = x.archivedPicks.filter(function(p){ return !ghost(p); });
@@ -2210,6 +2240,7 @@ S
     const payloads = rows.filter(function(p){
       if (!(p.track && p.pick && p.pick!=="NO PLAY")) return false;
       if (p.family==="winner") return true;
+      if (p.family==="spread") return !p.noLine && finite(p.line);
       return !p.noLine && finite(p.line) && Math.abs(Number(p.line))>1e-9;
     }).map(function(p){
       return {
@@ -2896,7 +2927,7 @@ S
         status = st.toUpperCase()+'<div class="tracker-status-score">'+esc(p.actualScore)+'</div>';
       }
       return "<tr><td>"+esc(when)+"</td><td>"+esc(String(p.league||"").toUpperCase())+"</td><td>"+esc((p.homeTeam||"A")+" vs "+(p.awayTeam||"B"))+
-        "</td><td style='font-weight:800'>"+esc(p.marketName||p.marketKey)+"</td><td>"+esc(finite(p.line)?displayLine(p.line):"—")+"</td><td style='white-space:nowrap;font-size:11px'><span class='del' data-sig='"+sig+"' style='cursor:pointer'>"+esc((function(){ var txt=String(p.predictionText||""); if(p.family==="winner") return txt; var ln=finite(p.line)?displayLine(p.line):""; if(ln&&/OVER|UNDER/.test(txt)) return txt.replace(/OVER\s+[-\d.]+/,"OVER "+ln).replace(/UNDER\s+[-\d.]+/,"UNDER "+ln); return txt; })())+"</span>"+(p.isLock?" <span class='lock'>🔒</span>":"")+
+        "</td><td style='font-weight:800'>"+esc(p.marketName||p.marketKey)+"</td><td>"+esc((function(){ if(!finite(p.line)) return "—"; if(p.family==="spread") return displaySigned(p.line); return String(p.line); })())+"</td><td style='white-space:nowrap;font-size:11px'><span class='del' data-sig='"+sig+"' style='cursor:pointer'>"+esc((function(){ var txt=String(p.predictionText||""); if(p.family==="winner") return txt; if(p.family==="spread") return txt; var ln=finite(p.line)?String(p.line):""; if(ln&&/OVER|UNDER/.test(txt)) return txt.replace(/OVER\s+[-\d.]+/,"OVER "+ln).replace(/UNDER\s+[-\d.]+/,"UNDER "+ln); return txt; })())+"</span>"+(p.isLock?" <span class='lock'>🔒</span>":"")+
         "</td><td class='conf-none'>"+esc(p.confidenceGrade||"—")+"</td><td class='"+cls+"'><div class='tracker-status-stack'>"+status+"</div></td></tr>";
     }).join("");
     if (empty) empty.style.display = vis.length ? "none" : "block";
@@ -3019,7 +3050,8 @@ S
         };
         if (!done){
           const canF5 = finite(f5.home) && finite(f5.away);
-          if (!canF5) continue;
+          const f5Complete = period > 5 || (period === 5 && /^end\b/i.test(String(detail||"").trim()));
+          if (!canF5 || !f5Complete) continue;
           byEvent[eid].forEach(function(p){
             if (String(p.marketKey||"").indexOf("f5")!==0) return;
             const st = settleMath(p, hs, as, { f5Home:f5.home, f5Away:f5.away });
