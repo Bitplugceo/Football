@@ -1,3 +1,4 @@
+S
 <!-- SECTION 1 — html-document -->
 <!DOCTYPE html>
 <html lang="en">
@@ -505,7 +506,7 @@
   'use strict';
 
 /* SECTION 8 — app-build */
-  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_fix7";
+  const APP_BUILD = "bb_engine_v4_mlb_ui_20260919_localtime";
   window.__APP_BUILD_VERSION = APP_BUILD;
 
   /* Versioned model constants. These remain un-backtested guesses (see Engine Report)
@@ -705,7 +706,15 @@
 
 /* SECTION 19 — parse-series */
   function parseSeries(val){
-    return String(val||"").split(/[,\s]+/).map(function(t){ return parseFloat(t); }).filter(finite).slice(0,10);
+    const parts = String(val||"").split(/[,\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+    const tok = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
+    const out = [];
+    for (let i=0;i<parts.length;i++){
+      if (!tok.test(parts[i])) continue;
+      const n = parseFloat(parts[i]);
+      if (finite(n)) out.push(n);
+    }
+    return out.slice(0,10);
   }
   function parseSeriesStrict(val){
     const parts = String(val||"").split(/[,\s]+/).map(function(t){ return t.trim(); }).filter(Boolean);
@@ -1501,10 +1510,29 @@
 
 
 /* SECTION 63 — format-fixture-time */
-  function formatFixtureTime(dateStr){
+  function formatLocalTime(dateStr){
     if (!dateStr) return "--:--";
-    try { return new Date(dateStr).toLocaleTimeString([], { hour:"numeric", minute:"2-digit", hour12:true }); }
+    try { return new Date(dateStr).toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit", hour12:true }); }
     catch(e){ return "--:--"; }
+  }
+  function formatEtTime(dateStr){
+    if (!dateStr) return "";
+    try {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone:"America/New_York", hour:"numeric", minute:"2-digit", hour12:true
+      }).format(new Date(dateStr)) + " ET";
+    } catch(e){ return ""; }
+  }
+  function formatLocalStamp(dateStr){
+    if (!dateStr) return "—";
+    try {
+      return new Date(dateStr).toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+    } catch(e){ return "—"; }
+  }
+  function formatFixtureTime(dateStr){
+    const local = formatLocalTime(dateStr);
+    const et = formatEtTime(dateStr);
+    return et && et !== local + " ET" ? local + " (" + et + ")" : local;
   }
 
 /* SECTION 64 — norm-name */
@@ -2904,7 +2932,7 @@
       const st = String(p.resultStatus||"pending").toLowerCase();
       const cls = st==="win"?"track-win":st==="loss"?"track-loss":st==="push"?"track-push":"track-pending";
       const sig = encodeURIComponent(p.signature||"");
-      const when = p.eventDate ? new Date(p.eventDate).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "—";
+      const when = p.eventDate ? formatLocalStamp(p.eventDate) : "—";
       let status = st.toUpperCase();
       const live = (window.g_liveBaseball||{})[p.eventId];
       if (st==="pending" && live && live.live){
@@ -2993,12 +3021,18 @@
       } catch(e){}
     }
     if (!candidates.length) return null;
-    if (candidates.length === 1 || !finite(base)) return candidates[0];
-    // Doubleheader: pick the completed game whose start is closest to the tracked kickoff.
-    candidates.sort(function(a,b){
-      return Math.abs(Date.parse(a.date||0)-base) - Math.abs(Date.parse(b.date||0)-base);
+    const WINDOW_MS = 3.5 * 3600 * 1000;
+    const dated = candidates.map(function(fx){
+      return { fx:fx, ts:Date.parse(fx.date||0) };
     });
-    return candidates[0];
+    if (finite(base)){
+      const near = dated.filter(function(x){ return finite(x.ts) && Math.abs(x.ts-base) <= WINDOW_MS; });
+      if (!near.length) return null;
+      near.sort(function(a,b){ return Math.abs(a.ts-base) - Math.abs(b.ts-base); });
+      return near[0].fx;
+    }
+    if (dated.length === 1) return dated[0].fx;
+    return null;
   }
 
 /* SECTION 101 — auto-settle */
@@ -3032,11 +3066,23 @@
         }
         const data = await fetchJSON(BB.SITE(league)+"/summary?event="+encodeURIComponent(eid), 12000);
         const c = (data.header && data.header.competitions && data.header.competitions[0]) || {};
-        const done = c.status && c.status.type && (c.status.type.completed || c.status.type.state==="post");
+        const done = c.status && c.status.type && !!(c.status.type.completed || /final/i.test(String(c.status.type.shortDetail||c.status.type.detail||"")));
         const cs = c.competitors||[];
         const home = cs.find(function(x){return x.homeAway==="home";}) || cs[0];
         const away = cs.find(function(x){return x.homeAway==="away";}) || cs[1];
         const hs = scoreVal(home && home.score), as = scoreVal(away && away.score);
+        const ticketStart = Date.parse(byEvent[eid][0].eventDate||0);
+        const gameStart = Date.parse(c.date || (data.header && data.header.competitions && data.header.competitions[0] && data.header.competitions[0].date) || 0);
+        if (finite(ticketStart) && finite(gameStart) && Math.abs(ticketStart-gameStart) > 3.5*3600*1000){
+          log("WARN","SETTLE","skip event — start time does not match ticket (doubleheader guard)", {eid:eid, ticketStart:byEvent[eid][0].eventDate, gameStart:c.date});
+          continue;
+        }
+        const inningsPlayed = Number(c.status && c.status.period) || 0;
+        const lookFinal = /final/i.test(String((c.status && c.status.type && (c.status.type.shortDetail||c.status.type.detail))||""));
+        if (done && inningsPlayed && inningsPlayed < 9 && !lookFinal){
+          log("WARN","SETTLE","skip event — marked done before 9 innings", {eid:eid, period:inningsPlayed});
+          continue;
+        }
         const f5 = f5ScoresFromCompetitors(cs);
         const period = Number(c.status && c.status.period);
         const detail = String((c.status && c.status.type && (c.status.type.shortDetail||c.status.type.detail||c.status.type.description))||"");
