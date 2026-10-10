@@ -20583,7 +20583,7 @@ function renderTrackedPicks() {
             .split("<")[0]
             .trim(),
         )}</td>
-        <td>${safeText(formatPickLine(p))}</td>
+        <td>${safeText(formatPickLine(p))}${typeof hbClvRowHtml === "function" ? hbClvRowHtml(p) : ""}</td>
         <td style="white-space: nowrap; font-size: 11px;"><span class="tracker-delete-pick-btn" data-sig="${encSig}" style="cursor:pointer;" title="Click to permanently delete this pick">${safeText(p.predictionText || "—")}</span>${p.isLock ? ' <span class="lock">🔒</span>' : ""}</td>
         <td class="conf-none">${safeText(grade)}</td>
         <td class="${statusClass}"><div class="tracker-status-stack">${statusHtml}</div></td>
@@ -21702,7 +21702,8 @@ function renderTrackerAnalytics() {
   const clvPositiveRecord = buildRecord(clvPositive);
   const clvNeutralRecord = buildRecord(clvNeutral);
   const clvNegativeRecord = buildRecord(clvNegative);
-  const hasCLVData = clvPicks.length > 0;
+  const _hbAutoClvHtml = typeof hbClvSummaryHtml === "function" ? hbClvSummaryHtml(allReportPicks) : ""; /* HB CLV */
+  const hasCLVData = clvPicks.length > 0 || !!_hbAutoClvHtml;
 
   const bestPickShadow = buildBestPickOnlyShadowExperiment(learningPicks);
 
@@ -22205,6 +22206,7 @@ function renderTrackerAnalytics() {
         </div>
         <div class="tracker-analytics-card-body">
           <div class="tracker-report-subtitle">CLV = how your pick line compares to where the market closed. Positive CLV = you beat the closing line. This is the single strongest long-term edge signal. Enter closing lines via the CUSTOM settle button.</div>
+          ${_hbAutoClvHtml}
           <div class="table-wrap tracker-report-table-wrap">
             <table class="tracker-analytics-table">
               <thead><tr><th>CLV Direction</th><th class="num">Picks</th><th class="num">Wins</th><th class="num">Losses</th><th class="num">Pushes</th><th class="rate">Win rate</th></tr></thead>
@@ -22220,7 +22222,7 @@ function renderTrackerAnalytics() {
           : `
       <div class="tracker-analytics-card">
         <div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">CLV (Closing Line Value)</div><div class="tracker-analytics-card-meta">No data yet</div></div>
-        <div class="tracker-analytics-card-body"><div class="tracker-report-subtitle">Use the CUSTOM settle button on any pick and enter the closing line to start CLV tracking. Even 20 CLV data points gives stronger signal than 100 W/L results alone.</div></div>
+        <div class="tracker-analytics-card-body"><div class="tracker-report-subtitle">Closing lines fill automatically from SportyBet shortly after kickoff (picks priced on a SportyBet game). You can also use the CUSTOM settle button and enter the closing line. Even 20 CLV data points gives stronger signal than 100 W/L results alone.</div></div>
       </div>`
       }
 
@@ -31540,6 +31542,19 @@ function buildTrackedPickPayload({
     lineAtPick: trackedLine,
     closingLine: null,
     clv: null,
+    ...(function () { /* HB CLV: SportyBet event this pick was priced on (only if the names agree) + price at pick */
+      const _o = {};
+      try {
+        const _sl = window.__hbSportyLast;
+        const _h = fixtureMeta.homeTeam, _a = fixtureMeta.awayTeam;
+        if (_sl && _sl.ok && _sl.eventId && !(_sl.home && _h && _h !== "—" && hbSportyNameScore(_h, _sl.home) < 0.34) && !(_sl.away && _a && _a !== "—" && hbSportyNameScore(_a, _sl.away) < 0.34)) {
+          _o.sportyEventId = String(_sl.eventId); _o.sportyKickoff = _sl.ko || null;
+        }
+        const _e = pickRow.hbOdds;
+        if (_e && _e.ok && Number.isFinite(_e.odds)) Object.assign(_o, { oddsDecimal: _e.odds, modelProb: _e.p, fairProb: _e.fair, evAtPick: _e.ev, stakePct: _e.stake, sigmaUsed: _e.sd });
+      } catch (_hbT) {}
+      return _o;
+    })(),
     decisionLine: isFinite(pickRow.decisionLine)
       ? Number(pickRow.decisionLine)
       : Number(pickRow.line),
@@ -31929,6 +31944,7 @@ function buildResultRows({ table, finalPicks, lockIdx, fixtureMeta, league, diag
 
       const details = buildPickExplanationDetails(p, isLock);
       details.open = false;
+      try { tdPred.setAttribute("data-hb-mk", String(p.marketKey || "")); const _hbCell = { p: p, td: tdPred, details: details, span: predSpan }; (window.__hbPlayCells = window.__hbPlayCells || []).push(_hbCell); if (p.lineMoveWarn) hbApplyMoveWarn(_hbCell, p.lineMoveWarn); } catch (_hbPc) {} /* HB CLV line-move WARN */
 
       predSpan.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -34170,6 +34186,7 @@ async function runEngine() {
         intelligencePackSummary: intelligencePack,
       },
     });
+    try { const _hbCells = window.__hbPlayCells || []; window.__hbPlayCells = []; if (_hbCells.length && typeof hbLinesAfterRun === "function") setTimeout(function () { hbLinesAfterRun(_hbCells).catch(function () {}); }, 400); } catch (_hbLa) {} /* HB CLV: line-move WARN for this run's PLAY cells */
     scrollResultsIntoViewNow(table);
 
     engineDebug(
@@ -35366,7 +35383,7 @@ function hbTag(id, on) {
 function hbOddsReset() {
   HB_ODDS_FIELDS.forEach(function (f) { [f[2], f[3]].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ""; }); if (f[1]) hbTag(f[1], false); });
   var d = document.getElementById("winnerDrawOdds"); if (d) d.value = ""; hbSportyStatus("");
-  window.__hbSportyLast = null;
+  window.__hbSportyLast = null; window.__hbLinesNow = null; window.__hbPlayCells = [];
 }
 function hbSportyStatus(msg, bad) { var el = document.getElementById("marketAutoStatus"); if (el) { el.textContent = msg; el.style.color = bad ? "#d92d2a" : ""; } }
 function hbSportyApply(res, keepLines) {
@@ -35413,6 +35430,219 @@ async function fetchAutoStats() {
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
 })();
+</script>
+
+<script>/* ===================== HB CLV v1: SportyBet opening / closing lines from the worker cron (port of BB v2.7) =====================
+   Worker thebetceo-engine snapshots handball (sr:sport:6) on cron slots 15/35/55 (next 2 h, then a wide page): keys
+   hb_lines_v1 / hb_lines_arch_v1, read with ?sport=handball. OPENING = first snapshot, LATEST = newest, CLOSING = last
+   snapshot before kickoff (frozen). Here: (1) after a run, [WARN] when SportyBet moved against a PLAY since opening
+   (picks NOT changed); (2) in the tracker, after kickoff, fetch the CLOSING line and compute CLV per pick.
+   Phone storage: per pick only a ~150-byte clvData object; retry log HB_CLV_TRIES_V1 capped at 200 entries. GET only. */
+var HB_CLV_TRY_KEY = "HB_CLV_TRIES_V1", HB_CLV_TRY_MAX = 200;
+var HB_CLV_MKS = { ft: 1, handicap: 1, h1: 1, handicap_h1: 1, team_a: 1, team_b: 1, winner: 1 };
+async function hbLinesGet(path) {
+  var j = await hbWorkerJson(path + (path.indexOf("?") >= 0 ? "&" : "?") + "sport=handball", 12000);
+  if (!j) throw new Error("lines: empty"); return j;
+}
+function hbClvNum(v) { if (v === null || v === undefined || v === "") return null; var n = Number(v); return Number.isFinite(n) ? n : null; }
+function hbClvSide(p) {
+  var s = String(p && p.side || "").toLowerCase();
+  if (s === "over" || s === "under" || s === "home" || s === "away") return s;
+  var d = hbOddsDir({ pick: String(p && (p.originalPredictionText || p.predictionText || p.pick) || "") });
+  if (d) return d.toLowerCase();
+  try { var f = typeof formatPickLine === "function" ? String(formatPickLine(p) || "") : ""; if (f === "HOME" || f === "AWAY") return f.toLowerCase(); } catch (_e) {}
+  return "";
+}
+/* "own" value: higher = better for the bettor. Handicap lines are in the HOME frame (SportyBet hcp = home handicap). */
+function hbClvOwn(mk, side, homeLine) { if (homeLine == null) return null; if (/^handicap/.test(mk)) return side === "home" ? homeLine : -homeLine; return side === "over" ? -homeLine : homeLine; }
+function hbClvPickHomeLine(p) {
+  var L = hbClvNum(p.lineAtPick != null ? p.lineAtPick : p.line); if (L == null) return null;
+  return /^handicap/.test(String(p.marketKey || "")) && String(p.lineSide || "home").toLowerCase() === "away" ? -L : L;
+}
+function hbClvToPickFrame(p, homeLine) { if (homeLine == null) return null; return /^handicap/.test(String(p.marketKey || "")) && String(p.lineSide || "home").toLowerCase() === "away" ? -homeLine : homeLine; }
+/* worker snapshot -> our side. 1X2 is 3-way: fair = de-vigged over home + draw + away. */
+function hbClvSnap(snap, side) {
+  if (!snap) return null; var isA = side === "over" || side === "home";
+  var o = hbClvNum(isA ? snap.oddsA : snap.oddsB), x = hbClvNum(isA ? snap.oddsB : snap.oddsA), d = hbClvNum(snap.oddsDraw);
+  var fair = null;
+  if (o && x && o > 1 && x > 1) fair = d && d > 1 ? (1 / o) / (1 / o + 1 / x + 1 / d) : (1 / o) / (1 / o + 1 / x);
+  return { line: hbClvNum(snap.line), odds: o, other: x, draw: d, fair: fair, at: hbClvNum(snap.at) };
+}
+function hbLineMoveAgainst(mk, side, open, now) {
+  if (!open || !now) return null;
+  if (mk !== "winner" && open.line != null && now.line != null && open.line !== now.line) {
+    var d = hbClvOwn(mk, side, now.line) - hbClvOwn(mk, side, open.line); /* > 0: market now gives our side MORE = money went the other way */
+    if (d >= 0.5) return { pts: d, text: "line " + open.line + " -> " + now.line };
+    return null;
+  }
+  if (open.fair != null && now.fair != null && open.fair - now.fair >= 0.02) return { pp: (open.fair - now.fair) * 100, text: "price " + open.odds + " -> " + now.odds + " (fair " + (open.fair * 100).toFixed(1) + "% -> " + (now.fair * 100).toFixed(1) + "%)" };
+  return null;
+}
+function hbClvSd(league, mk) { try { var r = hbCalProb(league || "", mk, 0, 0.5, /^handicap|winner/.test(mk) ? "home" : "over"); return r && Number.isFinite(r.sd) && r.sd > 0 ? r.sd : null; } catch (_e) { return null; } }
+function hbProbit(p) { /* Acklam inverse normal */
+  var a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239], b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572], c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783], d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  var q, r, pl = 0.02425;
+  if (p < pl) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p > 1 - pl) { q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  q = p - 0.5; r = q * q; return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+/* CLV for one tracked pick. pts: goals of line beaten (+ = better than close). pp: closing no-vig probability of our side
+   (re-priced at OUR line with the fitted goal SD) minus the break-even of our odds. beat: yes / no / flat. */
+function hbClvCompute(p, rec) {
+  var mk = String(p.marketKey || ""), side = hbClvSide(p);
+  if (!rec || !rec.closing || !HB_CLV_MKS[mk] || !side) return null;
+  if (mk === "winner" && side !== "home" && side !== "away") return null;
+  var c = hbClvSnap(rec.closing[mk], side), o = hbClvSnap(rec.opening && rec.opening[mk], side);
+  if (!c) return null;
+  var tHome = mk === "winner" ? null : hbClvPickHomeLine(p), tOdds = hbClvNum(p.oddsDecimal);
+  var pts = null;
+  if (mk !== "winner" && tHome != null && c.line != null) pts = Math.round((hbClvOwn(mk, side, tHome) - hbClvOwn(mk, side, c.line)) * 100) / 100;
+  var pp = null;
+  if (c.fair != null && tOdds && tOdds > 1) {
+    var pAt = c.fair;
+    if (pts) { var sd = hbClvSd(p.league, mk); if (sd) pAt = bbLrNormCdf(hbProbit(Math.min(0.999, Math.max(0.001, c.fair))) + pts / sd); }
+    pp = Math.round((pAt - 1 / tOdds) * 1000) / 10;
+  }
+  var mv = null;
+  if (o && o.line != null && c.line != null) mv = Math.round((c.line - o.line) * 100) / 100;
+  var beat = pp != null ? (pp > 0.05 ? "yes" : pp < -0.05 ? "no" : "flat") : pts != null ? (pts > 0 ? "yes" : pts < 0 ? "no" : "flat") : null;
+  return { done: 1, ev: rec.eventId, at: Date.now(), o: o ? [hbClvToPickFrame(p, o.line), o.odds] : null, c: [hbClvToPickFrame(p, c.line), c.odds],
+    t: [mk === "winner" ? null : hbClvNum(p.lineAtPick != null ? p.lineAtPick : p.line), tOdds], mv: mv == null ? null : hbClvToPickFrame(p, mv), pts: pts, pp: pp, beat: beat };
+}
+function hbClvKickoff(p) {
+  var k = hbClvNum(p.sportyKickoff); if (k) return k;
+  var d = Date.parse(String(p.eventDate || "")); if (Number.isFinite(d) && /T\d\d:\d\d/.test(String(p.eventDate || ""))) return d;
+  return null;
+}
+function hbClvTries() { try { var o = JSON.parse(localStorage.getItem(HB_CLV_TRY_KEY) || "{}"); return o && typeof o === "object" ? o : {}; } catch (_e) { return {}; } }
+function hbClvSaveTries(o) {
+  try { var ks = Object.keys(o); if (ks.length > HB_CLV_TRY_MAX) { ks.sort(function (a, b) { return (o[a][1] || 0) - (o[b][1] || 0); }); ks.slice(0, ks.length - HB_CLV_TRY_MAX).forEach(function (k) { delete o[k]; }); } localStorage.setItem(HB_CLV_TRY_KEY, JSON.stringify(o)); } catch (_e) {}
+}
+async function hbClvSweep(opts) {
+  opts = opts || {};
+  if (hbClvSweep._busy) return { busy: true };
+  hbClvSweep._busy = true;
+  var out = { checked: 0, filled: 0, none: 0, errors: 0 };
+  try {
+    var st = AppState && AppState.tracker && AppState.tracker.state; if (!st) return out;
+    var all = [].concat(Array.isArray(st.activePicks) ? st.activePicks : [], Array.isArray(st.archivedPicks) ? st.archivedPicks : []);
+    var now = opts.now || Date.now(), tries = hbClvTries(), todo = [];
+    all.forEach(function (p) {
+      if (!p || (p.clvData && p.clvData.done) || !HB_CLV_MKS[String(p.marketKey || "")]) return;
+      var key = String(p.pickId || p.signature || ""); if (!key) return;
+      var ko = hbClvKickoff(p), created = Date.parse(String(p.createdAt || "")) || null;
+      var ref = ko || created; if (!ref) return;
+      if (ko && now < ko + 5 * 60000) return;
+      if (!ko && now < created + 3 * 3600000) return;
+      if (now - ref > 4 * 86400000) return;
+      var tr = tries[key]; if (!opts.force && tr && now - tr[1] < 20 * 60000) return;
+      todo.push({ p: p, key: key, ko: ko, created: created });
+    });
+    todo = todo.slice(0, 40);
+    if (!todo.length) return out;
+    var searches = 0;
+    for (var i = 0; i < todo.length; i++) {
+      var t = todo[i];
+      if (t.p.sportyEventId || searches >= 5) continue;
+      searches++;
+      try {
+        var sj = await hbLinesGet("/sporty/lines/search?home=" + encodeURIComponent(t.p.homeTeam || "") + "&away=" + encodeURIComponent(t.p.awayTeam || "") + (t.ko ? "&ts=" + t.ko : "&date=" + new Date(t.created).toISOString().slice(0, 10)));
+        var cand = (sj && sj.ok ? sj.events || [] : []).map(function (e) { return { e: e, s: Math.min(hbSportyNameScore(t.p.homeTeam, e.homeTeamName), hbSportyNameScore(t.p.awayTeam, e.awayTeamName)) }; }).filter(function (x) { return x.s >= 0.5; }).sort(function (a, b) { return b.s - a.s; });
+        if (cand.length && !(cand.length > 1 && cand[1].s >= cand[0].s - 0.01)) t.ev = cand[0].e.eventId;
+      } catch (_e) { out.errors++; }
+    }
+    var ids = todo.map(function (t) { return t.p.sportyEventId || t.ev; }).filter(Boolean);
+    var recs = {};
+    if (ids.length) { try { var lj = await hbLinesGet("/sporty/lines?ids=" + encodeURIComponent(Array.from(new Set(ids)).join(","))); recs = (lj && lj.events) || {}; } catch (_e) { out.errors++; } }
+    var changed = false;
+    todo.forEach(function (t) {
+      out.checked++;
+      var id = t.p.sportyEventId || t.ev, rec = id ? recs[id] : null;
+      var cd = rec && rec.closed ? hbClvCompute(t.p, rec) : null;
+      if (cd) {
+        t.p.clvData = cd; t.p.sportyEventId = id;
+        if (cd.c[0] != null) t.p.closingLine = cd.c[0];
+        if (cd.c[1] != null) t.p.closingOdds = cd.c[1];
+        t.p.clv = cd.pts;
+        out.filled++; changed = true; delete tries[t.key];
+      } else {
+        var tr = tries[t.key] || [0, 0]; tr[0]++; tr[1] = Date.now(); tries[t.key] = tr;
+        var ref = t.ko || t.created;
+        if (tr[0] >= 12 || (ref && now - ref > 3.5 * 86400000)) { t.p.clvData = { done: 1, none: 1, at: Date.now() }; out.none++; changed = true; delete tries[t.key]; }
+      }
+    });
+    hbClvSaveTries(tries);
+    if (changed && !opts.dryRun) {
+      try { await saveTrackedPicks(loadTrackedPicks()); } catch (_e) {}
+      try { if (typeof renderTrackedPicks === "function") renderTrackedPicks(); } catch (_e) {}
+    }
+    return out;
+  } finally { hbClvSweep._busy = false; }
+}
+window.hbClvSweep = hbClvSweep;
+function hbClvFmtLine(v) { return v == null ? "-" : (v > 0 ? "+" : "") + v; }
+function hbClvRowHtml(p) {
+  var d = p && p.clvData; if (!d || !d.done) return "";
+  if (d.none) return '<div class="bb-clv" style="font-size:9px;opacity:.6;margin-top:2px" title="No SportyBet closing line was recorded for this game">CLV -</div>';
+  var mkw = String(p.marketKey || "") === "winner", L = function (x) { return x && x[0] != null ? String(x[0]) : "-"; }, O = function (x) { return x && x[1] != null ? "@" + Number(x[1]).toFixed(2) : ""; };
+  var full = "Opening: " + (d.o ? (mkw ? "" : L(d.o) + " ") + O(d.o) : "-") + "\nTaken: " + (mkw ? "" : L(d.t) + " ") + O(d.t) + "\nClosing: " + (mkw ? "" : L(d.c) + " ") + O(d.c) +
+    "\nLine move (open->close): " + (d.mv == null ? "-" : hbClvFmtLine(d.mv)) + "\nCLV: " + (d.pts == null ? "-" : hbClvFmtLine(d.pts) + " goals") + " / " + (d.pp == null ? "-" : hbClvFmtLine(d.pp) + "% prob") + "\nBeat close: " + (d.beat || "-");
+  var col = d.beat === "yes" ? "#1a9e4a" : d.beat === "no" ? "#d92d2a" : "inherit";
+  var head = "CLV " + (d.pts != null ? hbClvFmtLine(d.pts) : "") + (d.pp != null ? (d.pts != null ? " / " : "") + hbClvFmtLine(d.pp) + "%" : "") + (d.beat === "yes" ? " ✓" : d.beat === "no" ? " ✗" : "");
+  var sub = mkw ? "O " + O(d.o).slice(1) + " C " + O(d.c).slice(1) : "O " + L(d.o) + " C " + L(d.c);
+  return '<div class="bb-clv" style="font-size:9px;font-weight:800;margin-top:2px;color:' + col + '" title="' + safeText(full) + '">' + safeText(head) + '</div><div style="font-size:8px;opacity:.7">' + safeText(sub) + "</div>";
+}
+function hbClvSummary(picks) {
+  var w = (picks || []).filter(function (p) { return p && p.clvData && p.clvData.done && !p.clvData.none; });
+  var pts = w.filter(function (p) { return p.clvData.pts != null; }), pp = w.filter(function (p) { return p.clvData.pp != null; });
+  var beat = w.filter(function (p) { return p.clvData.beat === "yes"; }).length, decided = w.filter(function (p) { return p.clvData.beat === "yes" || p.clvData.beat === "no" || p.clvData.beat === "flat"; }).length;
+  var avg = function (a, f) { return a.length ? a.reduce(function (s, p) { return s + f(p); }, 0) / a.length : null; };
+  return { n: w.length, avgPts: avg(pts, function (p) { return p.clvData.pts; }), nPts: pts.length, avgPp: avg(pp, function (p) { return p.clvData.pp; }), nPp: pp.length, beatPct: decided ? beat / decided * 100 : null, beat: beat, decided: decided };
+}
+function hbClvSummaryHtml(picks) {
+  var s = hbClvSummary(picks); if (!s.n) return "";
+  var f = function (v, d, u) { return v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(d) + (u || ""); };
+  return '<div class="tracker-report-subtitle" style="font-weight:800">Auto CLV (SportyBet close, ' + s.n + " picks): avg " + f(s.avgPts, 2, " goals") + " (n=" + s.nPts + ") · avg " + f(s.avgPp, 1, "% prob") + " (n=" + s.nPp + ") · beat close " + (s.beatPct == null ? "-" : s.beatPct.toFixed(0) + "%") + " (" + s.beat + "/" + s.decided + ")</div>";
+}
+function hbApplyMoveWarn(c, txt) {
+  if (!c || !txt || !c.td || c.td.__hbMoveWarn === txt) return;
+  c.td.__hbMoveWarn = txt;
+  try { if (c.details) { var d = document.createElement("div"); d.className = "bb-move-warn"; d.style.cssText = "font-size:11px;margin-top:4px;white-space:normal;color:#d98200;font-weight:800"; d.textContent = txt; c.details.appendChild(d); } } catch (_e) {}
+  try { c.td.title = (c.td.title ? c.td.title + "\n" : "") + txt; var s = document.createElement("span"); s.className = "bb-move-flag"; s.textContent = " ⚠"; s.title = txt; s.style.color = "#d98200"; (c.span || c.td).appendChild(s); } catch (_e) {}
+}
+window.__hbPlayCells = [];
+async function hbLinesAfterRun(cellsIn) {
+  var last = window.__hbSportyLast; if (!last || !last.ok || !last.eventId) return null;
+  var cells = (cellsIn || window.__hbPlayCells || []).slice(); if (!cells.length) return null;
+  var tok = last.at, rec = null;
+  try { var j = await hbLinesGet("/sporty/lines?id=" + encodeURIComponent(last.eventId)); if (j && j.ok) rec = j; } catch (_e) { return null; }
+  if (!rec || !window.__hbSportyLast || window.__hbSportyLast.at !== tok) return null;
+  window.__hbLinesNow = { eventId: last.eventId, rec: rec, at: Date.now() };
+  var warned = 0;
+  cells.forEach(function (c) {
+    var p = c.p, mk = String(p.marketKey || ""), side = hbClvSide(p); if (!HB_CLV_MKS[mk] || !side) return;
+    var o = hbClvSnap(rec.opening && rec.opening[mk], side), n = hbClvSnap(rec.latest && rec.latest[mk], side);
+    var mvA = hbLineMoveAgainst(mk, side, o, n); if (!mvA) return;
+    var hrs = o && o.at ? Math.max(0, Math.round((Date.now() - o.at) / 3600000)) : null;
+    var txt = "[WARN] SportyBet moved against this pick since opening" + (hrs != null ? " (" + hrs + "h ago)" : "") + ": " + mvA.text + ". Pick NOT changed - stats decide; check team news.";
+    p.lineMoveWarn = txt; warned++;
+    try { if (Array.isArray(p.copyLog) && p.copyLog.indexOf(txt) < 0) p.copyLog.push(txt); } catch (_e) {}
+    bbApplyMoveWarnAll(p, txt, c);
+  });
+  return { warned: warned, eventId: last.eventId };
+}
+function bbApplyMoveWarnAll(p, txt, c) {
+  [c].concat(window.__hbPlayCells || []).forEach(function (cc) { if (cc && cc.p && cc.p.marketKey === p.marketKey) { cc.p.lineMoveWarn = txt; hbApplyMoveWarn(cc, txt); } });
+  try { document.querySelectorAll('#results td[data-hb-mk="' + String(p.marketKey).replace(/[^a-z0-9_]/gi, "") + '"]').forEach(function (td) { hbApplyMoveWarn({ td: td, details: td.querySelector("details"), span: td.querySelector("span") }, txt); }); } catch (_e) {}
+}
+window.hbLinesAfterRun = hbLinesAfterRun;
+(function () {
+  try {
+    setTimeout(function () { hbClvSweep().catch(function () {}); }, 25000);
+    setInterval(function () { if (!document.hidden) hbClvSweep().catch(function () {}); }, 10 * 60000);
+  } catch (_e) {}
+})();
+/* =================== END HB CLV v1 =================== */
 </script>
 
 </body>
