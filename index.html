@@ -3451,6 +3451,7 @@ const BB_LOCK_REGISTRY = Object.freeze([
   </div>
   <div class="section" id="marketSection">
     <h3>Market Lines</h3>
+    <div id="marketAutoStatus" style="font-size: 10px; min-height: 12px; margin: -4px 0 6px"></div>
 
     <div
       id="marketCoreGrid"
@@ -35364,12 +35365,12 @@ function hbTag(id, on) {
 }
 function hbOddsReset() {
   HB_ODDS_FIELDS.forEach(function (f) { [f[2], f[3]].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ""; }); if (f[1]) hbTag(f[1], false); });
-  var d = document.getElementById("winnerDrawOdds"); if (d) d.value = ""; hbTag("winnerHomeOdds", false);
+  var d = document.getElementById("winnerDrawOdds"); if (d) d.value = ""; hbSportyStatus("");
   window.__hbSportyLast = null;
 }
-function hbSportyStatus(msg, bad) { var el = document.getElementById("hbSportyStatus"); if (el) { el.textContent = msg; el.style.color = bad ? "#d92d2a" : ""; } }
+function hbSportyStatus(msg, bad) { var el = document.getElementById("marketAutoStatus"); if (el) { el.textContent = msg; el.style.color = bad ? "#d92d2a" : ""; } }
 function hbSportyApply(res, keepLines) {
-  if (!res || !res.ok) { hbSportyStatus("SportyBet: " + ((res && res.reason) || "fetch failed") + ". Type the lines/odds (Show odds).", true); return 0; }
+  if (!res || !res.ok) { hbSportyStatus("SportyBet odds: " + ((res && res.reason) || "fetch failed") + " - type the market lines; no PLAY without odds.", true); return 0; }
   var markets = res.data.markets || [], n = 0, filled = [];
   HB_ODDS_FIELDS.forEach(function (f) {
     var want = NaN;
@@ -35381,19 +35382,13 @@ function hbSportyApply(res, keepLines) {
     if (r.a) ok = hbSetVal(f[2], r.a) || ok;
     if (r.b) ok = hbSetVal(f[3], r.b) || ok;
     if (f[0] === "winner" && r.d) ok = hbSetVal("winnerDrawOdds", r.d) || ok;
-    if (ok) { n++; hbTag(f[1] || "winnerHomeOdds", true); filled.push(f[4] + (r.line != null ? " " + r.line : "") + " (" + [r.a, r.d, r.b].filter(Boolean).join("/") + ")"); }
+    if (ok) { n++; if (f[1]) hbTag(f[1], true); filled.push(f[4] + (r.line != null ? " " + r.line : "") + " (" + [r.a, r.d, r.b].filter(Boolean).join("/") + ")"); }
   });
   window.__hbSportyLast = { ok: true, eventId: res.event.eventId, home: res.event.homeTeamName, away: res.event.awayTeamName, ko: Number(res.event.estimateStartTime) || null, filled: filled, at: Date.now() };
-  hbSportyStatus("SportyBet " + res.event.homeTeamName + " v " + res.event.awayTeamName + ": " + n + " market(s) filled: " + filled.join(", "));
+  hbSportyStatus("✅ SportyBet " + res.event.homeTeamName + " v " + res.event.awayTeamName + ": " + n + " markets auto-filled (odds stored)");
   return n;
 }
 function hbFixtureStartMs() { try { var o = typeof getSelectedFixtureOption === "function" ? getSelectedFixtureOption() : null; var t = o && o.dataset.eventDate ? Date.parse(o.dataset.eventDate) : NaN; return Number.isFinite(t) ? t : 0; } catch (_e) { return 0; } }
-function hbTeamNames() { return [String((document.getElementById("teamAName") || {}).value || "").trim() || String((document.getElementById("ssTeamAName") || {}).value || "").trim(), String((document.getElementById("teamBName") || {}).value || "").trim() || String((document.getElementById("ssTeamBName") || {}).value || "").trim()]; }
-async function hbSportyRun(keepLines, startMs) {
-  var nm = hbTeamNames(); hbSportyStatus("SportyBet: looking up " + nm[0] + " v " + nm[1] + "…");
-  var res; try { res = await hbSportyLookup(nm[0], nm[1], startMs || 0); } catch (e) { res = { ok: false, reason: "fetch failed (" + String(e && e.message || e) + ")" }; }
-  return hbSportyApply(res, keepLines);
-}
 /* Fetch Stats wrapper: SportyBet lookup in parallel with SofaScore; lines + odds applied after the stats land. */
 async function fetchAutoStats() {
   hbOddsReset();
@@ -35407,18 +35402,11 @@ async function fetchAutoStats() {
 (function () {
   function build() {
     var ms = document.getElementById("marketSection"); if (!ms || document.getElementById("hbOddsBox")) return;
-    var box = document.createElement("div"); box.id = "hbOddsBox"; box.style.marginTop = "8px";
-    var row = function (lbl, a, b, pa, pb) { return '<div><label>' + lbl + '</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><input id="' + a + '" inputmode="decimal" placeholder="' + pa + '" /><input id="' + b + '" inputmode="decimal" placeholder="' + pb + '" /></div></div>'; };
-    box.innerHTML = '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button id="hbSportyFetchBtn" type="button">Fetch SportyBet odds</button><button id="hbOddsToggleBtn" type="button">Show odds</button></div>' +
-      '<div id="hbSportyStatus" style="font-size:12px;opacity:.85;margin-top:4px">Odds come from SportyBet by team names (or type them). A PLAY needs both prices.</div>' +
-      '<div id="hbOddsInputs" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">' +
-      row("FT total", "ftOverOdds", "ftUnderOdds", "Over", "Under") + row("Handicap", "handicapHomeOdds", "handicapAwayOdds", "Home", "Away") +
-      row("1H total", "h1OverOdds", "h1UnderOdds", "Over", "Under") + row("1H handicap", "handicapH1HomeOdds", "handicapH1AwayOdds", "Home", "Away") +
-      row("Team A total", "teamAOverOdds", "teamAUnderOdds", "Over", "Under") + row("Team B total", "teamBOverOdds", "teamBUnderOdds", "Over", "Under") +
-      '<div style="grid-column:1 / span 2"><label>1X2 (Home / Draw / Away)</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px"><input id="winnerHomeOdds" inputmode="decimal" placeholder="1" /><input id="winnerDrawOdds" inputmode="decimal" placeholder="X" /><input id="winnerAwayOdds" inputmode="decimal" placeholder="2" /></div></div></div>';
+    /* hidden odds store (handball is all auto-fetch, like BB auto leagues): no buttons, no visible odds inputs */
+    var box = document.createElement("div"); box.id = "hbOddsBox"; box.style.display = "none"; box.setAttribute("aria-hidden", "true");
+    box.innerHTML = ["ftOverOdds", "ftUnderOdds", "handicapHomeOdds", "handicapAwayOdds", "h1OverOdds", "h1UnderOdds", "handicapH1HomeOdds", "handicapH1AwayOdds",
+      "teamAOverOdds", "teamAUnderOdds", "teamBOverOdds", "teamBUnderOdds", "winnerHomeOdds", "winnerDrawOdds", "winnerAwayOdds"].map(function (id) { return '<input type="hidden" id="' + id + '" />'; }).join("");
     ms.appendChild(box);
-    document.getElementById("hbOddsToggleBtn").addEventListener("click", function () { var g = document.getElementById("hbOddsInputs"), on = g.style.display === "none"; g.style.display = on ? "grid" : "none"; this.textContent = on ? "Hide odds" : "Show odds"; });
-    document.getElementById("hbSportyFetchBtn").addEventListener("click", function () { hbSportyRun(true, hbFixtureStartMs()); });
     HB_ODDS_FIELDS.forEach(function (f) { if (f[1]) { var el = document.getElementById(f[1]); if (el) el.addEventListener("input", function (ev) { if (ev.isTrusted) hbTag(f[1], false); }); } });
     var ls = document.getElementById("leagueSelect"); if (ls) ls.addEventListener("change", hbOddsReset);
     var c = document.getElementById("clearBtn"); if (c) c.addEventListener("click", hbOddsReset);
