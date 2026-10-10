@@ -1,4 +1,3 @@
-S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27603,7 +27602,7 @@ function pickFixture(homeName, homeId, awayName, awayId, eventDate) {
   withErrorBoundary(fetchAutoStats, "fetchAutoStats_pickFixture")();
 }
 
-async function fetchAutoStats() {
+async function fetchAutoStatsCore() { /* wrapped by fetchAutoStats (HB odds module) */
   /* HB AUTO-FETCH: one tap = both teams' SofaScore match lists (last ~60 games each) + the SofaScore H2H list,
      fed through the SAME parser as a manual paste (parseSofascoreIndividual), so regulation-only scoring, the
      tournament lock, last-10 / venue splits and H2H extraction are identical to the paste path. */
@@ -33669,6 +33668,7 @@ async function runEngine() {
         return p;
       })
       .filter(Boolean);
+    try { hbApplyOdds(finalPicksForDisplay, league); } catch (_hbOddsErr) { try { console.warn("[HB Engine] odds layer failed", _hbOddsErr); } catch (_w) {} } /* HB ODDS: EV gate, both odds required */
 
 
     finalPicksForDisplay.forEach((p) => {
@@ -33861,6 +33861,13 @@ async function runEngine() {
         else { forcePickNoPlayWithNote(p, "probability unavailable"); return; }
       }
       if (!p.confidenceDisplay || p.confidenceDisplay === "NaN" || p.confidenceDisplay === "—") p.confidenceDisplay = p.confidence;
+    });
+    /* HB ODDS: priced picks are graded by EV per DECISIONS (A EV>=8% & P-be>=5pp, B >=5%, C >=3%), sample cap kept */
+    finalPicksForDisplay.forEach((p) => {
+      if (!p || p.pick === "NO PLAY" || !p.hbOdds || !p.hbOdds.ok) return;
+      p.winProbability = p.hbOdds.p;
+      p.confidence = _bbCapGrade(p, p.hbOdds.grade);
+      p.confidenceDisplay = p.confidence;
     });
 
 
@@ -35180,6 +35187,244 @@ const fixtureSelect = document.getElementById("fixtureSelect");
   setTimeout(window.updateLeagueDropdownIndicators, 1000);
 });
 
+</script>
+
+<script>/* ===================== HB ODDS MODULE v1 (handball port of the BB v2.7 EV module, 10 Oct 2026) =====================
+   Probabilities: hbCalProb (fitted, integer goals: whole lines push, 1X2 draw loses, FT draw inflation).
+   PLAY needs BOTH prices (1X2: home + draw + away). EV = P(win)*odds + P(push) - 1; breakeven = (1 - P(push)) / odds.
+   Gates (DECISIONS): P - breakeven >= 2pp, EV >= +3%, sanity EV <= 40% and |P - market fair| <= 20pp.
+   Grades: A EV>=8% & P-be>=5pp, B EV>=5%, C EV>=3%. Stake = quarter-Kelly on P(win|no push), cap 2%. Max 2 bets/game,
+   correlated bets keep the higher EV. SportyBet (sr:sport:6) through the user's worker /sporty/list?sport=handball and
+   /sporty/event. Market ids verified 10 Oct 2026: 1 = 1X2 (outcome 1 Home, 2 DRAW, 3 Away), 18 FT total, 16 Asian handicap
+   (hcp = home line), 68 1H total, 66 1H Asian handicap, 19 home total, 20 away total. */
+var HB_EV = { minEV: 0.03, minEdgeVsBreakeven: 0.02, kellyFraction: 0.25, kellyCap: 0.02, maxBetsPerGame: 2,
+  grade: { A: 0.08, Ape: 0.05, B: 0.05, C: 0.03 }, sanity: { maxEV: 0.40, maxGapVsFair: 0.20 } };
+/* [marketKey, lineInputId, oddsA id (Over/Home), oddsB id (Under/Away), label, SportyBet market id] */
+var HB_ODDS_FIELDS = [
+  ["ft", "ftMarket", "ftOverOdds", "ftUnderOdds", "FT total", "18"],
+  ["handicap", "handicapMarket", "handicapHomeOdds", "handicapAwayOdds", "Handicap", "16"],
+  ["h1", "h1Market", "h1OverOdds", "h1UnderOdds", "1H total", "68"],
+  ["handicap_h1", "handicapH1Market", "handicapH1HomeOdds", "handicapH1AwayOdds", "1H handicap", "66"],
+  ["team_a", "teamAMarket", "teamAOverOdds", "teamAUnderOdds", "Team A total", "19"],
+  ["team_b", "teamBMarket", "teamBOverOdds", "teamBUnderOdds", "Team B total", "20"],
+  ["winner", null, "winnerHomeOdds", "winnerAwayOdds", "1X2", "1"]
+];
+function hbOddsNum(id) {
+  var el = document.getElementById(id); var v = el ? Number(String(el.value || "").trim().replace(",", ".")) : NaN;
+  return Number.isFinite(v) && v >= 1.01 && v <= 100 ? v : null;
+}
+function hbFieldFor(mk) { for (var i = 0; i < HB_ODDS_FIELDS.length; i++) if (HB_ODDS_FIELDS[i][0] === mk) return HB_ODDS_FIELDS[i]; return null; }
+function hbKelly(pc, dec) { if (!(dec > 1) || !Number.isFinite(pc)) return 0; var f = (pc * dec - 1) / (dec - 1); return f > 0 ? Math.min(HB_EV.kellyCap, f * HB_EV.kellyFraction) : 0; }
+function hbSideTxt(mk, s) { return mk === "winner" || /^handicap/.test(mk) ? (s === "a" ? "HOME" : "AWAY") : (s === "a" ? "OVER" : "UNDER"); }
+/* Evaluate one market. mu = projected total (totals) or HOME-minus-AWAY margin (handicap/1X2); line = market line (handicap = home line). */
+function hbOddsEval(league, mk, mu, line) {
+  var out = { ok: false, mk: mk, reason: "" };
+  var f = hbFieldFor(mk); if (!f) { out.reason = "market not priced"; return out; }
+  if (!bbStrictFinite(mu)) { out.reason = "no projection"; return out; }
+  var L = mk === "winner" ? 0 : Number(line);
+  if (!Number.isFinite(L)) { out.reason = "no market line entered"; return out; }
+  if (mk !== "winner" && Math.abs(L * 2 - Math.round(L * 2)) > 1e-9) { out.reason = "quarter line " + L + " not supported (use a .0 or .5 line)"; return out; }
+  var ra = hbCalProb(league, mk, mu, L, mk === "winner" || /^handicap/.test(mk) ? "home" : "over");
+  var rb = hbCalProb(league, mk, mu, L, mk === "winner" || /^handicap/.test(mk) ? "away" : "under");
+  if (!ra || !rb) { out.reason = "probability unavailable"; return out; }
+  var oa = hbOddsNum(f[2]), ob = hbOddsNum(f[3]), od = mk === "winner" ? hbOddsNum("winnerDrawOdds") : null;
+  var fair = null;
+  if (mk === "winner") { if (oa && ob && od) { var s3 = 1 / oa + 1 / ob + 1 / od; fair = { a: (1 / oa) / s3, b: (1 / ob) / s3, d: (1 / od) / s3, overround: s3 - 1 }; } }
+  else if (oa && ob) { var s2 = 1 / oa + 1 / ob; fair = { a: (1 / oa) / s2, b: (1 / ob) / s2, overround: s2 - 1 }; }
+  var mkSide = function (s, r, dec, fp) {
+    var o = { side: s, win: r.win, push: r.push, loss: r.loss, dec: dec, fair: fp };
+    o.ev = dec ? r.win * dec + r.push - 1 : null; o.be = dec ? (1 - r.push) / dec : null;
+    o.pc = r.win + r.loss > 0 ? r.win / (r.win + r.loss) : null; return o;
+  };
+  var A = mkSide("a", ra, oa, fair ? fair.a : null), B = mkSide("b", rb, ob, fair ? fair.b : null);
+  out.pA = ra.win; out.pB = rb.win; out.pPush = ra.push; out.pDraw = mk === "winner" ? Math.max(0, 1 - ra.win - rb.win) : null; out.sd = ra.sd;
+  out.overround = fair ? fair.overround : null;
+  var lean = A.win >= B.win ? A : B, best = lean;
+  if (A.ev != null && B.ev != null) best = A.ev >= B.ev ? A : B;
+  if (best.ev != null && best.ev < 0 && lean.ev != null) best = lean;
+  out.side = best.side; out.pick = hbSideTxt(mk, best.side); out.p = best.win; out.odds = best.dec; out.ev = best.ev; out.breakeven = best.be; out.fair = best.fair;
+  out.fairOdds = best.win > 0 ? (1 - best.push) / best.win : null;
+  var pTxt = hbSideTxt(mk, lean.side) + " P=" + (lean.win * 100).toFixed(1) + "%" + (lean.push > 0.0005 ? " (push " + (lean.push * 100).toFixed(1) + "%)" : "") + (mk === "winner" ? " (draw " + (out.pDraw * 100).toFixed(1) + "%)" : "") + ", fair odds " + ((1 - lean.push) / lean.win).toFixed(2);
+  if (!fair) { out.needBothOdds = true; out.reason = "NO PLAY - NEED " + (mk === "winner" ? "HOME, DRAW AND AWAY" : "BOTH") + " ODDS (" + pTxt + ")"; return out; }
+  var head = out.pick + " P=" + (best.win * 100).toFixed(1) + "%" + (best.push > 0.0005 ? " (push " + (best.push * 100).toFixed(1) + "%)" : "") + " vs breakeven " + (best.be * 100).toFixed(1) + "% @ " + best.dec.toFixed(2) + ", EV " + (best.ev >= 0 ? "+" : "") + (best.ev * 100).toFixed(1) + "%, market fair " + (best.fair * 100).toFixed(1) + "%";
+  out.grade = best.ev >= HB_EV.grade.A && best.win - best.be >= HB_EV.grade.Ape ? "A" : best.ev >= HB_EV.grade.B ? "B" : best.ev >= HB_EV.grade.C ? "C" : "D";
+  out.stake = hbKelly(best.pc, best.dec);
+  if (best.win - best.be < HB_EV.minEdgeVsBreakeven) { out.reason = head + ": P - breakeven < 2pp"; return out; }
+  if (best.ev < HB_EV.minEV) { out.reason = head + ": EV < +3%"; return out; }
+  if (best.ev > HB_EV.sanity.maxEV || Math.abs(best.win - best.fair) > HB_EV.sanity.maxGapVsFair) { out.sanityBlock = true; out.reason = "CHECK ODDS/LINE - " + head + ": too far from the market to trust (typo, stale or wrong line)"; return out; }
+  out.ok = true; out.reason = head + ", stake " + (out.stake * 100).toFixed(2) + "% (quarter-Kelly, cap 2%)";
+  return out;
+}
+function hbOddsDir(p) { var t = String(p.pick || "").toUpperCase(); return t.indexOf("OVER") === 0 ? "OVER" : t.indexOf("UNDER") === 0 ? "UNDER" : t === "HOME" || t === "AWAY" ? t : ""; }
+function hbOddsCorrelated(a, b) {
+  var fam = function (mk) { return /^handicap|^winner/.test(mk) ? "side" : "total"; };
+  var ma = String(a.marketKey), mb = String(b.marketKey), da = hbOddsDir(a), db = hbOddsDir(b);
+  if (fam(ma) !== fam(mb)) {
+    var t = fam(ma) === "total" ? a : b, s = fam(ma) === "total" ? b : a, tm = String(t.marketKey);
+    return (tm === "team_a" && hbOddsDir(t) === "OVER" && hbOddsDir(s) === "HOME") || (tm === "team_b" && hbOddsDir(t) === "OVER" && hbOddsDir(s) === "AWAY");
+  }
+  return da === db;
+}
+/* runEngine hook: price every market. Engine goal thresholds are replaced by the EV gate when odds exist; hard engine
+   blocks (missing data, wide range, sample, recon) are respected. */
+function hbApplyOdds(picks, league) {
+  var soft = /threshold|floor|did not clear|below|zero edge|edge \d/i;
+  (picks || []).forEach(function (p) {
+    if (!p || !hbFieldFor(String(p.marketKey || ""))) return;
+    var mk = String(p.marketKey), wasPlay = p.pick && p.pick !== "NO PLAY";
+    var hardBlock = !wasPlay && p.noPlayReason && !soft.test(String(p.noPlayReason));
+    var e = hbOddsEval(league, mk, Number(p.proj), mk === "winner" ? 0 : Number(p.line));
+    p.hbOdds = e;
+    if (Number.isFinite(e.p)) { p.winProbability = e.p; p.distributionWinProbability = e.p; }
+    if (e.ok && !hardBlock && p.sampleTier !== "insufficient") {
+      var lineTxt = mk === "winner" ? "" : (/^handicap/.test(mk) ? " " + (e.side === "a" ? (Number(p.line) > 0 ? "+" : "") + Number(p.line) : (-Number(p.line) > 0 ? "+" : "") + (-Number(p.line))) : " " + displayLine(Number(p.line)));
+      p.pick = /^handicap|winner/.test(mk) ? e.pick : e.pick + lineTxt;
+      p.displayPick = p.pick; p.bufferedPickText = p.pick; p.confidence = e.grade; p.confidenceDisplay = e.grade;
+      p.stakePct = e.stake; p.whyPick = e.reason; p.playReason = e.reason; p.noPlayReason = null;
+    } else {
+      if (wasPlay) p.blockedPick = p.pick;
+      p.pick = "NO PLAY"; p.displayPick = "NO PLAY"; p.bufferedPickText = "NO PLAY"; p.isLock = false; p.stakePct = 0; p.confidence = null;
+      p.noPlayReason = hardBlock ? p.noPlayReason + " | " + e.reason : e.reason; p.whyPick = p.noPlayReason;
+    }
+  });
+  var bets = (picks || []).filter(function (p) { return p && hbOddsDir(p) && p.hbOdds && p.hbOdds.ok; });
+  bets.sort(function (x, y) { return (y.hbOdds.ev || 0) - (x.hbOdds.ev || 0); });
+  var kept = [];
+  bets.forEach(function (p) {
+    var clash = kept.find(function (q) { return hbOddsCorrelated(p, q); });
+    var drop = clash ? "correlated with " + (clash.name || clash.marketKey) + " " + clash.pick + " (higher EV kept)" : kept.length >= HB_EV.maxBetsPerGame ? "max " + HB_EV.maxBetsPerGame + " bets per game (lower EV dropped)" : "";
+    if (drop) { p.blockedPick = p.pick; p.pick = "NO PLAY"; p.displayPick = "NO PLAY"; p.bufferedPickText = "NO PLAY"; p.confidence = null; p.isLock = false; p.stakePct = 0; p.noPlayReason = "dropped: " + drop + " [" + p.hbOdds.reason + "]"; p.whyPick = p.noPlayReason; }
+    else kept.push(p);
+  });
+  return picks;
+}
+/* ---------- SportyBet lookup (worker) ---------- */
+var HB_SPORTY_STOP = /^(hc|hb|hk|hsg|sg|sc|tsv|thw|vfl|fc|cb|bm|rk|ks|mks|spr|kc|ik|if|hf|club|handball|handbal|handbol|balonmano|pallamano|team|de|la|le|les|the|and|gard)$/;
+function hbSportyTokens(s) { return hbFoldText(s).replace(/[^a-z0-9]+/g, " ").split(" ").filter(function (w) { return w && w.length > 1 && !/^\d+$/.test(w) && !HB_SPORTY_STOP.test(w); }); }
+function hbSportyNameScore(a, b) {
+  var A = hbSportyTokens(a), B = hbSportyTokens(b); if (!A.length || !B.length) return 0;
+  var hit = 0; A.forEach(function (w) { if (B.some(function (x) { return x === w || (w.length >= 4 && x.length >= 4 && (x.indexOf(w) === 0 || w.indexOf(x) === 0)); })) hit++; });
+  return hit / Math.min(A.length, B.length);
+}
+function hbWorkerBase() { var u = typeof WORKER_URL !== "undefined" ? String(WORKER_URL) : ""; return u.replace(/\/+$/, ""); }
+async function hbWorkerJson(path, ms) {
+  var ctl = typeof AbortController !== "undefined" ? new AbortController() : null; var t = ctl ? setTimeout(function () { ctl.abort(); }, ms || 15000) : null;
+  try { var r = await fetch(hbWorkerBase() + path, { signal: ctl ? ctl.signal : undefined, cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
+  finally { if (t) clearTimeout(t); }
+}
+async function hbSportyLookup(home, away, startMs) {
+  if (!home || !away) return { ok: false, reason: "team names missing" };
+  var evs = [];
+  for (var page = 1; page <= 3; page++) {
+    var d = await hbWorkerJson("/sporty/list?sport=handball&page=" + page);
+    if (!d || d.bizCode !== 10000 || !d.data) break;
+    (d.data.tournaments || []).forEach(function (t) { (t.events || []).forEach(function (e) { evs.push(e); }); });
+    if (evs.length >= Number(d.data.totalNum || 0)) break;
+  }
+  if (!evs.length) return { ok: false, reason: "SportyBet list empty or unavailable" };
+  var cands = [];
+  evs.forEach(function (e) {
+    var sh = hbSportyNameScore(home, e.homeTeamName), sa = hbSportyNameScore(away, e.awayTeamName);
+    var rh = hbSportyNameScore(home, e.awayTeamName), ra = hbSportyNameScore(away, e.homeTeamName);
+    var dt = startMs ? Math.abs(Number(e.estimateStartTime || 0) - startMs) : 0;
+    if (startMs && dt > 12 * 3600000) return;
+    if (sh > 0 && sa > 0) cands.push({ e: e, sc: Math.min(sh, sa) + (startMs && dt <= 3 * 3600000 ? 0.25 : 0), reversed: false });
+    else if (rh > 0 && ra > 0) cands.push({ e: e, sc: Math.min(rh, ra), reversed: true });
+  });
+  cands.sort(function (x, y) { return y.sc - x.sc; });
+  if (!cands.length || cands[0].sc < 0.5) return { ok: false, reason: "game not found on SportyBet (" + evs.length + " handball games listed)" };
+  if (cands[0].reversed) return { ok: false, reason: "SportyBet lists this game with home/away reversed (" + cands[0].e.homeTeamName + " v " + cands[0].e.awayTeamName + ") - not auto-filled" };
+  if (cands.length > 1 && cands[1].sc >= cands[0].sc - 0.01 && cands[1].e.eventId !== cands[0].e.eventId) return { ok: false, reason: "ambiguous: " + cands[0].e.homeTeamName + " v " + cands[0].e.awayTeamName + " / " + cands[1].e.homeTeamName + " v " + cands[1].e.awayTeamName };
+  var ev = await hbWorkerJson("/sporty/event?id=" + encodeURIComponent(cands[0].e.eventId));
+  if (!ev || ev.bizCode !== 10000 || !ev.data) return { ok: false, reason: "SportyBet event fetch failed" };
+  return { ok: true, event: cands[0].e, data: ev.data };
+}
+function hbSportyMarket(markets, id, wantLine) {
+  var list = (markets || []).filter(function (m) { return String(m.id) === String(id) && (m.status == null || Number(m.status) === 0); });
+  if (!list.length) return null;
+  var od = function (o) { if (!o || (o.isActive != null && Number(o.isActive) === 0)) return null; var v = Number(o.odds); return Number.isFinite(v) && v > 1 ? v : null; };
+  if (String(id) === "1") { /* 1X2: outcome ids 1 Home, 2 DRAW, 3 Away (never map "2" to Away) */
+    var o = list[0].outcomes || [], g = function (oid) { return od(o.find(function (x) { return String(x.id) === oid; })); };
+    return { line: null, a: g("1"), d: g("2"), b: g("3") };
+  }
+  var lineOf = function (m) { var mm = /(total|hcp)=(-?[\d.]+)/.exec(String(m.specifier || "")); return mm ? Number(mm[2]) : null; };
+  if (Number.isFinite(wantLine)) { var w = list.filter(function (m) { return lineOf(m) === wantLine; }); if (w.length) list = w; else return null; }
+  var fav = list.find(function (m) { return Number(m.favourite) === 1; });
+  if (!fav) { var bestD = Infinity; list.forEach(function (m) { var x = (m.outcomes || []).map(function (q) { return Number(q.odds); }); if (x.length === 2 && x.every(Number.isFinite) && Math.abs(x[0] - x[1]) < bestD) { bestD = Math.abs(x[0] - x[1]); fav = m; } }); }
+  if (!fav) return null;
+  var outs = fav.outcomes || [], pick = function (ids) { return od(outs.find(function (x) { return ids.indexOf(String(x.id)) >= 0; })); };
+  return { line: lineOf(fav), a: pick(["12", "1714"]), b: pick(["13", "1715"]) };
+}
+function hbSetVal(id, v) { var el = document.getElementById(id); if (!el || v == null) return false; el.value = String(v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); return true; }
+function hbTag(id, on) {
+  var el = document.getElementById(id); if (!el) return;
+  var tid = id + "AutoTag", tag = document.getElementById(tid);
+  if (!tag) { var cell = el.parentElement, lab = cell ? cell.querySelector("label") : null; if (!lab) return; tag = document.createElement("span"); tag.id = tid; tag.className = "autofill-indicator"; tag.textContent = "✅ Auto-filled"; tag.style.marginLeft = "4px"; lab.appendChild(tag); }
+  tag.style.display = on ? "inline" : "none";
+}
+function hbOddsReset() {
+  HB_ODDS_FIELDS.forEach(function (f) { [f[2], f[3]].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ""; }); if (f[1]) hbTag(f[1], false); });
+  var d = document.getElementById("winnerDrawOdds"); if (d) d.value = ""; hbTag("winnerHomeOdds", false);
+  window.__hbSportyLast = null;
+}
+function hbSportyStatus(msg, bad) { var el = document.getElementById("hbSportyStatus"); if (el) { el.textContent = msg; el.style.color = bad ? "#d92d2a" : ""; } }
+function hbSportyApply(res, keepLines) {
+  if (!res || !res.ok) { hbSportyStatus("SportyBet: " + ((res && res.reason) || "fetch failed") + ". Type the lines/odds (Show odds).", true); return 0; }
+  var markets = res.data.markets || [], n = 0, filled = [];
+  HB_ODDS_FIELDS.forEach(function (f) {
+    var want = NaN;
+    if (keepLines && f[1]) { var v = String((document.getElementById(f[1]) || {}).value || "").trim(); if (v !== "" && Number.isFinite(Number(v))) want = Number(v); }
+    var r = (Number.isFinite(want) ? hbSportyMarket(markets, f[5], want) : null) || hbSportyMarket(markets, f[5]);
+    if (!r) return;
+    var ok = false;
+    if (f[1] && r.line != null) ok = hbSetVal(f[1], r.line) || ok;
+    if (r.a) ok = hbSetVal(f[2], r.a) || ok;
+    if (r.b) ok = hbSetVal(f[3], r.b) || ok;
+    if (f[0] === "winner" && r.d) ok = hbSetVal("winnerDrawOdds", r.d) || ok;
+    if (ok) { n++; hbTag(f[1] || "winnerHomeOdds", true); filled.push(f[4] + (r.line != null ? " " + r.line : "") + " (" + [r.a, r.d, r.b].filter(Boolean).join("/") + ")"); }
+  });
+  window.__hbSportyLast = { ok: true, eventId: res.event.eventId, home: res.event.homeTeamName, away: res.event.awayTeamName, ko: Number(res.event.estimateStartTime) || null, filled: filled, at: Date.now() };
+  hbSportyStatus("SportyBet " + res.event.homeTeamName + " v " + res.event.awayTeamName + ": " + n + " market(s) filled: " + filled.join(", "));
+  return n;
+}
+function hbFixtureStartMs() { try { var o = typeof getSelectedFixtureOption === "function" ? getSelectedFixtureOption() : null; var t = o && o.dataset.eventDate ? Date.parse(o.dataset.eventDate) : NaN; return Number.isFinite(t) ? t : 0; } catch (_e) { return 0; } }
+function hbTeamNames() { return [String((document.getElementById("teamAName") || {}).value || "").trim() || String((document.getElementById("ssTeamAName") || {}).value || "").trim(), String((document.getElementById("teamBName") || {}).value || "").trim() || String((document.getElementById("ssTeamBName") || {}).value || "").trim()]; }
+async function hbSportyRun(keepLines, startMs) {
+  var nm = hbTeamNames(); hbSportyStatus("SportyBet: looking up " + nm[0] + " v " + nm[1] + "…");
+  var res; try { res = await hbSportyLookup(nm[0], nm[1], startMs || 0); } catch (e) { res = { ok: false, reason: "fetch failed (" + String(e && e.message || e) + ")" }; }
+  return hbSportyApply(res, keepLines);
+}
+/* Fetch Stats wrapper: SportyBet lookup in parallel with SofaScore; lines + odds applied after the stats land. */
+async function fetchAutoStats() {
+  hbOddsReset();
+  var nm = [String((document.getElementById("teamAName") || {}).value || "").trim(), String((document.getElementById("teamBName") || {}).value || "").trim()];
+  var pending = nm[0] && nm[1] ? hbSportyLookup(nm[0], nm[1], hbFixtureStartMs()).catch(function (e) { return { ok: false, reason: "fetch failed (" + String(e && e.message || e) + ")" }; }) : null;
+  if (pending) hbSportyStatus("SportyBet: looking up " + nm[0] + " v " + nm[1] + "…");
+  var out = await fetchAutoStatsCore();
+  if (pending) { try { var n = hbSportyApply(await pending, false); if (n && typeof setStatusText === "function") setStatusText("✅ Stats + SportyBet lines/odds loaded (" + n + " markets). Check the lines, then Run.", "ok"); } catch (_e) {} }
+  return out;
+}
+(function () {
+  function build() {
+    var ms = document.getElementById("marketSection"); if (!ms || document.getElementById("hbOddsBox")) return;
+    var box = document.createElement("div"); box.id = "hbOddsBox"; box.style.marginTop = "8px";
+    var row = function (lbl, a, b, pa, pb) { return '<div><label>' + lbl + '</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><input id="' + a + '" inputmode="decimal" placeholder="' + pa + '" /><input id="' + b + '" inputmode="decimal" placeholder="' + pb + '" /></div></div>'; };
+    box.innerHTML = '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button id="hbSportyFetchBtn" type="button">Fetch SportyBet odds</button><button id="hbOddsToggleBtn" type="button">Show odds</button></div>' +
+      '<div id="hbSportyStatus" style="font-size:12px;opacity:.85;margin-top:4px">Odds come from SportyBet by team names (or type them). A PLAY needs both prices.</div>' +
+      '<div id="hbOddsInputs" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">' +
+      row("FT total", "ftOverOdds", "ftUnderOdds", "Over", "Under") + row("Handicap", "handicapHomeOdds", "handicapAwayOdds", "Home", "Away") +
+      row("1H total", "h1OverOdds", "h1UnderOdds", "Over", "Under") + row("1H handicap", "handicapH1HomeOdds", "handicapH1AwayOdds", "Home", "Away") +
+      row("Team A total", "teamAOverOdds", "teamAUnderOdds", "Over", "Under") + row("Team B total", "teamBOverOdds", "teamBUnderOdds", "Over", "Under") +
+      '<div style="grid-column:1 / span 2"><label>1X2 (Home / Draw / Away)</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px"><input id="winnerHomeOdds" inputmode="decimal" placeholder="1" /><input id="winnerDrawOdds" inputmode="decimal" placeholder="X" /><input id="winnerAwayOdds" inputmode="decimal" placeholder="2" /></div></div></div>';
+    ms.appendChild(box);
+    document.getElementById("hbOddsToggleBtn").addEventListener("click", function () { var g = document.getElementById("hbOddsInputs"), on = g.style.display === "none"; g.style.display = on ? "grid" : "none"; this.textContent = on ? "Hide odds" : "Show odds"; });
+    document.getElementById("hbSportyFetchBtn").addEventListener("click", function () { hbSportyRun(true, hbFixtureStartMs()); });
+    HB_ODDS_FIELDS.forEach(function (f) { if (f[1]) { var el = document.getElementById(f[1]); if (el) el.addEventListener("input", function (ev) { if (ev.isTrusted) hbTag(f[1], false); }); } });
+    var ls = document.getElementById("leagueSelect"); if (ls) ls.addEventListener("change", hbOddsReset);
+    var c = document.getElementById("clearBtn"); if (c) c.addEventListener("click", hbOddsReset);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
+})();
 </script>
 
 </body>
