@@ -1,3 +1,4 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4161,6 +4162,22 @@ const HB_CAL = {
   h2: { k: 1.261, ha: 0.14, sdTotal: 4.461, sdMargin: 3.842, sdTeam: 2.944, drawInflation: 1.0 },
   leagueSd: {"149":{"ft":[0.968,0.986],"h1":[1.011,0.993],"h2":[0.972,0.935]},"921":{"ft":[0.961,1.004],"h1":[0.936,0.977],"h2":[0.956,1.058]},"159":{"ft":[0.967,0.956],"h1":[1.064,1.023],"h2":[0.948,0.99]},"157":{"ft":[1.017,1.02],"h1":[1.022,0.983],"h2":[0.98,1.011]},"248":{"ft":[1.021,1.013],"h1":[1.019,0.985],"h2":[1.1,1.025]},"11294":{"ft":[1.096,1.043],"h1":[1.022,1.072],"h2":[1.071,0.973]},"161":{"ft":[1.048,0.972],"h1":[0.994,1.036],"h2":[1.065,1.047]},"221":{"ft":[0.964,0.95],"h1":[1.044,1.001],"h2":[0.984,0.956]},"818":{"ft":[0.995,1.047],"h1":[0.933,1.0],"h2":[0.989,1.049]},"576":{"ft":[0.978,1.081],"h1":[0.939,1.115],"h2":[1.007,0.948]},"816":{"ft":[1.08,0.987],"h1":[1.067,0.923],"h2":[1.013,1.116]},"1404":{"ft":[0.982,0.959],"h1":[0.977,0.99],"h2":[1.044,0.985]},"59":{"ft":[0.997,0.961],"h1":[0.969,0.948],"h2":[0.941,0.957]},"245":{"ft":[0.966,1.058],"h1":[0.976,0.994],"h2":[0.971,0.994]},"1396":{"ft":[1.031,0.967],"h1":[1.02,0.968],"h2":[1.046,0.994]},"30":{"ft":[0.931,0.956],"h1":[1.011,1.02],"h2":[0.879,0.94]},"288":{"ft":[0.979,1.024],"h1":[0.977,0.94],"h2":[1.007,1.001]}},
 };
+/* ===== HB-FIX rev1 (audit fixes) ===== */
+const HB_MODEL_FIXES = Object.freeze({
+  h2hScaleBySample: true,        /* H2H weight ramps with sample size instead of a flat 35% from n=2 */
+  anchorDiscoveredLeagues: true, /* shrink thin samples toward the learned league mean for leagues without a LEAGUE_BASES row (live runs only) */
+  paramUncertainty: true         /* widen the outcome SD for fit uncertainty in k / ha / mean residual (post-hoc; does not change projections) */
+});
+/* Model switches HB_CAL was fitted under. If a live switch differs, the fit (k, ha, sd) is STALE: refit with calc/fit_cal.py,
+   then set fitModel to match HB_MODEL_FIXES. While stale the EV layer leans harder on the market (HB_EV.marketBlendStale). */
+HB_CAL.fitModel = { h2hScaleBySample: false, anchorDiscoveredLeagues: false };
+HB_CAL.nFit = 744;
+/* Standard errors of the fitted constants. ft k = 1.596 +/- 0.069 and ha = 0.30 +/- 0.18 are from the fit report; h1/h2 k SE (relative) is an
+   ASSUMED 5% because the report does not list it. Mean-residual SE for totals/teams = sd / sqrt(nFit). */
+const HB_CAL_SE = { ft: { kRel: 0.069 / 1.596, ha: 0.18 }, h1: { kRel: 0.05, ha: 0.18 }, h2: { kRel: 0.05, ha: 0.18 } };
+function hbCalIsStale() {
+  try { const f = HB_CAL.fitModel || {}; return Object.keys(f).some((k) => !!HB_MODEL_FIXES[k] !== !!f[k]); } catch (_e) { return true; }
+}
 function hbCalPeriod(mk) {
   const k = String(mk || "ft").toLowerCase();
   if (k === "h1" || k === "h1_team_a" || k === "h1_team_b" || k === "handicap_h1") return "h1";
@@ -4174,7 +4191,7 @@ function hbCalKind(mk) {
   if (/team_[ab]$/.test(k)) return "team";
   return "total";
 }
-function hbCalSd(league, mk) {
+function hbCalSd(league, mk, mu) {
   const per = hbCalPeriod(mk), kind = hbCalKind(mk), c = HB_CAL[per];
   let sd = kind === "total" ? c.sdTotal : kind === "team" ? c.sdTeam : c.sdMargin;
   try {
@@ -4183,6 +4200,14 @@ function hbCalSd(league, mk) {
     const row = ut != null && HB_CAL.leagueSd[String(ut)];
     if (row && row[per]) sd *= Number(row[per][kind === "total" || kind === "team" ? 0 : 1]) || 1;
   } catch (_e) {}
+  if (HB_MODEL_FIXES.paramUncertainty && bbStrictFinite(mu)) {
+    /* fit uncertainty enters as extra variance: margins via (SE_k/k * mu)^2 + SE_ha^2, totals/teams via the SE of the mean residual */
+    const se = HB_CAL_SE[per] || HB_CAL_SE.ft;
+    const extra2 = (kind === "margin" || kind === "winner")
+      ? Math.pow(se.kRel * Number(mu), 2) + se.ha * se.ha
+      : Math.pow(sd / Math.sqrt(HB_CAL.nFit || 744), 2);
+    sd = Math.sqrt(sd * sd + extra2);
+  }
   return sd;
 }
 function hbCalPhi(z) { return typeof _normalCdf === "function" ? _normalCdf(z) : 0.5 * (1 + Math.tanh(0.7978845608 * (z + 0.044715 * z * z * z))); }
@@ -4195,10 +4220,18 @@ function hbCalProb(league, mk, mu, line, side) {
   const kind = hbCalKind(mk);
   const L = kind === "winner" ? 0 : Number(line);
   if (!Number.isFinite(L)) return null;
-  const sd = hbCalSd(league, mk);
+  /* Quarter lines (x.25 / x.75): half the stake on each neighbouring line. win/push are stake-weighted, so EV = win*odds + push - 1 still holds
+     (push = refunded-stake fraction). */
+  if (kind !== "winner" && Math.abs(L * 2 - Math.round(L * 2)) > 1e-9 && Math.abs(L * 4 - Math.round(L * 4)) < 1e-9) {
+    const q1 = hbCalProb(league, mk, mu, L - 0.25, side), q2 = hbCalProb(league, mk, mu, L + 0.25, side);
+    if (!q1 || !q2) return null;
+    const qw = (q1.win + q2.win) / 2, qp = (q1.push + q2.push) / 2, ql = (q1.loss + q2.loss) / 2;
+    return qw + ql > 0 ? { p: clampNumber(qw / (qw + ql), 1e-6, 1 - 1e-6), win: qw, push: qp, loss: ql, sd: q1.sd, quarter: true } : null;
+  }
+  const sd = hbCalSd(league, mk, mu);
   if (!(sd > 0)) return null;
   const sdl = String(side || "").toLowerCase();
-  const isNeg = /under|away|team_b$/.test(sdl) && !/^h[12]_team_b$|^team_b$/.test(sdl) ? true : (sdl === "under" || sdl === "away");
+  const isNeg = /under|away/.test(sdl); /* side is over/under/home/away; team_a/team_b name the MARKET, not a side */
   const infl = (kind === "margin" || kind === "winner") ? (Number(HB_CAL[hbCalPeriod(mk)].drawInflation) || 1) : 1;
   const lo = Math.floor(mu - 8 * sd) - 1, hi = Math.ceil(mu + 8 * sd) + 1;
   const cdf = (x) => hbCalPhi((x - mu) / sd);
@@ -9704,10 +9737,10 @@ function logPromotionEvent(league, paramKey, oldValue, newValue, bootstrapStats,
 }
 
 /* CALCULATION SECTION */
-function testConfigurationSignificance(challengerRecord, baselineRecord, requiredZ = 1.0) {
+function testConfigurationSignificance(challengerRecord, baselineRecord, requiredZ = 1.645) {
   const nc = challengerRecord.wins + challengerRecord.losses;
   const nb = baselineRecord.wins + baselineRecord.losses;
-  if (nc < 5 || nb < 5) return { significant: false, z: 0 };
+  if (nc < 30 || nb < 30) return { significant: false, z: 0 }; /* HB-FIX: was 5; a z-test on <30 picks is noise */
 
   const pc = challengerRecord.wins / nc;
   const pb = baselineRecord.wins / nb;
@@ -10590,9 +10623,9 @@ function runCoordinateAscentTuner(allPicks, targetLeague) {
     venueStrongWeight: [0.55, 0.6, 0.65, 0.7, 0.75, 0.8],
     underEdgeFactor: [1.3, 1.4, 1.5, 1.6, 1.8],
     injuryOppBoostFactor: [0.1, 0.15, 0.2, 0.25, 0.3],
-    edgeFTPointThreshold: [4.0, 5.0, 6.0, 7.0, 8.0],
-    edgeH1PointThreshold: [5.0, 6.0, 7.0, 8.0, 9.0],
-    edgeTeamPointThreshold: [6.0, 7.0, 8.0, 9.0, 10.0],
+    edgeFTPointThreshold: [2.5, 3.0, 3.5, 4.0, 5.0],
+    edgeH1PointThreshold: [1.5, 2.0, 2.5, 3.0, 4.0],
+    edgeTeamPointThreshold: [1.8, 2.3, 2.8, 3.4, 4.0],
     confidenceAThresh: [0.6, 0.63, 0.66, 0.69, 0.72],
     confidenceBThresh: [0.52, 0.55, 0.58, 0.61, 0.64],
     confidenceCThresh: [0.45, 0.48, 0.51, 0.54, 0.57],
@@ -22525,7 +22558,7 @@ function getEmpiricalPriorWinRate(side, broadPicks) {
 const TRACKER_SIGNAL_SNAPSHOT_KEY = "HB_TRACKER_SIGNAL_SNAPSHOT_V1";
 const TRACKER_SIGNAL_MIN_ELIGIBLE = 40;
 const TRACKER_SIGNAL_MIN_VALIDATION = 15;
-const TRACKER_SIGNAL_VALIDATION_Z = 0.5;
+const TRACKER_SIGNAL_VALIDATION_Z = 1.645; /* HB-FIX: was 0.5 (p ~ 0.31); one-sided p < 0.05 */
 
 
 function loadTrackerSignalSnapshot() {
@@ -24964,7 +24997,10 @@ function getH2HWeight(
   /* FIX: exact 35% H2H whenever both teams have at least 2 H2H games. */
   const minLen = Math.min(Number(lenA) || 0, Number(lenB) || 0);
   if (minLen < 2) return 0;
-  return FIXED_BLEND.h2hWeight;
+  if (!HB_MODEL_FIXES.h2hScaleBySample) return FIXED_BLEND.h2hWeight;
+  /* HB-FIX: ramp to the 35% cap. 2 games -> 40% of cap (14%), 3 -> 60%, 4 -> 80%, 5+ -> full cap. */
+  const ramp = Math.min(1, 0.4 + 0.6 * (minLen - 2) / 3);
+  return FIXED_BLEND.h2hWeight * ramp;
 }
 
 /* CALCULATION SECTION */
@@ -25763,7 +25799,7 @@ function hbWinnerProbEdge(marginEdgePts, marketKey) {
 function selectedSideEdgeForProbability(edge, side) {
   if (!bbStrictFinite(edge)) return NaN;
   const s = String(side || "").toLowerCase();
-  return ["under","away","team_b","h2_team_b"].includes(s) ? -Number(edge) : Number(edge);
+  return ["under","away"].includes(s) ? -Number(edge) : Number(edge); /* HB-FIX: matches hbCalProb (team_b is a market, not a side) */
 }
 /* CALCULATION SECTION */
 function getDistributionWinProbabilityForPick(p, leagueKey) {
@@ -26544,7 +26580,14 @@ function getMarginConfidenceGrade(params) {
 /* CALCULATION SECTION */
 function anchorProjectionForMarket(proj, n, base, league, pointsOnlyPrior) {
   if (!isFinite(proj)) return proj;
-  if (pointsOnlyPrior && !Object.prototype.hasOwnProperty.call(LEAGUE_BASES || {}, league)) return proj;
+  if (pointsOnlyPrior && !Object.prototype.hasOwnProperty.call(LEAGUE_BASES || {}, league)) {
+    if (!HB_MODEL_FIXES.anchorDiscoveredLeagues) return proj;
+    /* HB-FIX: discovered leagues shrink toward their own learned mean (null in replay / as-of mode, so no look-ahead). */
+    let learned = null;
+    try { learned = getLearnedLeagueStats(league); } catch (_e) {}
+    if (!learned || !isFinite(learned.mean) || !(learned.mean > 0)) return proj;
+    return anchorProjection(proj, n, learned.mean, league);
+  }
   return anchorProjection(proj, n, base, league);
 }
 
@@ -29601,20 +29644,6 @@ function computeFTProjection({
   /* TEAM MEMORY: silent residual adjustment (live runs only: passed in via config.teamMemoryAdj, so replays and
      the tuner never see it). Form guard: a push against the team's recent scoring direction is limited. */
   let teamMemoryApplied = null;
-  if (false && config && config.teamMemoryAdj && isFinite(projAFT) && isFinite(projBFT)) {
-    const _tm = config.teamMemoryAdj;
-    const _tmScale = bbStrictFinite(_tm.scale) ? Number(_tm.scale) : 1;
-    const _tmGA = bbTmFormGuard(bbStrictFinite(_tm.dA) ? Number(_tm.dA) : 0, aFTS, _tmScale);
-    const _tmGB = bbTmFormGuard(bbStrictFinite(_tm.dB) ? Number(_tm.dB) : 0, bFTS, _tmScale);
-    teamMemoryApplied = {
-      baseA: projAFT, baseB: projBFT, baseTotal: ftProj,
-      dA: _tmGA.d, dB: _tmGB.d,
-      guardedA: _tmGA.guarded, guardedB: _tmGB.guarded, formDirA: _tmGA.dir, formDirB: _tmGB.dir,
-    };
-    projAFT = projAFT + _tmGA.d;
-    projBFT = projBFT + _tmGB.d;
-    ftProj = projAFT + projBFT;
-  }
 
   { const _hbc = hbApplyMarginCalibration("ft", projAFT, projBFT, _ctxRoot, config); projAFT = _hbc.a; projBFT = _hbc.b; ftProj = isFinite(projAFT) && isFinite(projBFT) ? projAFT + projBFT : NaN; } /* HB-CAL */
   const netVenueEffect =
@@ -29929,14 +29958,6 @@ function compute1HProjection({
   h1Proj = isFinite(projA1H) && isFinite(projB1H) ? projA1H + projB1H : NaN;
   /* TEAM MEMORY: half share of the FT adjustment (live runs only) */
   let teamMemoryApplied = null;
-  if (false && config && config.teamMemoryAdj && isFinite(projA1H) && isFinite(projB1H)) {
-    const _tmdA = bbStrictFinite(config.teamMemoryAdj.dA) ? Number(config.teamMemoryAdj.dA) : 0;
-    const _tmdB = bbStrictFinite(config.teamMemoryAdj.dB) ? Number(config.teamMemoryAdj.dB) : 0;
-    teamMemoryApplied = { baseA: projA1H, baseB: projB1H, baseTotal: h1Proj, dA: _tmdA, dB: _tmdB };
-    projA1H = projA1H + _tmdA;
-    projB1H = projB1H + _tmdB;
-    h1Proj = projA1H + projB1H;
-  }
 
   { const _hbc = hbApplyMarginCalibration("h1", projA1H, projB1H, null, config); projA1H = _hbc.a; projB1H = _hbc.b; h1Proj = isFinite(projA1H) && isFinite(projB1H) ? projA1H + projB1H : NaN; } /* HB-CAL */
   const h1Edge =
@@ -30222,14 +30243,6 @@ function compute2HProjection({
   h2Proj = isFinite(projA2H) && isFinite(projB2H) ? projA2H + projB2H : NaN;
   /* TEAM MEMORY: half share of the FT adjustment (live runs only) */
   let teamMemoryApplied = null;
-  if (false && config && config.teamMemoryAdj && isFinite(projA2H) && isFinite(projB2H)) {
-    const _tmdA = bbStrictFinite(config.teamMemoryAdj.dA) ? Number(config.teamMemoryAdj.dA) : 0;
-    const _tmdB = bbStrictFinite(config.teamMemoryAdj.dB) ? Number(config.teamMemoryAdj.dB) : 0;
-    teamMemoryApplied = { baseA: projA2H, baseB: projB2H, baseTotal: h2Proj, dA: _tmdA, dB: _tmdB };
-    projA2H = projA2H + _tmdA;
-    projB2H = projB2H + _tmdB;
-    h2Proj = projA2H + projB2H;
-  }
 
   { const _hbc = hbApplyMarginCalibration("h2", projA2H, projB2H, null, config); projA2H = _hbc.a; projB2H = _hbc.b; h2Proj = isFinite(projA2H) && isFinite(projB2H) ? projA2H + projB2H : NaN; } /* HB-CAL */
   const h2Edge =
@@ -35216,7 +35229,19 @@ const fixtureSelect = document.getElementById("fixtureSelect");
    /sporty/event. Market ids verified 10 Oct 2026: 1 = 1X2 (outcome 1 Home, 2 DRAW, 3 Away), 18 FT total, 16 Asian handicap
    (hcp = home line), 68 1H total, 66 1H Asian handicap, 19 home total, 20 away total. */
 var HB_EV = { minEV: 0.03, minEdgeVsBreakeven: 0.02, kellyFraction: 0.25, kellyCap: 0.02, maxBetsPerGame: 2,
-  grade: { A: 0.08, Ape: 0.05, B: 0.05, C: 0.03 }, sanity: { maxEV: 0.40, maxGapVsFair: 0.20 } };
+  grade: { A: 0.08, Ape: 0.05, B: 0.05, C: 0.03 }, sanity: { maxEV: 0.15, maxGapVsFair: 0.10 },
+  marketBlend: 0.40, marketBlendStale: 0.60 }; /* HB-FIX: model P is blended toward the devigged market; stale calibration leans harder on the market */
+/* Blend one side's probabilities toward the devigged fair probability fp. Totals/handicaps: blend the no-push conditional probability and keep the
+   model's push mass. 1X2: blend the unconditional win probability (fp is 3-way, draw included). */
+function hbBlendToMarket(r, fp, isWinner) {
+  var w = (typeof hbCalIsStale === "function" && hbCalIsStale()) ? HB_EV.marketBlendStale : HB_EV.marketBlend;
+  if (!r || fp == null || !(w > 0)) return r;
+  var win;
+  if (isWinner) win = (1 - w) * r.win + w * fp;
+  else { var pcM = r.win + r.loss > 0 ? r.win / (r.win + r.loss) : 0.5; win = (1 - r.push) * ((1 - w) * pcM + w * fp); }
+  var loss = Math.max(0, 1 - r.push - win);
+  return { p: win + loss > 0 ? win / (win + loss) : r.p, win: win, push: r.push, loss: loss, sd: r.sd, blended: w, modelWin: r.win, modelLoss: r.loss };
+}
 /* [marketKey, lineInputId, oddsA id (Over/Home), oddsB id (Under/Away), label, SportyBet market id] */
 var HB_ODDS_FIELDS = [
   ["ft", "ftMarket", "ftOverOdds", "ftUnderOdds", "FT total", "18"],
@@ -35235,13 +35260,19 @@ function hbFieldFor(mk) { for (var i = 0; i < HB_ODDS_FIELDS.length; i++) if (HB
 function hbKelly(pc, dec) { if (!(dec > 1) || !Number.isFinite(pc)) return 0; var f = (pc * dec - 1) / (dec - 1); return f > 0 ? Math.min(HB_EV.kellyCap, f * HB_EV.kellyFraction) : 0; }
 function hbSideTxt(mk, s) { return mk === "winner" || /^handicap/.test(mk) ? (s === "a" ? "HOME" : "AWAY") : (s === "a" ? "OVER" : "UNDER"); }
 /* Evaluate one market. mu = projected total (totals) or HOME-minus-AWAY margin (handicap/1X2); line = market line (handicap = home line). */
+/* model-vs-market gap on the UNBLENDED model probability (blending would hide exactly the typo / stale-line cases this gate exists for) */
+function hbRawGapSide(r, fp, isWinner) {
+  if (!r || fp == null) return 0;
+  var m = isWinner ? r.win : (r.win + r.loss > 0 ? r.win / (r.win + r.loss) : r.win);
+  return m - fp;
+}
 function hbOddsEval(league, mk, mu, line) {
   var out = { ok: false, mk: mk, reason: "" };
   var f = hbFieldFor(mk); if (!f) { out.reason = "market not priced"; return out; }
   if (!bbStrictFinite(mu)) { out.reason = "no projection"; return out; }
   var L = mk === "winner" ? 0 : Number(line);
   if (!Number.isFinite(L)) { out.reason = "no market line entered"; return out; }
-  if (mk !== "winner" && Math.abs(L * 2 - Math.round(L * 2)) > 1e-9) { out.reason = "quarter line " + L + " not supported (use a .0 or .5 line)"; return out; }
+  if (mk !== "winner" && Math.abs(L * 4 - Math.round(L * 4)) > 1e-9) { out.reason = "line " + L + " must be a multiple of 0.25"; return out; } /* HB-FIX: quarter lines priced in hbCalProb */
   var ra = hbCalProb(league, mk, mu, L, mk === "winner" || /^handicap/.test(mk) ? "home" : "over");
   var rb = hbCalProb(league, mk, mu, L, mk === "winner" || /^handicap/.test(mk) ? "away" : "under");
   if (!ra || !rb) { out.reason = "probability unavailable"; return out; }
@@ -35254,8 +35285,10 @@ function hbOddsEval(league, mk, mu, line) {
     o.ev = dec ? r.win * dec + r.push - 1 : null; o.be = dec ? (1 - r.push) / dec : null;
     o.pc = r.win + r.loss > 0 ? r.win / (r.win + r.loss) : null; return o;
   };
+  var raRaw = ra, rbRaw = rb; /* pure model probabilities, kept for the sanity gate and diagnostics */
+  if (fair) { ra = hbBlendToMarket(ra, fair.a, mk === "winner"); rb = hbBlendToMarket(rb, fair.b, mk === "winner"); }
   var A = mkSide("a", ra, oa, fair ? fair.a : null), B = mkSide("b", rb, ob, fair ? fair.b : null);
-  out.pA = ra.win; out.pB = rb.win; out.pPush = ra.push; out.pDraw = mk === "winner" ? Math.max(0, 1 - ra.win - rb.win) : null; out.sd = ra.sd;
+  out.pModelA = raRaw.win; out.pModelB = rbRaw.win; out.marketBlend = ra.blended || 0; out.calStale = (typeof hbCalIsStale === "function") && hbCalIsStale(); out.pA = ra.win; out.pB = rb.win; out.pPush = ra.push; out.pDraw = mk === "winner" ? Math.max(0, 1 - ra.win - rb.win) : null; out.sd = ra.sd;
   out.overround = fair ? fair.overround : null;
   var lean = A.win >= B.win ? A : B, best = lean;
   if (A.ev != null && B.ev != null) best = A.ev >= B.ev ? A : B;
@@ -35269,7 +35302,7 @@ function hbOddsEval(league, mk, mu, line) {
   out.stake = hbKelly(best.pc, best.dec);
   if (best.win - best.be < HB_EV.minEdgeVsBreakeven) { out.reason = head + ": P - breakeven < 2pp"; return out; }
   if (best.ev < HB_EV.minEV) { out.reason = head + ": EV < +3%"; return out; }
-  if (best.ev > HB_EV.sanity.maxEV || Math.abs(best.win - best.fair) > HB_EV.sanity.maxGapVsFair) { out.sanityBlock = true; out.reason = "CHECK ODDS/LINE - " + head + ": too far from the market to trust (typo, stale or wrong line)"; return out; }
+  if (best.ev > HB_EV.sanity.maxEV || Math.abs(hbRawGapSide(best.side === "a" ? raRaw : rbRaw, best.fair, mk === "winner") ) > HB_EV.sanity.maxGapVsFair) { out.sanityBlock = true; out.reason = "CHECK ODDS/LINE - " + head + ": too far from the market to trust (typo, stale or wrong line)"; return out; }
   out.ok = true; out.reason = head + ", stake " + (out.stake * 100).toFixed(2) + "% (quarter-Kelly, cap 2%)";
   return out;
 }
@@ -35430,6 +35463,45 @@ async function fetchAutoStats() {
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
 })();
+
+/* ===================== HB-CAL SELF-TEST (runs once at load; failures go to engineDebug, never throw) ===================== */
+function hbRunCalSelfTest() {
+  var fails = [], near = function (a, b, t) { return Math.abs(a - b) <= (t || 1e-9); };
+  var chk = function (c, m) { if (!c) fails.push(m); };
+  try {
+    var lg = "ehf_cl";
+    var h = hbCalProb(lg, "handicap", 0, 0, "home"), a = hbCalProb(lg, "handicap", 0, 0, "away");
+    chk(h && a && near(h.win, a.win, 1e-6) && near(h.push, a.push, 1e-6), "handicap symmetry at mu=0");
+    chk(h && near(h.win + h.push + h.loss, 1, 1e-9), "handicap win+push+loss = 1");
+    var o = hbCalProb(lg, "ft", 58, 58, "over"), u = hbCalProb(lg, "ft", 58, 58, "under");
+    chk(o && u && o.push > 0.02 && near(o.win, u.win, 1e-6), "whole total line: push > 0, over/under symmetric at mu = line");
+    var oh = hbCalProb(lg, "ft", 58, 58.5, "over"), uh = hbCalProb(lg, "ft", 58, 58.5, "under");
+    chk(oh && uh && near(oh.push, 0, 1e-12) && near(oh.win + uh.win, 1, 1e-9), "half total line: no push, P(over)+P(under)=1");
+    var lo = hbCalProb(lg, "ft", 56, 58.5, "over"), hi = hbCalProb(lg, "ft", 60, 58.5, "over");
+    chk(lo && hi && hi.win > lo.win, "P(over) increases with mu");
+    var q = hbCalProb(lg, "handicap", 3, -2.25, "home"), q1 = hbCalProb(lg, "handicap", 3, -2.5, "home"), q2 = hbCalProb(lg, "handicap", 3, -2.0, "home");
+    chk(q && q1 && q2 && near(q.win, (q1.win + q2.win) / 2, 1e-9) && near(q.push, (q1.push + q2.push) / 2, 1e-9), "quarter line = average of neighbouring lines");
+    var w = hbCalProb(lg, "winner", 0, 0, "home"), wa = hbCalProb(lg, "winner", 0, 0, "away");
+    var draw = w && wa ? 1 - w.win - wa.win : NaN;
+    chk(w && wa && near(w.win, wa.win, 1e-6) && draw > 0.06 && draw < 0.20, "1X2 symmetric at mu=0 with a realistic draw mass (got " + (draw * 100).toFixed(1) + "%)");
+    var r = { p: 0.55, win: 0.5, push: 0.09, loss: 0.41 };
+    var b0 = hbBlendToMarket(r, 0.5, false);
+    chk(b0 && b0.win < r.win && b0.win > 0.5 * (1 - r.push) && near(b0.win + b0.loss + b0.push, 1, 1e-9), "market blend moves P toward the market and conserves mass");
+    chk(near(hbKelly(0.6, 2.0), HB_EV.kellyCap), "Kelly respects the stake cap");
+    chk(hbKelly(0.4, 2.0) === 0, "Kelly is zero when there is no edge");
+    chk(getH2HWeight(1, 5, "ft") === 0 && getH2HWeight(5, 5, "ft") === FIXED_BLEND.h2hWeight, "H2H weight: 0 below 2 games, full cap at 5");
+    if (HB_MODEL_FIXES.h2hScaleBySample) chk(getH2HWeight(2, 2, "ft") < getH2HWeight(4, 4, "ft"), "H2H weight increases with sample size");
+  } catch (e) { fails.push("self-test threw: " + (e && e.message ? e.message : e)); }
+  var stale = false; try { stale = hbCalIsStale(); } catch (_e) { stale = true; }
+  window.__HB_CAL_SELFTEST = { ok: fails.length === 0, fails: fails, calStale: stale, fixes: HB_MODEL_FIXES };
+  try {
+    if (typeof engineDebug === "function") {
+      if (fails.length) engineDebug("HB-CAL SELF-TEST FAILED", fails);
+      if (stale) engineDebug("HB-CAL STALE: model switches differ from the fit. Refit k/ha/sd, then set HB_CAL.fitModel to match HB_MODEL_FIXES. EV layer is leaning on the market (blend " + HB_EV.marketBlendStale + ").");
+    } else if (fails.length) console.warn("[HB] cal self-test failed", fails);
+  } catch (_e2) {}
+}
+try { hbRunCalSelfTest(); } catch (_e) {}
 </script>
 
 <script>/* ===================== HB CLV v1: SportyBet opening / closing lines from the worker cron (port of BB v2.7) =====================
