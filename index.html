@@ -27599,6 +27599,13 @@ function pickFixture(homeName, homeId, awayName, awayId, eventDate) {
   withErrorBoundary(fetchAutoStats, "fetchAutoStats_pickFixture")();
 }
 
+/* HB-FIX-2026-10: this wrapper was referenced (fetch button + pickFixture) but missing from the build, which threw
+   "ReferenceError: Can't find variable: fetchAutoStats" at load and tripped the FATAL ENGINE CRASH screen. A hoisted
+   function declaration resolves at call time, so script/load order cannot break it. */
+function fetchAutoStats(...args) {
+  return withErrorBoundary(fetchAutoStatsCore, "fetchAutoStats").apply(this, args);
+}
+
 async function fetchAutoStatsCore() { /* wrapped by fetchAutoStats */
   /* HB AUTO-FETCH: one tap = both teams' SofaScore match lists (last ~60 games each) + the SofaScore H2H list,
      fed through the SAME parser as a manual paste (parseSofascoreIndividual), so regulation-only scoring, the
