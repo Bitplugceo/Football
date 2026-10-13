@@ -1,9 +1,10 @@
+S
 <!DOCTYPE html>
 <html lang="en">
 <head>
 
                        
-  <meta name="generator" content="hb-engine-v2.0-20261013" />
+  <meta name="generator" content="hb-engine-v2.1-20261013" />
   <meta charset="UTF-8" />
   <meta
     name="viewport"
@@ -3650,7 +3651,7 @@ body.dark-mode .tracker-analytics-section-head {
      H1     - league first-half share of goals (per league), applied per side.
    SD per league = RMS of past one-step residuals (walk-forward), fallback HB_MODEL.SD. */
 var HB_MODEL = {
-  CFG: { tauDays: 120, lambda: 6, haPriorN: 80, mPriorN: 40, iters: 25, mTauDays: 45, haGlobal: 0.8, minGames: 30, minTeamGames: 3,
+  CFG: { tauDays: 120, lambda: 6, haPriorN: 80, mPriorN: 40, iters: 25, mTauDays: 45, haGlobal: null, minGames: 30, minTeamGames: 3,
          pace: false, paceLambda: 20, h2h: "margin", h2hK: 12, h2hMaxYears: 3, prevSeasonW: 1.0 },
   PRIOR: { m: 29.6, ha: 1.0, h1Share: 0.4935 },
   SD: { ft: 6.88, h1: 4.49, team: 4.43, margin: 5.58, h1margin: 3.94, h1team: 2.9 }, /* walk-forward residual RMSE, SportyBet results 2025-01..2026-10 */
@@ -3659,23 +3660,25 @@ var HB_MODEL = {
   valid: function (g) {
     var h = g[7], a = g[8];
     if (!Number.isFinite(h) || !Number.isFinite(a) || h < 10 || a < 10 || h > 55 || a > 55 || h + a < 30 || h + a > 95) return false;
-    if (Number.isFinite(g[3]) && Number.isFinite(g[4]) && g[3] + g[4] !== h) return false;
-    if (Number.isFinite(g[5]) && Number.isFinite(g[6]) && g[5] + g[6] !== a) return false;
+    if (Number.isFinite(g[3]) && Number.isFinite(g[4]) && (g[3] < 0 || g[4] < 0 || g[3] + g[4] !== h)) return false; /* FIX: a half can never be negative / exceed the final */
+    if (Number.isFinite(g[5]) && Number.isFinite(g[6]) && (g[5] < 0 || g[6] < 0 || g[5] + g[6] !== a)) return false;
     return true;
   },
   fit: function (games, tSec, cfg) {
     cfg = Object.assign({}, HB_MODEL.CFG, cfg || {});
-    var G = [], i, g, w, tau = cfg.tauDays * 86400;
+    var G = [], i, g, w, tau = cfg.tauDays * 86400, tRef = -Infinity;
+    for (i = 0; i < games.length; i++) { g = games[i]; if (g[0] < tSec && HB_MODEL.valid(g) && g[0] > tRef) tRef = g[0]; }
+    if (!(tRef > -Infinity)) tRef = tSec; /* FIX: ages are measured from the newest usable game, so an off-season gap no longer washes every rating out to zero */
     for (i = 0; i < games.length; i++) {
       g = games[i];
       if (!(g[0] < tSec) || !HB_MODEL.valid(g)) continue;
-      w = Math.exp(-(tSec - g[0]) / tau);
+      w = Math.exp(-(tRef - g[0]) / tau);
       if (w < 1e-4) continue;
       G.push({ t: g[0], h: String(g[1]), a: String(g[2]), hs: g[7], as: g[8], h1h: g[3], h1a: g[5], w: w });
     }
     var out = { n: G.length, ok: G.length >= cfg.minGames, cfg: cfg };
     var sw = 0, sm = 0, sh = 0, s1 = 0, s1n = 0, mw = 0, mm = 0, mtau = (cfg.mTauDays || cfg.tauDays) * 86400;
-    G.forEach(function (x) { var w2 = Math.exp(-(tSec - x.t) / mtau); mw += w2; mm += w2 * (x.hs + x.as) / 2; sw += x.w; sm += x.w * (x.hs + x.as) / 2; sh += x.w * (x.hs - x.as);
+    G.forEach(function (x) { var w2 = Math.exp(-(tRef - x.t) / mtau); mw += w2; mm += w2 * (x.hs + x.as) / 2; sw += x.w; sm += x.w * (x.hs + x.as) / 2; sh += x.w * (x.hs - x.as);
       if (Number.isFinite(x.h1h) && Number.isFinite(x.h1a) && x.hs + x.as > 0) { s1 += x.w * (x.h1h + x.h1a); s1n += x.w * (x.hs + x.as); } });
     var P = Object.assign({}, HB_MODEL.PRIOR, cfg.prior || {});
     out.m = (mm + P.m * cfg.mPriorN * 0.05) / (mw + cfg.mPriorN * 0.05);
@@ -3725,16 +3728,16 @@ var HB_MODEL = {
     var ea = F.m - ha / 2 + (F.A[a] || 0) + (F.D[h] || 0);
     if (cfg.pace && F.P) { var p = (F.P[h] || 0) + (F.P[a] || 0); var tot0 = eh + ea; if (tot0 > 0) { eh += p * eh / tot0; ea += p * ea / tot0; } }
     if (cfg.h2h) {
-      var cut = (opts.tSec || Infinity) - cfg.h2hMaxYears * 365 * 86400, rs = 0, rm = 0, n = 0;
+      var cut = (opts.tSec || Infinity) - cfg.h2hMaxYears * 365 * 86400, rs = 0, rm = 0, n = 0, cnt = 0;
       F.G.forEach(function (x) {
         if (x.t < cut) return;
         var same = x.h === h && x.a === a, rev = x.h === a && x.a === h; if (!same && !rev) return;
         var ph = F.m + F.ha / 2 + (F.A[x.h] || 0) + (F.D[x.a] || 0), pa = F.m - F.ha / 2 + (F.A[x.a] || 0) + (F.D[x.h] || 0);
-        rs += (x.hs + x.as) - (ph + pa); var mg = (x.hs - x.as) - (ph - pa); rm += same ? mg : -mg; n++;
+        var xw = x.w; rs += xw * ((x.hs + x.as) - (ph + pa)); var mg = (x.hs - x.as) - (ph - pa); rm += xw * (same ? mg : -mg); n += xw; cnt++; /* FIX: recency-weighted */
       });
-      if (n) { var wt = n / (n + cfg.h2hK); var dT = wt * rs / n, dM = wt * rm / n; if (cfg.h2h === "margin") dT = 0; eh += dT / 2 + dM / 2; ea += dT / 2 - dM / 2; r.h2h = { n: n, w: wt, adjTotal: dT, adjMargin: dM }; }
+      if (n) { var wt = n / (n + cfg.h2hK); var dT = wt * rs / n, dM = wt * rm / n; if (cfg.h2h === "margin") dT = 0; eh += dT / 2 + dM / 2; ea += dT / 2 - dM / 2; r.h2h = { n: cnt, w: wt, adjTotal: dT, adjMargin: dM }; }
     }
-    eh = Math.max(5, eh); ea = Math.max(5, ea);
+    if (eh < 5 || ea < 5) { r.reason = "projection below 5 goals for a side (broken ratings)"; return r; } /* FIX: no silent clamp */
     r.ok = true; r.home = eh; r.away = ea; r.total = eh + ea; r.margin = eh - ea;
     r.h1Home = eh * F.h1Share; r.h1Away = ea * F.h1Share; r.h1Total = r.h1Home + r.h1Away; r.h1Margin = r.h1Home - r.h1Away;
     return r;
@@ -3744,7 +3747,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = HB_MODEL;
 
 </script>
 <script>
-/* HANDBALL ENGINE v2.0 (13 Oct 2026) — handball goal lines on SportyBet NG (sport sr:sport:6), same shell/UI as the other engines.
+/* HANDBALL ENGINE v2.1 (13 Oct 2026, audit fixes) — handball goal lines on SportyBet NG (sport sr:sport:6), same shell/UI as the other engines.
    Markets = SportyBet's own main lines only (the market flagged favourite=1): Total Goals (18), 1st Half Total (68),
    Home Team Total (19), Away Team Total (20). No 2nd-half market: SportyBet offers no 2nd-half line.
    Prices are never read, stored or shown; grades come from goal edges. Missing values are NaN. Bad data -> NO PLAY.
@@ -3752,7 +3755,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = HB_MODEL;
    ratings, rolling league mean, global home advantage 0.8, H2H margin residual shrunk n/(n+12). */
 "use strict";
 function isFiniteVal(v) { if (typeof v === "number") return Number.isFinite(v); if (typeof v === "string") return v.trim() !== "" && Number.isFinite(Number(v)); return false; }
-const HB_BUILD = "hb-engine-v2.0-20261013";
+const HB_BUILD = "hb-engine-v2.1-20261013";
 /* handball-engine worker (deployed 13 Oct 2026). Configurable without editing the file: ?hbWorker=https://... or
    localStorage "HB_WORKER_URL" (https only); otherwise the default below. */
 const HB_WORKER_DEFAULT = "https://handball-engine.ridwantunde636.workers.dev";
@@ -3779,11 +3782,14 @@ function hbModelProject(input, MODEL) {
     L = { homeMean:s.homeMean/ks.length, awayMean:s.awayMean/ks.length, h1Share:s.h1Share/ks.length, ratings:{}, sdMult:1.1, unknown:true }; }
   function wm(x){ x=(x||[]).filter(function(v){return typeof v==="number"&&isFinite(v);}).slice(-P.list.nForm).reverse();
     if(!x.length) return null; var a=0,w=0; for(var i=0;i<x.length;i++){var q=Math.pow(P.list.decay,i);a+=q*x[i];w+=q;} return {m:a/w,n:x.length}; }
-  var hid=input.home&&input.home.id, aid=input.away&&input.away.id, R=L.ratings||{}, ph, pa, path;
+  var hid=input.home&&input.home.id, aid=input.away&&input.away.id, R=L.ratings||{}, ph, pa, path, haU;
   if (hid!=null && aid!=null && R[String(hid)] && R[String(aid)]) {
-    var rh=R[String(hid)], ra=R[String(aid)];
-    var drift = P.drift * ((L.recent60||0) - (L.ratingBase[0]+L.ratingBase[1])) / 2;
-    ph = L.ratingBase[0] + rh[0] + ra[1] + drift; pa = L.ratingBase[1] + ra[0] + rh[1] + drift; path = "ratings";
+    var sc1=function(x){return Math.abs(x)>4.5 ? (x<0?-1:1)*(4.5+0.5*(Math.abs(x)-4.5)) : x;}; /* FIX: soft-clip extreme small-sample ratings */
+    var rh=[sc1(R[String(hid)][0]),sc1(R[String(hid)][1])], ra=[sc1(R[String(aid)][0]),sc1(R[String(aid)][1])];
+    var bs=L.ratingBase[0]+L.ratingBase[1], nT=Object.keys(R).length, haRaw=L.ratingBase[0]-L.ratingBase[1];
+    haU = input.neutral ? 0 : Math.max(-1, Math.min(3, 0.8 + (haRaw-0.8)*nT/(nT+10))); /* FIX: shrink noisy per-league HA to the global prior; none at a neutral venue */
+    var drift = L.recent60>0 ? Math.max(-1, Math.min(1, P.drift * (L.recent60 - bs) / 2)) : 0; /* FIX: no drift if recent60 is missing; capped +-1 goal per side */
+    ph = bs/2 + haU/2 + rh[0] + ra[1] + drift; pa = bs/2 - haU/2 + ra[0] + rh[1] + drift; path = "ratings";
   } else {
     var Ls=(L.homeMean+L.awayMean)/2, k=P.list.shrinkK;
     var dev=function(x){var r=wm(x); return r? r.n/(r.n+k)*(r.m-Ls) : 0;};
@@ -3793,9 +3799,9 @@ function hbModelProject(input, MODEL) {
     if (hh.length) { var w=hh.length/(hh.length+P.h2h.k), hm=hh.reduce(function(a,b){return a+b;},0)/hh.length, d=w*(hm-(ph+pa))/2; ph+=d; pa+=d; }
     path = "list";
   }
-  var ft=ph+pa, sh=L.h1Share, m=L.sdMult||1;
+  var ft=ph+pa, sh=L.h1Share, m=(L.sdMult && L.sdMult!==1) ? L.sdMult : 1.1; /* FIX: a default 1.0 means "not measured" -> be conservative */
   var out = { path:path, league:String(input.league), unknownLeague:!!L.unknown,
-    ft:ft, h1:ft*sh, home:ph, away:pa, margin:ph-pa, h1Home:ph*sh, h1Away:pa*sh,
+    ft:ft, h1:ft*sh, home:ph, away:pa, ha:haU, margin:ph-pa, h1Home:ph*sh, h1Away:pa*sh,
     sd:{ ft:P.sd.ft*m, h1:P.sd.h1*m, team:P.sd.team*m }, edges:{} };
   var ln=input.lines||{}, T=P.thresholds;
   [["ft","ft",T.ft],["h1","h1",T.h1],["home","home",T.team],["away","away",T.team]].forEach(function(z){
@@ -3817,7 +3823,12 @@ const HB_MK_ORDER = ["ft", "h1", "ta", "tb"];
 const HB_INPUT_IDS = { ft: "ftMarket", h1: "h1Market", ta: "taMarket", tb: "tbMarket" };
 /* goal-edge thresholds (v2 values, re-tested walk-forward 13 Oct 2026; per-league values are auto-tuned nightly by the worker on REAL lines) */
 const HB_EDGE_DEFAULT = { ft: 3.5, h1: 2.5, ta: 2.8, tb: 2.8 };
-const HB_CAPS = { ft: 10, h1: 6, ta: 7, tb: 7 }; /* |edge| above this = wrong line / broken data -> NO PLAY */
+const HB_CAPS = { ft: 7.5, h1: 5, ta: 5, tb: 5 }; /* |edge| above this = wrong line / broken data -> NO PLAY */
+const HB_THRESH_MIN = { ft: 2.5, h1: 1.5, ta: 1.8, tb: 1.8 }; /* worker-tuned thresholds below this are ignored (a 0.05 threshold would play noise) */
+const HB_MARKET_SHRINK = 0.5; /* the bookmaker line carries information: only this share of the model-vs-line gap is treated as real in P(side). Calibrate from the tracker Brier score. */
+const HB_XCHECK_MAX = 6; /* snapshot-ratings total vs in-page league fit total: a larger gap = probable team-id / data mismatch -> NO PLAY */
+const HB_SNAPSHOT_MAX_DAYS = 14; /* ratings snapshot older than this is not used */
+const HB_NEUTRAL = /World Championship|Olympic|Asian Games|Games\b|Africa Cup of Nations|Asian Championship|EHF Euro(?! Cup)|EHF - EURO|European Championship|Nations|Pan American|FENAUDE|Final Four|Super Cup|Supercup|Supercopa|Supertaca/i; /* neutral / single-venue events: no home advantage */
 const HB_BOUNDS = { ft: [30.5, 85.5], h1: [14.5, 42.5], ta: [12.5, 45.5], tb: [12.5, 45.5] };
 /* ?hbSyncTest=1: full tracker + worker sync, but in a separate local key and the worker's scratch namespace (test=1),
    never mixed with the real tracker. */
@@ -3845,12 +3856,10 @@ const NaNv = Number.NaN;
 const mean = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaNv);
 const sd = (a) => { if (a.length < 2) return NaNv; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / a.length); };
 const fmt1 = (v) => (isFiniteVal(v) ? Number(v).toFixed(1) : "NaN");
+const fmt2 = (v) => (isFiniteVal(v) ? Number(v).toFixed(2) : "NaN");
 const fmtPct = (v) => (isFiniteVal(v) ? (v * 100).toFixed(1) + "%" : "NaN");
 function erf(x) { const s = x < 0 ? -1 : 1; x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
 const normCdf = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
-const logit = (p) => Math.log(p / (1 - p));
-const sigm = (x) => 1 / (1 + Math.exp(-x));
-function comb(n, k) { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return r; }
 function parseSeries(id) {
   const el = document.getElementById(id); if (!el) return [];
   return String(el.value || "").split(/[,;\s]+/).map((x) => x.trim()).filter((x) => x !== "").map(Number);
@@ -3877,7 +3886,14 @@ function addLeague(id, name, cat, keepAll) {
 }
 HB_DATA.tours.forEach((t) => { const l = addLeague(t.id, t.name, t.cat, true); if (l) { l.active = !!t.active; l.dead = !!t.dead; l.sb = !!t.sb; } });
 function curLeague() { const v = (document.getElementById("leagueSelect") || {}).value || ""; return HB_LEAGUES[v] || null; }
-function leagueStats(lg) { if (!lg) return null; for (const t of lg.tids) { const s = HB_DATA.stats[t]; if (s) return Object.assign({ cat: lg.name, league: lg.name }, s); } return { cat: lg.name, league: lg.name, n: 0, tier: "X" }; }
+/* FIX: HB_DATA.stats is a static 77-league snapshot; leagues the ratings snapshot covers (>= 6 rated teams) are no longer blocked as "0 results". */
+function modelStats(lg) {
+  try { const k = rmLeagueKey(lg), L = k != null && g_hbRM && g_hbRM.leagues && g_hbRM.leagues[k]; if (!L) return null;
+    if (Object.keys(L.ratings || {}).length < 6) return null;
+    return { cat: lg.name, league: lg.name, n: null, nRecent: null, avgTotal: +(L.homeMean + L.awayMean).toFixed(2), medTotal: null, sdTotal: null, avgH1: +((L.homeMean + L.awayMean) * L.h1Share).toFixed(2), medH1: null, ha: L.homeAdv, h1Share: L.h1Share, tier: "M" };
+  } catch (_e) { return null; }
+}
+function leagueStats(lg) { if (!lg) return null; for (const t of lg.tids) { const s = HB_DATA.stats[t]; if (s) return Object.assign({ cat: lg.name, league: lg.name }, s); } return modelStats(lg) || { cat: lg.name, league: lg.name, n: 0, tier: "X" }; }
 function renderLeagueOptions() {
   /* Same as the other engines: one A–Z list of "Country - League", no special groups or markers. */
   const sel = document.getElementById("leagueSelect"); if (!sel) return; const keep = sel.value;
@@ -3897,8 +3913,8 @@ async function refreshLeagues() {
 /* ---------------- network ---------------- */
 const _cache = new Map();
 async function fetchJson(url, label, ttlMs, timeoutMs) {
-  if (!(_cache.get(url) && Date.now() - _cache.get(url).t < (ttlMs || 60000))) engineDebug("fetch start", { request: url.replace(/^https:\/\/[^/]+/, ""), timeoutMs: timeoutMs || 15000 });
-  const c = _cache.get(url); if (c && Date.now() - c.t < (ttlMs || 60000)) return c.d;
+  if (!(_cache.get(url) && Date.now() - _cache.get(url).t < (ttlMs == null ? 60000 : ttlMs))) engineDebug("fetch start", { request: url.replace(/^https:\/\/[^/]+/, ""), timeoutMs: timeoutMs || 15000 });
+  const c = _cache.get(url); if (c && Date.now() - c.t < (ttlMs == null ? 60000 : ttlMs)) return c.d;
   const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), timeoutMs || 15000);
   const t0 = Date.now();
   try {
@@ -3927,6 +3943,9 @@ function gismoRow(m) {
   if (!m || m.canceled || m.cancelled || m.postponed || m.walkover || m.removed) return null;
   const p = m.periods || {}, ft = p.ft, h1 = p.p1; if (!ft || !h1) return null;
   const st = m.status && m.status.name; if (st && !/ended|^AET|^AP|after/i.test(st)) return null;
+  { const _h1h = Number(h1.home), _h1a = Number(h1.away), _fh = Number(ft.home), _fa = Number(ft.away);
+    if (![_h1h, _h1a, _fh, _fa].every(Number.isFinite) || _h1h > _fh || _h1a > _fa) return null; /* FIX: 1st half can never exceed the final (2nd half was derived, so the old check could not fail) */
+    if (/^(AET|AP)|after/i.test(String(st || "")) && _fh !== _fa) return null; /* FIX: extra-time games only usable if the regulation score is level */ }
   const r = [(m._dt || m.time || {}).uts || 0, m.teams && m.teams.home && m.teams.home.uid, m.teams && m.teams.away && m.teams.away.uid, Number(h1.home), Number(ft.home) - Number(h1.home), Number(h1.away), Number(ft.away) - Number(h1.away), Number(ft.home), Number(ft.away)];
   if (!r[1] || !r[2] || !HB_MODEL.valid(r)) return null;
   return r;
@@ -3935,17 +3954,17 @@ function gismoMeta(m) { return { id: "sr:match:" + m._id, t: ((m._dt || m.time |
 /* league history for the model: the fixture's current season + the previous season of the same competition (found through the teams'
    last matches), Sportradar match ids = SportyBet event ids. Everything at or after kickoff is dropped (no look-ahead). */
 async function loadLeagueHistory(f) {
-  const out = { rows: [], meta: new Map(), src: [], errs: [], seasons: [] };
+  const out = { rows: [], fitRows: [], meta: new Map(), src: [], errs: [], seasons: [] };
   const num = String(f.eventId).replace(/^sr:match:/, ""); if (!/^\d+$/.test(num)) { out.errs.push("not a Sportradar match id"); return out; }
   const mi = await gismo("match_info/" + num, 600000); const m0 = mi && mi.match; if (!m0) { out.errs.push("match_info empty"); return out; }
   const hid = m0.teams.home.uid, aid = m0.teams.away.uid, utid = m0._utid, sids = [m0._seasonid];
   const lastx = await Promise.all([hid, aid].map((u) => gismo("stats_team_lastx/" + u + "/30", 3600000).catch((e) => { out.errs.push("team last 30: " + e.message); return { matches: [] }; })));
   lastx.forEach((d) => (d.matches || []).forEach((m) => { if (m._utid === utid && !sids.includes(m._seasonid)) sids.push(m._seasonid); }));
   const seen = new Set(); const cut = (f.start || Date.now()) / 1000 - 600;
-  const add = (m, tag) => { if (!m || seen.has(m._id)) return; const r = gismoRow(m); if (!r || r[0] >= cut || r[0] * 1000 < Date.now() - HB_CONFIG.maxHistDays * 86400000) return; seen.add(m._id); out.rows.push(r); out.meta.set(m._id, Object.assign(gismoMeta(m), { tag })); };
+  const add = (m, tag) => { if (!m || seen.has(m._id)) return; const r = gismoRow(m); if (!r || r[0] >= cut || r[0] * 1000 < Date.now() - HB_CONFIG.maxHistDays * 86400000) return; seen.add(m._id); out.rows.push(r); if (tag === "league") out.fitRows.push(r); out.meta.set(m._id, Object.assign(gismoMeta(m), { tag })); };
   for (const sid of sids.slice(0, 3)) { try { const d = await gismo("stats_season_fixtures2/" + sid, 1800000); let n = 0; (d.matches || []).forEach((m) => { const b = seen.size; add(m, "league"); if (seen.size > b) n++; }); out.seasons.push(sid); out.src.push("season " + sid + ": " + n); } catch (e) { out.errs.push("season " + sid + ": " + e.message); } }
   lastx.forEach((d) => (d.matches || []).forEach((m) => add(m, "other"))); /* cups / Europe: used for the team view and H2H, rated against league-average opponents */
-  out.rows.sort((x, y) => x[0] - y[0]); out.hid = hid; out.aid = aid; out.home = m0.teams.home; out.away = m0.teams.away;
+  out.rows.sort((x, y) => x[0] - y[0]); out.fitRows.sort((x, y) => x[0] - y[0]); out.hid = hid; out.aid = aid; out.home = m0.teams.home; out.away = m0.teams.away;
   return out;
 }
 /* one team's view of a model row (newest first in the inputs) */
@@ -4054,7 +4073,7 @@ async function onLeagueChange() {
 
 /* ---------------- fixtures (UPCOMING ONLY) ---------------- */
 let g_fixtureDay = 0;
-function watDayBounds(dayOffset) { const now = new Date(); const s = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, 0, 0, 0, 0).getTime(); return [s, s + 86400000]; }
+function watDayBounds(dayOffset) { const wat = Date.now() + 3600000; const s = Math.floor(wat / 86400000) * 86400000 - 3600000 + dayOffset * 86400000; return [s, s + 86400000]; } /* FIX: real WAT (UTC+1) day, not the browser timezone */
 async function loadFixtures(dayOffset) {
   g_fixtureDay = dayOffset;
   document.getElementById("fixturesTodayBtn").classList.toggle("active", dayOffset === 0);
@@ -4110,7 +4129,8 @@ async function fetchStats() {
     if (stale()) { engineDebug("stats for " + A + " v " + B + " discarded (match changed while loading)"); return; }
     AppState.hist = H;
     const S = leagueStats(lg);
-    AppState.fit = H.rows.length ? HB_MODEL.fit(H.rows, (f.start || Date.now()) / 1000, { prior: S && S.tier !== "X" ? { m: S.avgTotal / 2, h1Share: S.h1Share } : undefined }) : null;
+    const _pr = {}; if (S && S.tier !== "X") { if (Number.isFinite(S.avgTotal)) _pr.m = S.avgTotal / 2; if (Number.isFinite(S.h1Share)) _pr.h1Share = S.h1Share; if (Number.isFinite(S.ha)) _pr.ha = S.ha; }
+    AppState.fit = H.fitRows.length ? HB_MODEL.fit(H.fitRows, (f.start || Date.now()) / 1000, { prior: _pr }) : null; /* FIX: cups / Europe rows no longer pollute the league fit */
     const now = Date.now();
     const lastOf = (uid) => H.rows.filter((r) => r[1] === uid || r[2] === uid).slice(-HB_CONFIG.lastN).reverse().map((r) => teamView(r, uid));
     const pa = lastOf(H.hid), pb = lastOf(H.aid);
@@ -4182,34 +4202,42 @@ async function loadWorkerModel() {
 }
 const HB_RATINGS_EDGE = { ft: 3.5, h1: 2.0, ta: 2.5, tb: 2.5 }; /* model_bt.md: ratings-path thresholds; fallback keeps 3.5 / 2.5 / 2.8 */
 function rmLeagueKey(lg) { if (!lg) return null; const m = HB_SOFA_LEAGUE[lg.tids[0]]; if (m != null) return String(m); const t = String(lg.tids[0] || "").match(/:(\d+)$/); return t ? t[1] : null; }
+function snapshotAgeDays() { const t = Date.parse(String(g_hbRM.generated || "").replace(" WAT", "+01:00").replace(" ", "T")); return Number.isFinite(t) ? (Date.now() - t) / 86400000 : Infinity; }
+function hbIsNeutral(lg) { return !!(lg && HB_NEUTRAL.test(lg.name)); }
 function ratingsProject() {
   const f = AppState.fixture, lg = curLeague(); if (!f || !lg) return null; const k = rmLeagueKey(lg); const L = g_hbRM.leagues[k]; if (!L) return null;
-  const id = (x) => { const m = String(x || "").match(/(\d+)$/); return m ? Number(m[1]) : null; }; const hid = id(f.hid), aid = id(f.aid); /* Sportradar competitor id = SofaScore team id */
+  const age = snapshotAgeDays(); if (!(age <= HB_SNAPSHOT_MAX_DAYS)) { engineDebug("ratings snapshot too old (" + (isFinite(age) ? age.toFixed(1) + " days" : "unknown date") + ") -> not used"); return null; } /* FIX: staleness guard */
+  const id = (x) => { const m = String(x || "").match(/(\d+)$/); return m ? Number(m[1]) : null; }; const hid = id(f.hid), aid = id(f.aid); /* Sportradar competitor id = SofaScore team id (cross-checked below) */
   if (hid == null || aid == null) return null;
-  const R = hbModelProject({ league: k, home: { id: hid, scored: [], allowed: [] }, away: { id: aid, scored: [], allowed: [] } }, g_hbRM);
+  const H = AppState.hist; if (H && H.hid != null && (id(H.hid) !== hid || id(H.aid) !== aid)) { engineDebug("home/away or team ids differ between SportyBet and Sportradar -> snapshot ratings not used"); return null; } /* FIX: orientation / id cross-check */
+  const R = hbModelProject({ league: k, neutral: hbIsNeutral(lg), home: { id: hid, scored: [], allowed: [] }, away: { id: aid, scored: [], allowed: [] } }, g_hbRM);
   if (!R || R.path !== "ratings") return null; const sh = g_hbRM.leagues[k].h1Share;
-  return { ok: true, home: R.home, away: R.away, total: R.ft, margin: R.margin, h1Total: R.h1, h1Margin: R.margin * sh, h1Home: R.h1Home, h1Away: R.h1Away, sd: R.sd, ha: L.homeAdv, league: L.name, snap: g_hbRM.generated };
+  return { ok: true, home: R.home, away: R.away, total: R.ft, margin: R.margin, h1Total: R.h1, h1Margin: R.margin * sh, h1Home: R.h1Home, h1Away: R.h1Away, sd: R.sd, ha: R.ha, league: L.name, snap: g_hbRM.generated };
 }
 function computeModel(C, A, B) {
-  const RP = ratingsProject();
+  const RP = ratingsProject(); const lgc = curLeague(); const neutral = hbIsNeutral(lgc);
+  const tSec = ((AppState.fixture && AppState.fixture.start) || Date.now()) / 1000;
   if (RP) { g_hbPath = "ratings"; const proj = { ft: RP.total, h1: RP.h1Total, ta: RP.home, tb: RP.away };
-    return { P: Object.assign({ m: RP.total / 2, h1Share: RP.h1Total / RP.total }, RP), proj, src: "opponent-adjusted ratings snapshot (" + RP.snap + "), " + RP.league + " home advantage " + fmt1(RP.ha), h2h: null }; }
+    let xcheck = null; /* FIX: independent cross-check of the snapshot against the in-page league fit */
+    try { const F = AppState.fit, H = AppState.hist; if (F && H && F.ok) { const Q = HB_MODEL.project(Object.assign({}, F, { cfg: Object.assign({}, F.cfg, { h2h: false }) }), H.hid, H.aid, { neutral, tSec }); if (Q.ok) xcheck = { total: Q.total, diff: RP.total - Q.total }; } } catch (_e) {}
+    return { path: "ratings", xcheck, P: Object.assign({ m: RP.total / 2, h1Share: RP.h1Total / RP.total }, RP), proj, src: "opponent-adjusted ratings snapshot (" + RP.snap + "), " + RP.league + " home advantage used " + fmt1(RP.ha) + (neutral ? " (neutral venue: 0)" : ""), h2h: null }; }
   g_hbPath = "fallback";
   const H = AppState.hist, F = AppState.fit, useH2H = !!(document.getElementById("useGH2H") || {}).checked;
   let P = null, src = "";
   if (F && H && F.ok) {
     const cfg = Object.assign({}, F.cfg, { h2h: useH2H ? HB_MODEL.CFG.h2h : false }); const F2 = Object.assign({}, F, { cfg });
-    P = HB_MODEL.project(F2, H.hid, H.aid, { tSec: (AppState.fixture && AppState.fixture.start || Date.now()) / 1000 });
+    P = HB_MODEL.project(F2, H.hid, H.aid, { tSec, neutral });
     src = P.ok ? "opponent-adjusted ratings (" + F.n + " league games)" : "";
   }
-  if (!P || !P.ok) { /* form fallback */
-    const m = isFiniteVal(C.avgTotal) ? C.avgTotal / 2 : HB_MODEL.PRIOR.m, ha = HB_MODEL.CFG.haGlobal, sh = isFiniteVal(C.h1Share) ? C.h1Share : HB_MODEL.PRIOR.h1Share;
-    const home = (mean(A.gs) + mean(B.ga)) / 2 + ha / 2, away = (mean(B.gs) + mean(A.ga)) / 2 - ha / 2;
+  if (!P || !P.ok) { /* form fallback (information only, never played) */
+    const m = isFiniteVal(C.avgTotal) ? C.avgTotal / 2 : HB_MODEL.PRIOR.m, ha = neutral ? 0 : (isFiniteVal(C.ha) ? Math.max(-1, Math.min(3, C.ha)) : HB_MODEL.PRIOR.ha), sh = isFiniteVal(C.h1Share) ? C.h1Share : HB_MODEL.PRIOR.h1Share;
+    const k6 = (x, n) => m + (x - m) * n / (n + 6); /* FIX: shrink raw form means toward the league mean */
+    const home = (k6(mean(A.gs), A.gs.length) + k6(mean(B.ga), B.ga.length)) / 2 + ha / 2, away = (k6(mean(B.gs), B.gs.length) + k6(mean(A.ga), A.ga.length)) / 2 - ha / 2;
     P = { ok: isFiniteVal(home) && isFiniteVal(away), home, away, total: home + away, margin: home - away, h1Home: home * sh, h1Away: away * sh, h1Total: (home + away) * sh, h1Margin: (home - away) * sh, m, ha, h1Share: sh, fallback: true };
     src = "form fallback: typed last-10 series, NO opponent adjustment" + (P.ok ? "" : " (series missing)");
   }
   const proj = { ft: P.total, h1: P.h1Total, ta: P.home, tb: P.away };
-  return { P, proj, src, h2h: P.h2h || null };
+  return { path: "fallback", P, proj, src, h2h: P.h2h || null };
 }
 /* ---------------- run ---------------- */
 function noPlay(market, line, proj, reason, extra) { return Object.assign({ marketKey: market, name: HB_MARKETS[market].label, line, proj, edge: NaNv, prob: NaNv, pick: "NO PLAY", grade: "NaN", reason }, extra || {}); }
@@ -4219,15 +4247,16 @@ async function loadWorkerThresholds() {
   try { const r = await fetch(HB_WORKER_URL + "/hb/thresholds", { cache: "no-store" }); const j = await r.json();
     if (j && j.ok && j.thresholds) { g_hbThresh = { at: Date.now(), thresholds: j.thresholds, changelog: j.changelog || [], rules: j.rules || null }; try { localStorage.setItem(HB_THRESH_CACHE, JSON.stringify(g_hbThresh)); } catch (_e) {} } } catch (e) { reportSoftFailure("worker-thresholds", e); }
 }
-function effectiveEdge(C, market) {
+function hbThreshFresh() { return !!(g_hbThresh && g_hbThresh.at && Date.now() - g_hbThresh.at < 7 * 86400000); } /* FIX: cached worker thresholds expire after 7 days */
+function effectiveEdge(C, market, path) {
   if (!C || C.tier === "X") return null; let base = HB_EDGE_DEFAULT[market]; if (!isFiniteVal(base)) return null;
-  if (g_hbPath === "ratings" && HB_RATINGS_EDGE[market] != null) base = HB_RATINGS_EDGE[market];
-  const w = g_hbThresh && g_hbThresh.thresholds && g_hbThresh.thresholds[C.cat]; const v = w && w[market] && w[market].v;
-  return isFiniteVal(v) && v > 0 ? Number(v) : base;
+  if ((path || g_hbPath) === "ratings" && HB_RATINGS_EDGE[market] != null) base = HB_RATINGS_EDGE[market];
+  const w = hbThreshFresh() && g_hbThresh.thresholds && g_hbThresh.thresholds[C.cat]; const v = w && w[market] && w[market].v;
+  return isFiniteVal(v) && Number(v) >= HB_THRESH_MIN[market] && Number(v) <= HB_CAPS[market] * 0.8 ? Number(v) : base; /* FIX: bounded */
 }
-const sdOf = (mk) => { const k = HB_MARKETS[mk].sd; const r = g_hbPath === "ratings" && g_hbRM.params.sd; return r && r[k === "h1team" ? "team" : k] ? +r[k === "h1team" ? "team" : k].toFixed(2) : HB_MODEL.SD[k]; };
+const sdOf = (mk, model) => { const k = HB_MARKETS[mk].sd; const ps = model && model.P && model.P.sd; if (ps && Number.isFinite(ps[k])) return +ps[k].toFixed(2); return HB_MODEL.SD[k]; }; /* FIX: per-league sdMult now used */
 /* P(side) from a normal on integer goals (whole lines push), SD = walk-forward residual RMSE of this market */
-function sideProb(mk, edge, line) { const s = sdOf(mk); const whole = Math.abs(line - Math.round(line)) < 1e-9; const z = (Math.abs(edge) - (whole ? 0.5 : 0)) / s; return normCdf(z); }
+function sideProb(mk, edge, line, model) { const s = sdOf(mk, model); const whole = Math.abs(line - Math.round(line)) < 1e-9; const z = (Math.abs(edge) * HB_MARKET_SHRINK - (whole ? 0.5 : 0)) / s; return normCdf(z); } /* FIX: edge shrunk (the line is information), whole lines lose 0.5 for the push */
 function evaluate(mk, C, model, line, ctx) {
   const lab = HB_MARKETS[mk].label;
   if (!isFiniteVal(line)) return noPlay(mk, NaNv, model ? model.proj[mk] : NaNv, "No " + lab + " line (SportyBet does not offer it for this match, or type it).");
@@ -4236,18 +4265,19 @@ function evaluate(mk, C, model, line, ctx) {
   const proj = model.proj[mk]; if (!isFiniteVal(proj)) return noPlay(mk, line, NaNv, "Projection not finite.");
   const edge = proj - line;
   const side = edge > 0 ? "OVER" : "UNDER";
-  const pSide = sideProb(mk, edge, line);
-  const base = { marketKey: mk, name: lab, line, proj, edge, prob: pSide, side };
-  const minEdge = effectiveEdge(C, mk);
+  const pSide = sideProb(mk, edge, line, model); const sdv = sdOf(mk, model);
+  const base = { marketKey: mk, name: lab, line, proj, edge, prob: pSide, side, sd: sdv, z: Math.abs(edge) / sdv };
+  const minEdge = effectiveEdge(C, mk, model.path);
   if (!isFiniteVal(minEdge)) return Object.assign(base, { pick: "NO PLAY", grade: "NaN", reason: "No threshold for " + C.cat + " (league sample too small: no real averages)." });
   if (Math.abs(edge) > HB_CAPS[mk]) return Object.assign(base, { pick: "NO PLAY", grade: "NaN", reason: "Edge " + fmt1(edge) + " exceeds the sanity cap ±" + HB_CAPS[mk] + " (wrong line, wrong match or broken data)." });
-  if (Math.abs(edge) < minEdge) return Object.assign(base, { pick: "NO PLAY", grade: "NaN", reason: `Below ${C.cat} threshold: edge ${fmt1(edge)} (need ±${minEdge}).` });
+  if (Math.abs(edge) < minEdge) return Object.assign(base, { pick: "NO PLAY", grade: "NaN", reason: `Below ${C.cat} threshold: edge ${fmt2(edge)} (need ±${minEdge}).` });
+  if (model.xcheck && Math.abs(model.xcheck.diff) > HB_XCHECK_MAX) return Object.assign(base, { pick: "NO PLAY", grade: "NaN", reason: "Snapshot ratings and the in-page league fit disagree by " + fmt1(model.xcheck.diff) + " total goals (> " + HB_XCHECK_MAX + "): probable team-id / data mismatch." });
   if (ctx.blockReason) return Object.assign(base, { pick: "NO PLAY", grade: "NaN", reason: ctx.blockReason });
   if (model.P.fallback) return Object.assign(base, { pick: "NO PLAY", grade: "NaN", reason: "Form fallback only (no league fit, no opponent adjustment): shown for information, never played." });
   const grade = Math.abs(edge) >= minEdge * 1.5 ? "A" : Math.abs(edge) >= minEdge * 1.25 ? "B" : "C";
   const lineTxt = String(line);
   const projTxt = `projection ${fmt1(proj)} vs line ${line}`;
-  return Object.assign(base, { pick: side + " " + lineTxt, grade, reason: `${side}: ${projTxt} (edge ${fmt1(edge)}, need ±${minEdge}; P(${side}) ${fmtPct(pSide)}).` });
+  return Object.assign(base, { pick: side + " " + lineTxt, grade, reason: `${side}: ${projTxt} (edge ${fmt2(edge)}, need ±${minEdge}; P(${side}) ${fmtPct(pSide)}).` });
 }
 function runEngine() {
   setEngineAlert(false);
@@ -4267,7 +4297,7 @@ function runEngine() {
     const model = computeModel(C, A, B);
     const corr = trackerCorrelationBlock(lg, nameA, nameB);
     HB_MK_ORDER.forEach((mk) => rows.push(Object.assign(evaluate(mk, C, model, lines[mk], corr[mk] ? { blockReason: corr[mk] } : {}), { model })));
-    window.__hbLastModel = { league: lg.name, model, C };
+    hbDecorrelate(rows); window.__hbLastModel = { league: lg.name, model, C };
   }
   rows.forEach((p) => { if (p.marketKey === "ta") p.name = (nameA || "Home Team") + " Total"; if (p.marketKey === "tb") p.name = (nameB || "Away Team") + " Total"; });
   renderRows(table, rows, lg, nameA, nameB, C);
@@ -4288,22 +4318,22 @@ function explainDetails(p, C, nameA, nameB) {
   const m = p.model; const lines = [p.reason];
   if (m && m.P) {
     const P = m.P, F = AppState.fit, H = AppState.hist;
-    lines.push(`Source: ${m.src}.`);
+    lines.push(`Source: ${m.src}.`); if (m.xcheck) lines.push(`Cross-check: in-page league fit total ${fmt1(m.xcheck.total)} vs snapshot ${fmt1(m.P.total)} (gap ${fmt1(m.xcheck.diff)}; > ${HB_XCHECK_MAX} = NO PLAY).`);
     lines.push(`Projection: ${nameA} ${fmt1(P.home)} – ${fmt1(P.away)} ${nameB} (total ${fmt1(P.total)}, margin ${fmt1(P.margin)}); 1st half ${fmt1(P.h1Home)} – ${fmt1(P.h1Away)} (${fmtPct(P.h1Share)} of goals).`);
     if (F && H && !P.fallback) { const r = (u) => [(F.A[String(u)] || 0), (F.D[String(u)] || 0)]; const ra = r(H.hid), rb = r(H.aid);
       lines.push(g_hbPath === "ratings" ? `Ratings path: per-league home/away bases (home advantage ${fmt1(P.ha)} goals for this league), opponent-adjusted att/def, drift to the last-60 mean; thresholds FT 3.5, 1H 2.0, team 2.5.` : `Fallback path (no ratings for these teams): in-page fit on Sportradar league results, league mean ${fmt1(P.m * 2)} goals, home advantage ${fmt1(P.ha)} goals; stricter thresholds FT 3.5, 1H 2.5, team 2.8.`);
       lines.push(`Ratings (goals vs average, opponent-adjusted): ${nameA} attack ${ra[0] >= 0 ? "+" : ""}${ra[0].toFixed(2)}, defence ${ra[1] >= 0 ? "+" : ""}${ra[1].toFixed(2)} (+ = concedes more); ${nameB} attack ${rb[0] >= 0 ? "+" : ""}${rb[0].toFixed(2)}, defence ${rb[1] >= 0 ? "+" : ""}${rb[1].toFixed(2)}.`); }
     lines.push(m.h2h ? `H2H: ${m.h2h.n} meeting(s); margin residual ${m.h2h.adjMargin >= 0 ? "+" : ""}${m.h2h.adjMargin.toFixed(2)} after shrinkage ${fmtPct(m.h2h.w)} (n/(n+${HB_MODEL.CFG.h2hK})). Totals ignore H2H (it did not beat the baseline).` : "H2H: not used (none found, or the H2H box is unticked).");
-    lines.push(`P(side) from a normal on goals with the market's walk-forward error SD ${sdOf(p.marketKey)}; display only — grades come from the goal edge (A ≥ 1.5×, B ≥ 1.25× the threshold).`);
+    lines.push(`P(side) from a normal on goals with the market's walk-forward error SD ${sdOf(p.marketKey, m)}, with the model-vs-line gap shrunk x${HB_MARKET_SHRINK} because the bookmaker line carries information; display only — grades come from the goal edge (A ≥ 1.5×, B ≥ 1.25× the threshold).`);
   }
-  if (C && C.tier !== "X") lines.push(`${C.league} (SportyBet results): n=${C.n}, recent avg total ${C.avgTotal} (median ${C.medTotal}, sd ${C.sdTotal}), 1st half avg ${C.avgH1}, home margin ${C.ha}, tier ${C.tier}.`);
+  if (C && C.tier === "M") lines.push(`${C.league}: covered by the ratings snapshot (no SportyBet result counts); snapshot avg total ${C.avgTotal}, 1st half avg ${C.avgH1}, home margin ${C.ha}.`); else if (C && C.tier !== "X") lines.push(`${C.league} (SportyBet results): n=${C.n}, recent avg total ${C.avgTotal} (median ${C.medTotal}, sd ${C.sdTotal}), 1st half avg ${C.avgH1}, home margin ${C.ha}, tier ${C.tier}.`);
   const ul = document.createElement("ul"); ul.className = "why-pick-list"; lines.forEach((t) => { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); }); b.appendChild(ul); d.appendChild(b); return d;
 }
 function renderRows(table, rows, lg, nameA, nameB, L) {
   const toTrack = [];
   /* 🔒 lock = the single strongest qualifying pick (grade, then edge ÷ threshold) */
   const gr = { A: 3, B: 2, C: 1 }; let lock = null;
-  rows.forEach((p) => { if (p.pick === "NO PLAY") return; const thr = effectiveEdge(L, p.marketKey) || 1; const sc = (gr[p.grade] || 0) * 100 + Math.abs(p.edge) / thr; if (!lock || sc > lock.sc) lock = { p, sc }; });
+  rows.forEach((p) => { if (p.pick === "NO PLAY") return; const thr = effectiveEdge(L, p.marketKey, p.model && p.model.path) || 1; const sc = (gr[p.grade] || 0) * 100 + (isFiniteVal(p.z) ? p.z : Math.abs(p.edge) / thr); /* FIX: rank by SD-normalised edge */ if (!lock || sc > lock.sc) lock = { p, sc }; });
   rows.forEach((p) => {
     const isNo = p.pick === "NO PLAY"; const row = table.insertRow(); const isLock = !!(lock && lock.p === p); p.isLock = isLock;
     const td1 = document.createElement("td"); td1.textContent = p.name + (isFiniteVal(p.line) ? " " + p.line : ""); row.appendChild(td1);
@@ -4327,12 +4357,22 @@ let g_tracker = { picks: [] };
 function trackerLoad() { try { setTimeout(() => { const st = g_tracker.picks.reduce((o, p) => { o[p.resultStatus] = (o[p.resultStatus] || 0) + 1; return o; }, {}); engineDebug("hydrate state snapshot", { local: { totalCount: g_tracker.picks.length, pending: st.pending || 0, wins: st.win || 0, losses: st.loss || 0, pushes: st.push || 0 } }); }, 0); const j = JSON.parse(localStorage.getItem(TRACKER_KEY) || "null"); g_tracker = j && Array.isArray(j.picks) ? j : { picks: [] }; } catch (_e) { g_tracker = { picks: [] }; } }
 function trackerSave() { g_tracker.picks.forEach(leanFix); trackerDebug("tracker save", { picks: g_tracker.picks.length, testMode: !!HB_TEST_MODE }); if (HB_TEST_MODE) return; try { localStorage.setItem(TRACKER_KEY, JSON.stringify(g_tracker)); } catch (e) { addIssue("Tracker save failed: " + e.message); } }
 function watDayKey(ms) { return Math.floor((ms + 3600000) / 86400000); }
-function trackerCorrelationBlock(lg, A, B) { return {}; } /* one pick per market per match: the signature already de-duplicates */
+function trackerCorrelationBlock(lg, A, B) { return {}; } /* correlation is handled after evaluation in hbDecorrelate() */
+/* FIX: Full-time, Home-team and Away-team totals are one estimate. Picks pointing opposite ways on that family are contradictory -> only the pick that agrees with the strongest one survives; survivors share a corrGroup so reports can count a match once. */
+function hbDecorrelate(rows) {
+  const fam = rows.filter((p) => (p.marketKey === "ft" || p.marketKey === "ta" || p.marketKey === "tb") && p.pick !== "NO PLAY"); if (!fam.length) return;
+  const ref = fam.slice().sort((a, b) => (b.z || 0) - (a.z || 0))[0];
+  fam.forEach((p) => { if (p !== ref && p.side !== ref.side) { p.pick = "NO PLAY"; p.grade = "NaN"; p.reason = "Contradicts the stronger " + ref.name + " " + ref.side + " pick on the same goal total -> NO PLAY."; } else p.corrGroup = "total"; });
+}
 function trackPicks(list, lg, A, B) {
   const f = AppState.fixture; if (!f || !f.eventId) { addIssue("Pick not tracked: no SportyBet fixture selected (manual entries are not tracked)."); return; }
+  if (!(f.start > Date.now())) { addIssue("Pick not tracked: kickoff has already passed."); return; } /* FIX: nothing is tracked after kickoff */
   list.forEach((p) => {
-    const sig = f.eventId + "|" + p.marketKey; if (g_tracker.picks.some((x) => x.signature === sig)) return;
-    g_tracker.picks.unshift({ signature: sig, eventId: f.eventId, leagueKey: lg.key, league: lg.name, cat: lg.name, homeTeam: A, awayTeam: B, eventDate: f.start, createdAt: Date.now(), marketKey: p.marketKey, mv: HB_BUILD, market: p.name, line: p.line, side: p.side, pick: p.pick, grade: p.grade, isLock: !!p.isLock, proj: Math.round(p.proj * 10) / 10, edge: Math.round(p.edge * 10) / 10, prob: isFiniteVal(p.prob) ? Math.round(p.prob * 1000) / 1000 : NaNv, resultStatus: "pending", actual: NaNv, build: HB_BUILD });
+    const sig = f.eventId + "|" + p.marketKey; const ex = g_tracker.picks.find((x) => x.signature === sig);
+    const rec = { eventId: f.eventId, leagueKey: lg.key, league: lg.name, cat: lg.name, homeTeam: A, awayTeam: B, eventDate: f.start, marketKey: p.marketKey, mv: HB_BUILD, market: p.name, line: p.line, side: p.side, pick: p.pick, grade: p.grade, isLock: !!p.isLock, proj: Math.round(p.proj * 10) / 10, edge: Math.round(p.edge * 10) / 10, sd: isFiniteVal(p.sd) ? Math.round(p.sd * 100) / 100 : NaNv, z: isFiniteVal(p.z) ? Math.round(p.z * 1000) / 1000 : NaNv, corrGroup: p.corrGroup || null, lineSrc: AppState.autoLines[p.marketKey] === p.line ? "auto" : "manual", prob: isFiniteVal(p.prob) ? Math.round(p.prob * 1000) / 1000 : NaNv, build: HB_BUILD };
+    if (ex) { /* FIX: a still-pending pre-kickoff pick follows the latest run (line moved / side flipped) instead of keeping a stale first run */
+      if (ex.resultStatus === "pending" && !ex.awaitFinal && ex.eventDate > Date.now()) { Object.assign(ex, rec); ex.synced = false; ex.updatedAt = Date.now(); } return; }
+    g_tracker.picks.unshift(Object.assign({ signature: sig, createdAt: Date.now(), resultStatus: "pending", actual: NaNv }, rec));
   });
   trackerSave(); renderTracker(); syncPicksToWorker();
 }
@@ -4347,8 +4387,8 @@ const HB_PERIOD = { ft: "ft", ta: "ft", tb: "ft", h1: "h1" };
 /* r = { h1: [home, away] | null, ft: [home, away] | null } (regulation) */
 function scoreValid(period, s) {
   if (!Array.isArray(s) || s.length !== 2 || !s.every((x) => Number.isInteger(x) && x >= 0)) return false;
-  if (period === "ft") return s[0] >= 10 && s[1] >= 10 && s[0] <= 55 && s[1] <= 55 && s[0] + s[1] >= 30; /* a finished handball game; 0-0 / walkover scores never settle */
-  return s[0] <= 35 && s[1] <= 35 && s[0] + s[1] >= 8; /* first half */
+  if (period === "ft") return s[0] >= 5 && s[1] >= 5 && s[0] <= 70 && s[1] <= 70 && s[0] + s[1] >= 30; /* FIX: real blowouts (e.g. 40-6) settle; 0-0 / 10-0 walkover scores still never do */
+  return s[0] <= 40 && s[1] <= 40 && s[0] + s[1] >= 4; /* first half (FIX: legit low halves such as 4-3 settle) */
 }
 function actualOf(mk, r) { const s = r && r[HB_PERIOD[mk]]; if (!s) return NaNv; return mk === "ft" || mk === "h1" ? s[0] + s[1] : mk === "ta" ? s[0] : mk === "tb" ? s[1] : NaNv; }
 function gradeActual(p, actual) {
@@ -4386,9 +4426,9 @@ async function srFinal(eventId) {
   const pair = (x) => (x && Number.isFinite(Number(x.home)) && Number.isFinite(Number(x.away)) ? [Number(x.home), Number(x.away)] : null);
   const h1 = pair(per.p1), ft = pair(per.ft); const ended = sid === 100 || sid === 110 || sid === 120 || sid === 123 || /^(ended|AET|AP|after)/i.test(name);
   const h1Done = !!h1 && (ended || /halftime|pause|2nd half|overtime|penalt/i.test(name));
-  const r = { h1: h1Done ? h1 : null, ft: null, name };
-  if (ended && ft) { const res = m.result || {}; const okRes = String(res.period || "nt") !== "nt" || (Number(res.home) === ft[0] && Number(res.away) === ft[1]); const okHalf = !h1 || (h1[0] <= ft[0] && h1[1] <= ft[1]);
-    if (okRes && okHalf) r.ft = ft; else engineDebug("srFinal cross-check failed " + eventId, { per, res }); }
+  const r = { h1: h1Done ? h1 : null, ft: null, name }; if (r.h1 && ended && ft && !(h1[0] <= ft[0] && h1[1] <= ft[1])) r.h1 = null; /* FIX: corrupt half > final */
+  if (ended && ft) { const res = m.result || {}; const okRes = String(res.period || "nt") !== "nt" || (Number(res.home) === ft[0] && Number(res.away) === ft[1]); const okHalf = !h1 || (h1[0] <= ft[0] && h1[1] <= ft[1]); const okReg = !/^(AET|AP|after)/i.test(name) || ft[0] === ft[1]; /* FIX: after extra time the regulation score must be level */
+    if (okRes && okHalf && okReg) r.ft = ft; else engineDebug("srFinal cross-check failed " + eventId, { per, res }); }
   if (!r.h1 && !r.ft) return null;
   return { kind: r.ft ? "final" : "half", r, name };
 }
@@ -4549,7 +4589,7 @@ async function pullWorkerPicks() {
   } catch (e) { reportSoftFailure("worker-picks-pull", e); return 0; }
 }
 function leagueRowsForConfig() { return Object.values(HB_LEAGUES).map((l) => [l, leagueStats(l)]).sort((x, y) => (y[1].n || 0) - (x[1].n || 0)); }
-function configText() { return leagueRowsForConfig().map(([l, d]) => [l.name, "n=" + d.n, d.tier].concat(HB_MK_ORDER.map((mk) => HB_MARKETS[mk].label + " " + effectiveEdge(d, mk))).join(" | ")).join("\n"); }
+function configText() { return leagueRowsForConfig().map(([l, d]) => [l.name, "n=" + (d.n == null ? "model" : d.n), d.tier].concat(HB_MK_ORDER.map((mk) => HB_MARKETS[mk].label + " " + effectiveEdge(d, mk, "ratings"))).join(" | ")).join("\n"); }
 function changeLogHtml() {
   const log = (g_hbThresh && g_hbThresh.changelog) || [];
   const rows = log.slice(0, 50).map((e) => `<tr><td>${escapeHtml(fmtDT(e.at))}</td><td>${escapeHtml(e.cat)}</td><td>${escapeHtml((HB_MARKETS[e.market || e.mk] || {}).label || e.market || e.mk)}</td><td>${escapeHtml(String(e.from))} → ${escapeHtml(String(e.to))}</td><td>${escapeHtml(e.action)}</td><td>${escapeHtml(e.reason || "")}</td></tr>`).join("");
@@ -4557,7 +4597,7 @@ function changeLogHtml() {
 }
 function configHtml() {
   const v = (x) => (x == null ? "NaN" : x);
-  const rows = leagueRowsForConfig().map(([l, d]) => `<tr><td>${escapeHtml(l.name)}</td><td>${d.n}</td><td>${d.tier}</td><td>${v(d.avgTotal)}</td>${HB_MK_ORDER.map((mk) => `<td>${v(effectiveEdge(d, mk))}</td>`).join("")}</tr>`).join("");
+  const rows = leagueRowsForConfig().map(([l, d]) => `<tr><td>${escapeHtml(l.name)}</td><td>${d.n == null ? "model" : d.n}</td><td>${d.tier}</td><td>${v(d.avgTotal)}</td>${HB_MK_ORDER.map((mk) => `<td>${v(effectiveEdge(d, mk, "ratings"))}</td>`).join("")}</tr>`).join("");
   return `<div class="tracker-analytics-shell"><div class="tracker-analytics-heading"><div class="tracker-analytics-title">Per-league thresholds (read-only)</div><div class="tracker-analytics-subtitle">${escapeHtml(HB_DATA.window)}. Tier X = NO PLAY. Goal edges only, no prices. Auto-tuned nightly by the handball-engine worker${g_hbThresh && g_hbThresh.at ? " (synced " + fmtDT(g_hbThresh.at) + ")" : " (worker not reached — embedded defaults)"}.</div></div><div class="tracker-report-table-wrap"><table class="tracker-report-table"><tr><th>League</th><th>n</th><th>Tier</th><th>Avg</th><th>FT</th><th>1H</th><th>Home</th><th>Away</th></tr>${rows}</table></div>${changeLogHtml()}</div>`;
 }
 
@@ -4652,6 +4692,7 @@ function setTrackerModalView(v) { g_trackerView = ["picks", "report", "debug", "
 const _pct = (w, l) => (w + l ? (w / (w + l)) * 100 : NaN);
 const formatPctHB = (v) => (isFinite(v) ? v.toFixed(1) + "%" : "NaN");
 function _rec(list) { list = list.filter((p) => !p.lean); /* diagnostic LEAN rows (NO PLAY by the engine) are shown but never counted in the record */ const w = list.filter((p) => p.resultStatus === "win").length, l = list.filter((p) => p.resultStatus === "loss").length, pu = list.filter((p) => p.resultStatus === "push").length; return { wins: w, losses: l, pushes: pu, settled: w + l + pu, winPct: _pct(w, l) }; }
+function _recMatch(list) { const g = {}; list.filter((p) => !p.lean && /^(win|loss|push)$/.test(String(p.resultStatus))).forEach((p) => { (g[p.eventId] = g[p.eventId] || []).push(p); }); let w = 0, l = 0, pu = 0; Object.values(g).forEach((a) => { const aw = a.filter((x) => x.resultStatus === "win").length, al = a.filter((x) => x.resultStatus === "loss").length; if (aw > al) w++; else if (al > aw) l++; else pu++; }); return { wins: w, losses: l, pushes: pu, settled: w + l + pu, winPct: _pct(w, l) }; } /* FIX: one result per match (picks on one match are correlated) */
 function _groupRows(list, keyFn) { const g = {}; list.forEach((p) => { const k = keyFn(p); if (k == null) return; (g[k] = g[k] || []).push(p); }); return Object.keys(g).map((k) => Object.assign({ label: k }, _rec(g[k]))).sort((a, b) => b.settled - a.settled); }
 function _table(head, rows, empty, cols) { return `<div class="table-wrap tracker-report-table-wrap"><table class="tracker-analytics-table"><thead><tr>${head}</tr></thead><tbody>${rows || `<tr><td colspan="${cols}" class="note">${empty}</td></tr>`}</tbody></table></div>`; }
 function _card(title, meta, body) { return `<div class="tracker-analytics-card"><div class="tracker-analytics-card-head"><div class="tracker-analytics-card-title">${title}</div><div class="tracker-analytics-card-meta">${meta}</div></div><div class="tracker-analytics-card-body">${body}</div></div>`; }
@@ -4661,10 +4702,11 @@ function reportHtml() {
   const all = g_tracker.picks, settledAll = all.filter((p) => ["win", "loss", "push"].includes(p.resultStatus)), at = _rec(settledAll);
   const cur = settledAll.filter((p) => p.build === HB_BUILD && p.resultStatus !== "push"), curRec = _rec(cur), active = all.filter((p) => p.resultStatus === "pending").length;
   const sorted = settledAll.slice().sort((a, b) => (a.eventDate || 0) - (b.eventDate || 0)); const cut = Math.floor(sorted.length * 0.7), test = sorted.slice(cut), testRec = _rec(test);
-  const status = at.settled >= 50 ? (at.winPct >= 54.05 ? "ABOVE BREAK-EVEN" : "BELOW BREAK-EVEN") : "COLLECTING";
+  const status = at.settled >= 50 ? "REVIEW" : "COLLECTING"; const mrec = _recMatch(settledAll); /* FIX: no profit verdict: break-even depends on the price taken and the engine never reads prices */
   const conf = _groupRows(settledAll, (p) => "Grade " + String(p.grade || "NaN").toUpperCase());
-  const eb = (e) => { e = Math.abs(Number(e)); return !isFinite(e) ? null : e < 1 ? "< 2.0 goals" : e < 3 ? "2.0–3.0 goals" : e < 4 ? "3.0–4.0 goals" : e < 6 ? "4.0–6.0 goals" : "6.0+ goals"; };
-  const edge = _groupRows(settledAll, (p) => eb(p.edge));
+  const zOf = (p) => { const k = HB_MARKETS[p.marketKey] && HB_MARKETS[p.marketKey].sd; const sdv = Number(p.sd) > 0 ? Number(p.sd) : HB_MODEL.SD[k]; return Math.abs(Number(p.edge)) / sdv; };
+  const eb = (p) => { const z = zOf(p); return !isFinite(z) ? null : z < 0.5 ? "< 0.5 SD" : z < 0.75 ? "0.5–0.75 SD" : z < 1.0 ? "0.75–1.0 SD" : "1.0+ SD"; }; /* FIX: buckets in SDs (goals are not comparable across markets) and the labels now match the boundaries */
+  const edge = _groupRows(settledAll, (p) => eb(p));
   const mk = _groupRows(settledAll, (p) => p.market + " " + p.side);
   const lg = _groupRows(settledAll, (p) => p.league);
   const pl = _groupRows(settledAll.flatMap((p) => [Object.assign({}, p, { _pl: p.homeTeam }), Object.assign({}, p, { _pl: p.awayTeam })]), (p) => p._pl).slice(0, 40);
@@ -4677,10 +4719,11 @@ function reportHtml() {
         <div class="tracker-kpi-card featured"><div class="tracker-kpi-label">Overall (same as Tracked Picks header)</div><div class="tracker-kpi-value">${at.wins}W</div><div class="tracker-kpi-sub">Losses ${at.losses} • Pushes ${at.pushes} • Win rate ${formatPctHB(at.winPct)} • ${at.settled} settled picks</div></div>
         <div class="tracker-kpi-card"><div class="tracker-kpi-label">Active picks</div><div class="tracker-kpi-value">${active}</div><div class="tracker-kpi-sub">Current model ${escapeHtml(HB_BUILD)}</div></div>
         <div class="tracker-kpi-card"><div class="tracker-kpi-label">Settled picks (learning-eligible)</div><div class="tracker-kpi-value">${curRec.settled}</div><div class="tracker-kpi-sub">of ${at.settled} settled picks • threshold tuning needs 50 real-line rows per league/market • excludes pushes/other model versions</div></div>
-        <div class="tracker-kpi-card"><div class="tracker-kpi-label">Review status</div><div class="tracker-kpi-value">${escapeHtml(status)}</div><div class="tracker-kpi-sub">Break-even reference at 1.85 = 54.05% (note only)</div></div>
+        <div class="tracker-kpi-card"><div class="tracker-kpi-label">Per match (de-correlated)</div><div class="tracker-kpi-value">${formatPctHB(mrec.winPct)}</div><div class="tracker-kpi-sub">${mrec.wins}W-${mrec.losses}L-${mrec.pushes}P over ${mrec.settled} matches (each match counted once)</div></div>
+        <div class="tracker-kpi-card"><div class="tracker-kpi-label">Review status</div><div class="tracker-kpi-value">${escapeHtml(status)}</div><div class="tracker-kpi-sub">Break-even depends on the price you take (54.05% only at 1.85); no profit verdict is shown</div></div>
         <div class="tracker-kpi-card"><div class="tracker-kpi-label">All-time (matches Tracked Picks page)</div><div class="tracker-kpi-value">${at.settled}</div><div class="tracker-kpi-sub">${at.wins}W-${at.losses}L-${at.pushes}P • every version, incl. pushes</div></div>
       </div>
-      ${_card("Out-of-sample validation", test.length >= 10 ? "Most recent 30%" : "Not yet available", test.length >= 10 ? `<div class="tracker-report-subtitle">Win rate on the most recent 30% of settled picks (held out from the earlier 70%). Checks whether results hold on picks the thresholds were not tuned on.</div><div class="tracker-kpi-grid"><div class="tracker-kpi-card"><div class="tracker-kpi-label">Test win rate</div><div class="tracker-kpi-value">${formatPctHB(testRec.winPct)}</div><div class="tracker-kpi-sub">${test.length} held-out picks</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Training size</div><div class="tracker-kpi-value">${cut}</div><div class="tracker-kpi-sub">Picks used to build the split</div></div></div>` : `<div class="tracker-empty-note">No out-of-sample check yet. Needs 30+ settled picks.</div>`)}
+      ${_card("Recency check (not a true hold-out)", test.length >= 10 ? "Most recent 30%" : "Not yet available", test.length >= 10 ? `<div class="tracker-report-subtitle">Win rate on the most recent 30% of settled picks. This is NOT a true hold-out: thresholds are auto-tuned on the same tracked picks and picks from one match are correlated. Use it only to spot drift.</div><div class="tracker-kpi-grid"><div class="tracker-kpi-card"><div class="tracker-kpi-label">Test win rate</div><div class="tracker-kpi-value">${formatPctHB(testRec.winPct)}</div><div class="tracker-kpi-sub">${test.length} held-out picks</div></div><div class="tracker-kpi-card"><div class="tracker-kpi-label">Training size</div><div class="tracker-kpi-value">${cut}</div><div class="tracker-kpi-sub">Picks used to build the split</div></div></div>` : `<div class="tracker-empty-note">No recency check yet. Needs 30+ settled picks.</div>`)}
       <div class="tracker-analytics-grid two">
         ${_card("Confidence performance", "Do higher grades actually win more?", _table("<th>Grade</th>" + _wlHead, conf.map(_wlRow).join(""), "No confidence-grade data yet.", 6))}
         ${_card("Edge bucket performance", "Check whether bigger edges are actually stronger", _table("<th>Edge</th>" + _wlHead, edge.map(_wlRow).join(""), "No edge data yet.", 6))}
@@ -4705,7 +4748,7 @@ function debugHtml() {
 function healthHtml() {
   const all = g_tracker.picks, lgName = (curLeague() || {}).name || "", inLg = all.filter((p) => p.league === lgName && ["win", "loss"].includes(p.resultStatus)).sort((a, b) => (a.settledAt || 0) - (b.settledAt || 0));
   const errs = g_issues.length, warns = g_engineDebugLog.slice(0, 100).filter((l) => /soft-failure|warn/i.test(l)).length; let bytes = 0; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); bytes += (k.length + String(localStorage.getItem(k)).length) * 2; } } catch (_e) {}
-  let mh = null; if (inLg.length >= 10) { const r = _rec(inLg), r10 = _rec(inLg.slice(-10)); mh = { all: r.winPct / 100, rec: r10.winPct / 100, n: inLg.length, drift: (r10.winPct - r.winPct) / 100 }; mh.status = mh.drift < -0.15 ? "degrading" : "stable"; }
+  let mh = null; if (inLg.length >= 30) { const prior = _rec(inLg.slice(0, -20)), r20 = _rec(inLg.slice(-20)); const p0 = prior.winPct / 100, p1 = r20.winPct / 100; const se = Math.sqrt(Math.max(p0 * (1 - p0), 0.05) / Math.max(1, r20.wins + r20.losses)); mh = { all: p0, rec: p1, n: inLg.length, drift: p1 - p0, z: (p1 - p0) / se }; mh.status = mh.z < -2 ? "degrading" : "stable"; } /* FIX: last 20 vs the earlier picks, flagged only at z < -2 (the old 15-point rule fired by chance ~1 time in 6) */
   const probs = all.filter((p) => ["win", "loss"].includes(p.resultStatus) && isFiniteVal(p.prob)).slice(0, 200); const brier = probs.length >= 20 ? mean(probs.map((p) => Math.pow(p.prob - (p.resultStatus === "win" ? 1 : 0), 2))) : NaN;
   const overall = mh ? mh.status : errs ? "errors detected" : "nominal", good = mh ? mh.status !== "degrading" : !errs, at = _rec(all);
   const pf = (v) => (isFinite(v) ? (v * 100).toFixed(1) + "%" : "NaN");
@@ -4713,7 +4756,7 @@ function healthHtml() {
   const sec = (t, m, b) => `<div class="tracker-analytics-section"><div class="tracker-analytics-section-head"><div class="tracker-analytics-section-title">${t}</div><div class="tracker-analytics-section-meta">${m}</div></div><div class="tracker-analytics-section-body">${b}</div></div>`;
   return `<div class="tracker-analytics-shell"><div class="tracker-analytics-topbar"><div class="tracker-analytics-heading"><div class="tracker-analytics-kicker">Engine Health</div><div class="tracker-analytics-title">Check Engine Light</div><div class="tracker-analytics-subtitle">Live diagnostics for the current league and overall tracker state. This is a system-status view, not a prediction-quality guarantee — pair it with the Engine Report.</div></div></div>
     <div class="tracker-summary-strip"><div class="tracker-summary-cell ${good ? "primary" : ""}"><div class="tracker-summary-label">Overall Status</div><div class="tracker-summary-value">${escapeHtml(String(overall).toUpperCase())}</div><div class="tracker-summary-sub">${lgName ? escapeHtml(lgName.toUpperCase()) : "No league selected"}</div></div><div class="tracker-summary-cell"><div class="tracker-summary-label">Recent Errors</div><div class="tracker-summary-value">${errs}</div><div class="tracker-summary-sub">${warns} warnings (last 100 log lines)</div></div><div class="tracker-summary-cell"><div class="tracker-summary-label">Storage Used</div><div class="tracker-summary-value">${(bytes / 1024).toFixed(1)} KB</div><div class="tracker-summary-sub">localStorage footprint</div></div><div class="tracker-summary-cell"><div class="tracker-summary-label">Save Failures</div><div class="tracker-summary-value">${window.__hbSaveFailures || 0}</div><div class="tracker-summary-sub">Consecutive tracker save errors</div></div></div>
-    ${sec("Recent Win Rate Drift", lgName ? escapeHtml(lgName.toUpperCase()) : "NaN", mh ? `<div class="tracker-mini-stat-grid">${ms("All-Time Win Rate", pf(mh.all), mh.n + " settled picks")}${ms("Last 10 Win Rate", pf(mh.rec), "Drift: " + (mh.drift >= 0 ? "+" : "") + (mh.drift * 100).toFixed(1) + " pp")}</div>` : '<div class="tracker-empty-note">Select a league with 10+ settled picks to see drift status.</div>')}
+    ${sec("Recent Win Rate Drift", lgName ? escapeHtml(lgName.toUpperCase()) : "NaN", mh ? `<div class="tracker-mini-stat-grid">${ms("Earlier Win Rate", pf(mh.all), mh.n + " settled picks (excl. last 20)")}${ms("Last 20 Win Rate", pf(mh.rec), "z " + mh.z.toFixed(1) + " · Drift: " + (mh.drift >= 0 ? "+" : "") + (mh.drift * 100).toFixed(1) + " pp")}</div>` : '<div class="tracker-empty-note">Select a league with 30+ settled picks to see drift status.</div>')}
     ${sec("Calibration Status", probs.length >= 20 ? "Last " + probs.length + " picks" : "Not yet available", isFinite(brier) ? `<div class="tracker-mini-stat-grid">${ms("Brier Score", brier.toFixed(4), "Lower is better (0 = perfect)")}${ms("Picks", probs.length, "with recorded win probability")}</div>` : '<div class="tracker-empty-note">Needs 20+ settled picks with recorded win probabilities before calibration metrics appear.</div>')}
     ${sec("Tracker Volume", "All leagues combined", `<div class="tracker-mini-stat-grid">${ms("Active Picks", all.filter((p) => p.resultStatus === "pending").length, all.length + " saved")}${ms("Settled", at.settled, at.wins + "W / " + at.losses + "L")}</div>`)}
     ${sec("Last Threshold Pass", g_hbThresh && g_hbThresh.at ? escapeHtml(fmtDT(g_hbThresh.at)) : "Never synced", `<div class="tracker-empty-note">Thresholds are re-checked nightly by the handball-engine worker (needs 50+ settled real-line picks per league/market; max ±0.5 per change; auto-rollback).</div>`)}</div>`;
